@@ -56,7 +56,8 @@ export const CartPage: React.FC<CartPageProps> = ({ cart, updateQuantity, remove
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
         {/* Main List */}
         <div className="lg:col-span-8 space-y-10">
-          {Object.entries(groupedByStore).map(([storeId, group]) => (
+          {/* Explicitly cast Object.entries to ensure 'group' is not 'unknown' */}
+          {(Object.entries(groupedByStore) as Array<[string, { storeName: string; items: CartItem[] }]>).map(([storeId, group]) => (
             <div key={storeId} className="space-y-4 animate-in fade-in duration-700">
               <div className="flex items-center justify-between pb-2 border-b border-slate-800/50">
                 <div className="flex items-center space-x-3">
