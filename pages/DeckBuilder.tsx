@@ -23,7 +23,7 @@ export const DeckBuilderPage: React.FC<DeckBuilderProps> = ({ activeGame }) => {
 
   const handleAnalyze = async () => {
     setIsAnalyzing(true);
-    // Simple mock card list for Gemini analysis
+    // analyzeDeck now guaranteed to return string
     const result = await analyzeDeck(deckName, ['Gurimon', 'Koromon', 'Huckmon', 'Meramon']);
     setAnalysis(result);
     setIsAnalyzing(false);
