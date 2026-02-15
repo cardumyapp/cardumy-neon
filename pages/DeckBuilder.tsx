@@ -2,23 +2,13 @@
 import React, { useState } from 'react';
 import { GameType } from '../types';
 import { MOCK_CARDS } from '../constants';
-import { analyzeDeck } from '../services/gemini';
 
-interface DeckBuilderProps {
+interface DeckBuilderPageProps {
   activeGame: GameType | 'All';
 }
 
-export const DeckBuilderPage: React.FC<DeckBuilderProps> = ({ activeGame }) => {
+export const DeckBuilderPage: React.FC<DeckBuilderPageProps> = ({ activeGame }) => {
   const [deckName, setDeckName] = useState('Novo Deck 1');
-  const [analysis, setAnalysis] = useState<string | null>(null);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-
-  const handleAnalyze = async () => {
-    setIsAnalyzing(true);
-    const result = await analyzeDeck(deckName, ['Gurimon', 'Koromon', 'Huckmon', 'Meramon']);
-    setAnalysis(result);
-    setIsAnalyzing(false);
-  };
 
   // Se não houver um foco de jogo selecionado, solicita ao usuário
   if (activeGame === 'All') {
@@ -74,42 +64,19 @@ export const DeckBuilderPage: React.FC<DeckBuilderProps> = ({ activeGame }) => {
           <div className="p-4 bg-slate-950/50 border-b border-slate-800 flex justify-between items-center">
              <div className="flex items-center space-x-2">
                <h3 className="font-black text-xs uppercase tracking-widest text-slate-500">Lista do Deck</h3>
-               <span className="bg-slate-800 text-white text-[9px] px-2 py-0.5 rounded-full">55/60</span>
+               <span className="bg-slate-800 text-white text-[9px] px-2 py-0.5 rounded-full">0/60</span>
              </div>
-             <button 
-              onClick={handleAnalyze}
-              disabled={isAnalyzing}
-              className="text-[10px] font-black uppercase bg-indigo-600/20 text-indigo-400 px-3 py-1.5 rounded-xl border border-indigo-600/30 hover:bg-indigo-600 hover:text-white transition-all disabled:opacity-50 flex items-center space-x-2"
-             >
-               <i className="fas fa-sparkles"></i>
-               <span>{isAnalyzing ? 'Analisando...' : 'Pedir IA'}</span>
-             </button>
           </div>
           <div className="flex-1 overflow-y-auto p-4 space-y-6 scrollbar-hide">
-            {analysis && (
-              <div className="bg-indigo-950/30 border border-indigo-800/50 p-4 rounded-2xl text-xs text-indigo-200 mb-4 animate-in fade-in slide-in-from-top-2">
-                <div className="flex justify-between mb-2">
-                  <span className="font-black flex items-center space-x-2 text-indigo-400 uppercase tracking-widest">
-                    <i className="fas fa-brain"></i>
-                    <span>Sugerido pela IA</span>
-                  </span>
-                  <button onClick={() => setAnalysis(null)} className="text-indigo-400 hover:text-white transition-colors">
-                    <i className="fas fa-times"></i>
-                  </button>
-                </div>
-                <p className="leading-relaxed italic">"{analysis}"</p>
-              </div>
-            )}
-
             <div>
               <h4 className="text-[10px] font-black text-slate-600 uppercase tracking-widest mb-3">Linha Evolutiva / Eggs</h4>
               <ul className="space-y-1">
                 <li className="flex justify-between items-center text-sm p-3 hover:bg-slate-800/50 rounded-2xl group transition-colors cursor-pointer">
-                  <span className="text-purple-400 font-bold">Gurimon</span>
-                  <div className="flex items-center space-x-3">
-                    <button className="bg-slate-950 w-6 h-6 flex items-center justify-center rounded-lg text-xs hover:bg-slate-800 transition-colors border border-slate-800">-</button>
-                    <span className="font-black text-white w-4 text-center">4</span>
-                    <button className="bg-slate-950 w-6 h-6 flex items-center justify-center rounded-lg text-xs hover:bg-slate-800 transition-colors border border-slate-800">+</button>
+                  <span className="text-purple-400 font-bold">Inicie sua estratégia</span>
+                  <div className="flex items-center space-x-3 opacity-30">
+                    <button className="bg-slate-950 w-6 h-6 flex items-center justify-center rounded-lg text-xs border border-slate-800">-</button>
+                    <span className="font-black text-white w-4 text-center">0</span>
+                    <button className="bg-slate-950 w-6 h-6 flex items-center justify-center rounded-lg text-xs border border-slate-800">+</button>
                   </div>
                 </li>
               </ul>
@@ -117,18 +84,7 @@ export const DeckBuilderPage: React.FC<DeckBuilderProps> = ({ activeGame }) => {
 
             <div>
               <h4 className="text-[10px] font-black text-slate-600 uppercase tracking-widest mb-3">Deck Principal</h4>
-              <ul className="space-y-1">
-                {['Huckmon', 'Meramon', 'SkullMeramon', 'BaoHuckmon', 'SaviorHuckmon'].map((card) => (
-                  <li key={card} className="flex justify-between items-center text-sm p-3 hover:bg-slate-800/50 rounded-2xl group transition-colors cursor-pointer">
-                    <span className="text-slate-300 font-medium">{card}</span>
-                    <div className="flex items-center space-x-3">
-                      <button className="bg-slate-950 w-6 h-6 flex items-center justify-center rounded-lg text-xs border border-slate-800">-</button>
-                      <span className="font-black text-white w-4 text-center">4</span>
-                      <button className="bg-slate-950 w-6 h-6 flex items-center justify-center rounded-lg text-xs border border-slate-800">+</button>
-                    </div>
-                  </li>
-                ))}
-              </ul>
+              <p className="text-xs text-slate-600 italic px-3">Adicione cartas clicando nos resultados à direita.</p>
             </div>
           </div>
         </div>
@@ -159,7 +115,7 @@ export const DeckBuilderPage: React.FC<DeckBuilderProps> = ({ activeGame }) => {
                ))}
                {MOCK_CARDS.filter(c => c.game === activeGame).length === 0 && (
                  <div className="col-span-full py-20 text-center opacity-30 italic text-sm">
-                   Nenhuma carta de {activeGame} encontrada para pré-visualização.
+                   Nenhuma carta de {activeGame} encontrada.
                  </div>
                )}
              </div>
