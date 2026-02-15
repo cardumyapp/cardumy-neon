@@ -12,6 +12,8 @@ import { OrderDetails } from './pages/OrderDetails';
 import { StoreProfile } from './pages/StoreProfile';
 import { EventDetails } from './pages/EventDetails';
 import { CartPage } from './pages/Cart';
+import { FoldersPage } from './pages/Folders';
+import { SupportPage } from './pages/Support';
 import { Product, CartItem, GameType } from './types';
 import { GAMES } from './constants';
 
@@ -84,7 +86,7 @@ const AppContent: React.FC = () => {
       {/* Mobile Sidebar Overlay */}
       {isMobileMenuOpen && (
         <div 
-          className="fixed inset-0 bg-black/70 backdrop-blur-md z-[60] md:hidden animate-in fade-in duration-300"
+          className="fixed inset-0 bg-black/70 backdrop-blur-md z-[60] md:hidden"
           onClick={() => setIsMobileMenuOpen(false)}
         />
       )}
@@ -114,7 +116,7 @@ const AppContent: React.FC = () => {
         </div>
 
         {/* Global Game Selector */}
-        <div className={`px-4 mb-4 transition-opacity duration-300 ${isSidebarCollapsed ? 'md:opacity-0 md:pointer-events-none' : 'opacity-100'}`}>
+        <div className={`px-4 mb-4 transition-all duration-300 ${isSidebarCollapsed ? 'md:h-0 md:opacity-0 md:overflow-hidden md:mb-0' : 'opacity-100'}`}>
           <div className="relative">
             <button 
               onClick={() => setIsGamePickerOpen(!isGamePickerOpen)}
@@ -127,7 +129,7 @@ const AppContent: React.FC = () => {
                   <p className="text-xs font-bold text-white truncate max-w-[120px]">{currentGameInfo.label}</p>
                 </div>
               </div>
-              <i className={`fas fa-chevron-down text-[10px] text-slate-500 transition-transform ${isGamePickerOpen ? 'rotate-180' : ''}`}></i>
+              <i className="fas fa-chevron-down text-[10px] text-slate-500"></i>
             </button>
 
             {isGamePickerOpen && (
@@ -159,6 +161,7 @@ const AppContent: React.FC = () => {
         <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto scrollbar-hide">
           <SidebarItem to="/" icon="fa-house" label="Início" active={location.pathname === '/'} collapsed={isSidebarCollapsed} />
           <SidebarItem to="/perfil" icon="fa-user" label="Perfil" active={location.pathname === '/perfil'} collapsed={isSidebarCollapsed} />
+          <SidebarItem to="/pastas" icon="fa-folder-open" label="Pastas" active={location.pathname === '/pastas'} collapsed={isSidebarCollapsed} />
           <SidebarItem to="/busca" icon="fa-magnifying-glass" label="Cartas" active={location.pathname === '/busca'} collapsed={isSidebarCollapsed} />
           <SidebarItem to="/deckbuilder" icon="fa-hammer" label="Deckbuilder" active={location.pathname === '/deckbuilder'} collapsed={isSidebarCollapsed} />
           <SidebarItem to="/lojas" icon="fa-shop" label="Lojas" active={location.pathname === '/lojas' || location.pathname.startsWith('/loja/')} collapsed={isSidebarCollapsed} />
@@ -168,21 +171,19 @@ const AppContent: React.FC = () => {
           <SidebarItem to="/suporte" icon="fa-circle-question" label="Suporte" active={location.pathname === '/suporte'} collapsed={isSidebarCollapsed} />
         </nav>
 
-        {/* Social Links Sidebar */}
-        <div className={`px-4 py-4 border-t border-slate-800/50 flex items-center ${isSidebarCollapsed ? 'justify-center' : 'justify-around'} transition-all`}>
-           <a href="#" className="text-slate-500 hover:text-pink-500 transition-colors p-1.5"><i className="fab fa-instagram"></i></a>
-           {!isSidebarCollapsed && (
-             <>
-               <a href="#" className="text-slate-500 hover:text-blue-400 transition-colors p-1.5"><i className="fab fa-twitter"></i></a>
-               <a href="#" className="text-slate-500 hover:text-indigo-400 transition-colors p-1.5"><i className="fab fa-discord"></i></a>
-             </>
-           )}
-        </div>
+        {/* Social Links Sidebar - Only shown when NOT collapsed and NOT on small height */}
+        {!isSidebarCollapsed && (
+          <div className="px-4 py-4 border-t border-slate-800/50 flex items-center justify-around transition-all animate-in fade-in duration-300">
+             <a href="#" className="text-slate-500 hover:text-pink-500 transition-colors p-1.5"><i className="fab fa-instagram"></i></a>
+             <a href="#" className="text-slate-500 hover:text-blue-400 transition-colors p-1.5"><i className="fab fa-twitter"></i></a>
+             <a href="#" className="text-slate-500 hover:text-indigo-400 transition-colors p-1.5"><i className="fab fa-discord"></i></a>
+          </div>
+        )}
 
-        {/* Desktop Toggle Button */}
+        {/* Desktop Toggle Button - Hidden on Mobile */}
         <button 
           onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-          className="hidden md:flex mx-4 my-4 p-3 bg-slate-800/30 hover:bg-slate-800 text-slate-500 hover:text-white rounded-xl border border-white/5 transition-all items-center justify-center group"
+          className={`hidden md:flex mx-4 my-4 p-3 bg-slate-800/30 hover:bg-slate-800 text-slate-500 hover:text-white rounded-xl border border-white/5 transition-all items-center justify-center group ${isSidebarCollapsed ? 'md:mx-2' : ''}`}
         >
           <i className={`fas ${isSidebarCollapsed ? 'fa-angles-right' : 'fa-angles-left'} transition-transform group-hover:scale-110`}></i>
           {!isSidebarCollapsed && <span className="ml-3 text-[10px] font-black uppercase tracking-widest">Recolher</span>}
@@ -191,7 +192,7 @@ const AppContent: React.FC = () => {
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col overflow-hidden relative">
-        <header className="h-16 bg-slate-900/50 backdrop-blur-md border-b border-slate-800 flex items-center justify-between px-4 md:px-8 z-40 transition-all duration-300">
+        <header className="h-16 bg-slate-900/50 backdrop-blur-md border-b border-slate-800 flex items-center justify-between px-4 md:px-8 z-40">
           <div className="flex items-center space-x-4">
             <button 
               onClick={() => setIsMobileMenuOpen(true)}
@@ -199,35 +200,23 @@ const AppContent: React.FC = () => {
             >
               <i className="fas fa-bars"></i>
             </button>
-            
             <div className="hidden md:flex items-center space-x-4 bg-slate-800/50 px-4 py-2 rounded-full w-96 border border-white/5">
               <i className="fas fa-search text-slate-500"></i>
               <input type="text" placeholder="Buscar no Cardumy..." className="bg-transparent border-none focus:outline-none w-full text-sm placeholder:text-slate-600" />
             </div>
-
-            <div className="md:hidden font-black text-xl tracking-tight bg-gradient-to-r from-purple-400 to-pink-500 bg-clip-text text-transparent">
-              Cardumy
-            </div>
           </div>
 
           <div className="flex items-center space-x-3 md:space-x-6">
-            
-
-            <Link to="/carrinho" className="relative p-2 rounded-xl hover:bg-slate-800 transition-colors group">
-              <i className="fas fa-shopping-cart text-slate-400 group-hover:text-purple-400 transition-colors"></i>
+            <Link to="/carrinho" className="relative p-2 rounded-xl hover:bg-slate-800 group">
+              <i className="fas fa-shopping-cart text-slate-400 group-hover:text-purple-400"></i>
               {cartCount > 0 && (
                 <span className="absolute top-0 right-0 w-4 h-4 bg-pink-600 text-white text-[9px] flex items-center justify-center rounded-full border border-slate-900 font-bold">
                   {cartCount}
                 </span>
               )}
             </Link>
-            {/* Notification Bell */}
-            <button className="relative p-2 rounded-xl hover:bg-slate-800 transition-colors group">
-              <i className="fas fa-bell text-slate-400 group-hover:text-purple-400 transition-colors"></i>
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-pink-600 rounded-full border border-slate-900"></span>
-            </button>
-            <div className="flex items-center space-x-2 md:space-x-3 bg-slate-800/50 pr-2 md:pr-4 pl-1 py-1 rounded-full border border-white/5">
-              <img src="https://i.pravatar.cc/150?u=viped" className="w-7 h-7 md:w-8 md:h-8 rounded-full border border-purple-500 shadow-lg" alt="Avatar" />
+            <div className="flex items-center space-x-2 md:space-x-3 bg-slate-800/50 pr-2 md:pr-4 pl-1 py-1 rounded-full border border-white/5 cursor-pointer">
+              <img src="https://i.pravatar.cc/150?u=viped" className="w-7 h-7 md:w-8 md:h-8 rounded-full border border-purple-500" alt="Avatar" />
               <div className="hidden sm:flex flex-col">
                  <span className="text-xs font-bold leading-none">viped</span>
                  <span className="text-[10px] text-slate-500 uppercase font-black">Lendário</span>
@@ -236,10 +225,11 @@ const AppContent: React.FC = () => {
           </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-purple-900/10 via-slate-950 to-slate-950 p-4 md:p-8 transition-all duration-300">
+        <div className="flex-1 overflow-y-auto bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-purple-900/10 via-slate-950 to-slate-950 p-4 md:p-8">
           <Routes>
             <Route path="/" element={<Dashboard activeGame={activeGame} />} />
             <Route path="/busca" element={<Search activeGame={activeGame} />} />
+            <Route path="/pastas" element={<FoldersPage />} />
             <Route path="/produtos" element={<Products onAddToCart={addToCart} activeGame={activeGame} />} />
             <Route path="/deckbuilder" element={<DeckBuilderPage activeGame={activeGame} />} />
             <Route path="/lojas" element={<Stores />} />
@@ -249,7 +239,7 @@ const AppContent: React.FC = () => {
             <Route path="/pedidos" element={<Orders />} />
             <Route path="/pedido/:id" element={<OrderDetails />} />
             <Route path="/carrinho" element={<CartPage cart={cart} updateQuantity={updateQuantity} removeFromCart={removeFromCart} />} />
-            <Route path="/suporte" element={<div className="flex flex-col items-center justify-center h-[60vh] text-center"><i className="fas fa-headset text-6xl text-slate-800 mb-4"></i><h2 className="text-2xl font-bold">Suporte Cardumy</h2><p className="text-slate-500">Estamos aqui para ajudar o cardume!</p></div>} />
+            <Route path="/suporte" element={<SupportPage />} />
           </Routes>
         </div>
       </main>
