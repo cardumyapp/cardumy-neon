@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { MOCK_CARDS } from '../constants';
 import { GameType, Card } from '../types';
 
@@ -14,15 +14,9 @@ interface SearchProps {
 }
 
 export const Search: React.FC<SearchProps> = ({ activeGame }) => {
-  const [selectedGame, setSelectedGame] = useState<GameType | 'All'>(activeGame);
   const [searchQuery, setSearchQuery] = useState('');
   const [addingToFolder, setAddingToFolder] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
-
-  // Sync with global focus
-  useEffect(() => {
-    setSelectedGame(activeGame);
-  }, [activeGame]);
 
   const folders: Folder[] = [
     { id: 'f1', name: 'Minha Coleção', color: 'bg-purple-500' },
@@ -38,46 +32,54 @@ export const Search: React.FC<SearchProps> = ({ activeGame }) => {
     setTimeout(() => setLastAdded(null), 3000);
   };
 
+  // Se não houver um foco de jogo selecionado, solicita ao usuário (Igual ao Deckbuilder)
+  if (activeGame === 'All') {
+    return (
+      <div className="h-[70vh] flex flex-col items-center justify-center text-center space-y-6 animate-in fade-in zoom-in-95 duration-500">
+        <div className="w-24 h-24 bg-slate-900/50 border border-slate-800 rounded-full flex items-center justify-center text-slate-700 shadow-2xl relative">
+          <i className="fas fa-magnifying-glass text-4xl"></i>
+          <div className="absolute -top-1 -right-1 w-6 h-6 bg-purple-600 rounded-full flex items-center justify-center border-4 border-slate-950">
+             <i className="fas fa-exclamation text-[10px] text-white"></i>
+          </div>
+        </div>
+        <div className="space-y-2">
+          <h2 className="text-2xl font-black text-white uppercase tracking-tight">O Cardume precisa de um Foco</h2>
+          <p className="text-slate-500 text-sm max-w-xs mx-auto leading-relaxed">
+            Para pesquisar cartas e ver preços, selecione uma franquia de TCG na barra lateral esquerda.
+          </p>
+        </div>
+        <div className="flex space-x-2 opacity-20">
+           <i className="fas fa-fish-fins text-slate-500"></i>
+           <i className="fas fa-fish-fins text-slate-500"></i>
+           <i className="fas fa-fish-fins text-slate-500"></i>
+        </div>
+      </div>
+    );
+  }
+
+  // Filtragem respeitando o foco global (activeGame nunca será 'All' aqui)
+  const filteredCards = MOCK_CARDS.filter(card => {
+    const gameMatch = card.game === activeGame;
+    const searchMatch = card.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                       card.code.toLowerCase().includes(searchQuery.toLowerCase());
+    return gameMatch && searchMatch;
+  });
+
   return (
     <div className="flex flex-col lg:flex-row gap-8 animate-in fade-in duration-500">
       
       {/* Sidebar Filters - Desktop */}
       <aside className={`lg:w-72 flex-shrink-0 space-y-8 ${showFilters ? 'block' : 'hidden lg:block'}`}>
-        <div className="bg-slate-900/50 border border-slate-800 rounded-3xl p-6 sticky top-8">
+        <div className="bg-slate-900/50 border border-slate-800 rounded-3xl p-6 sticky top-8 shadow-xl">
           <div className="flex items-center justify-between mb-6">
             <h3 className="font-black uppercase text-xs tracking-widest text-slate-500">Filtros Avançados</h3>
-            <button className="text-purple-400 text-[10px] font-bold hover:underline" onClick={() => setSelectedGame('All')}>Limpar</button>
           </div>
 
-          <div className="space-y-6">
-            {/* Game Selector */}
-            <div className="space-y-3">
-              <label className="text-sm font-bold text-slate-300">Franquia</label>
-              <div className="grid grid-cols-1 gap-2">
-                <button 
-                  onClick={() => setSelectedGame('All')}
-                  className={`text-left px-4 py-2.5 rounded-xl text-xs font-medium transition-all border ${
-                    selectedGame === 'All' 
-                    ? 'bg-purple-600 border-purple-500 text-white' 
-                    : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
-                  }`}
-                >
-                  Todas as Franquias
-                </button>
-                {Object.values(GameType).slice(0, 6).map(g => (
-                  <button 
-                    key={g}
-                    onClick={() => setSelectedGame(g as GameType)}
-                    className={`text-left px-4 py-2.5 rounded-xl text-xs font-medium transition-all border ${
-                      selectedGame === g 
-                      ? 'bg-purple-600 border-purple-500 text-white' 
-                      : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
-                    }`}
-                  >
-                    {g}
-                  </button>
-                ))}
-              </div>
+          <div className="space-y-8">
+            {/* Contexto Atual (Informativo) */}
+            <div className="p-4 bg-purple-600/10 rounded-2xl border border-purple-500/20">
+               <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Explorando</p>
+               <p className="text-xs font-bold text-white">{activeGame}</p>
             </div>
 
             {/* Rarity */}
@@ -114,7 +116,7 @@ export const Search: React.FC<SearchProps> = ({ activeGame }) => {
             <i className="fas fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-slate-500"></i>
             <input 
               type="text" 
-              placeholder={`Pesquisar em ${selectedGame === 'All' ? 'todas as franquias' : selectedGame}...`}
+              placeholder={`Pesquisar em ${activeGame}...`}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full bg-slate-900 border border-slate-800 rounded-2xl pl-12 pr-4 py-4 focus:outline-none focus:border-purple-500 transition-all shadow-xl"
@@ -129,11 +131,13 @@ export const Search: React.FC<SearchProps> = ({ activeGame }) => {
         </div>
 
         {/* Results Info */}
-        <div className="flex items-center justify-between text-sm">
-          <p className="text-slate-400">Mostrando <span className="text-white font-bold">20</span> de <span className="text-white font-bold">1.428</span> cartas encontradas</p>
+        <div className="flex items-center justify-between text-sm px-2">
+          <p className="text-slate-400 text-xs uppercase font-bold tracking-tight">
+            <span className="text-white">{filteredCards.length}</span> resultados em {activeGame}
+          </p>
           <div className="flex items-center space-x-2">
-            <span className="text-slate-500 text-xs">Ordenar:</span>
-            <select className="bg-transparent font-bold text-purple-400 outline-none cursor-pointer">
+            <span className="text-slate-500 text-[10px] font-black uppercase tracking-widest">Ordenar:</span>
+            <select className="bg-transparent font-bold text-purple-400 outline-none cursor-pointer text-xs">
               <option>Relevância</option>
               <option>Preço: Menor p/ Maior</option>
               <option>Preço: Maior p/ Menor</option>
@@ -144,8 +148,8 @@ export const Search: React.FC<SearchProps> = ({ activeGame }) => {
 
         {/* Cards Grid */}
         <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-6">
-          {MOCK_CARDS.map((card) => (
-            <div key={card.id} className="group bg-slate-900/40 rounded-3xl border border-slate-800 hover:border-purple-500/50 transition-all duration-300 flex flex-col overflow-hidden relative">
+          {filteredCards.map((card) => (
+            <div key={card.id} className="group bg-slate-900/40 rounded-3xl border border-slate-800 hover:border-purple-500/50 transition-all duration-300 flex flex-col overflow-hidden relative shadow-lg">
               <div className="relative aspect-[3/4.2] p-2">
                 <div className="w-full h-full rounded-2xl overflow-hidden bg-slate-800 relative shadow-2xl">
                   <img 
@@ -169,7 +173,7 @@ export const Search: React.FC<SearchProps> = ({ activeGame }) => {
 
               <div className="p-5 pt-2 flex-1 flex flex-col">
                 <div className="mb-4">
-                  <h4 className="font-bold text-white group-hover:text-purple-400 transition-colors truncate" title={card.name}>
+                  <h4 className="font-bold text-white group-hover:text-purple-400 transition-colors truncate text-sm" title={card.name}>
                     {card.name}
                   </h4>
                   <div className="flex items-center space-x-2 mt-1">
@@ -210,7 +214,7 @@ export const Search: React.FC<SearchProps> = ({ activeGame }) => {
                   ) : (
                     <button 
                       onClick={() => setAddingToFolder(card.id)}
-                      className="w-full bg-slate-800 hover:bg-purple-600 text-white py-3 rounded-2xl text-xs font-bold transition-all border border-white/5 flex items-center justify-center space-x-2 group/btn active:scale-95"
+                      className="w-full bg-slate-800 hover:bg-purple-600 text-white py-3 rounded-2xl text-xs font-bold transition-all border border-white/5 flex items-center justify-center space-x-2 group/btn active:scale-95 shadow-md"
                     >
                       <i className="fas fa-folder-plus text-slate-400 group-hover/btn:text-white transition-colors"></i>
                       <span>Adicionar à Pasta</span>
@@ -226,6 +230,13 @@ export const Search: React.FC<SearchProps> = ({ activeGame }) => {
               </div>
             </div>
           ))}
+
+          {filteredCards.length === 0 && (
+            <div className="col-span-full py-20 text-center space-y-4">
+               <i className="fas fa-ghost text-4xl text-slate-800"></i>
+               <p className="text-slate-500 font-black uppercase text-xs tracking-widest">Nenhuma carta encontrada em {activeGame}</p>
+            </div>
+          )}
         </div>
       </div>
     </div>

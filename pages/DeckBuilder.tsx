@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { GameType } from '../types';
 import { MOCK_CARDS } from '../constants';
 import { analyzeDeck } from '../services/gemini';
@@ -10,53 +10,61 @@ interface DeckBuilderProps {
 
 export const DeckBuilderPage: React.FC<DeckBuilderProps> = ({ activeGame }) => {
   const [deckName, setDeckName] = useState('Novo Deck 1');
-  const [selectedGame, setSelectedGame] = useState<GameType>(activeGame === 'All' ? GameType.DIGIMON : activeGame);
   const [analysis, setAnalysis] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
-  // Re-sync if game changes and we are in "All" or starting fresh
-  useEffect(() => {
-    if (activeGame !== 'All') {
-      setSelectedGame(activeGame);
-    }
-  }, [activeGame]);
-
   const handleAnalyze = async () => {
     setIsAnalyzing(true);
-    // analyzeDeck now guaranteed to return string
     const result = await analyzeDeck(deckName, ['Gurimon', 'Koromon', 'Huckmon', 'Meramon']);
     setAnalysis(result);
     setIsAnalyzing(false);
   };
 
+  // Se não houver um foco de jogo selecionado, solicita ao usuário
+  if (activeGame === 'All') {
+    return (
+      <div className="h-[70vh] flex flex-col items-center justify-center text-center space-y-6 animate-in fade-in zoom-in-95 duration-500">
+        <div className="w-24 h-24 bg-slate-900/50 border border-slate-800 rounded-full flex items-center justify-center text-slate-700 shadow-2xl relative">
+          <i className="fas fa-hammer text-4xl"></i>
+          <div className="absolute -top-1 -right-1 w-6 h-6 bg-purple-600 rounded-full flex items-center justify-center border-4 border-slate-950">
+             <i className="fas fa-exclamation text-[10px] text-white"></i>
+          </div>
+        </div>
+        <div className="space-y-2">
+          <h2 className="text-2xl font-black text-white uppercase tracking-tight">Canteiro de Obras Vazio</h2>
+          <p className="text-slate-500 text-sm max-w-xs mx-auto leading-relaxed">
+            Para começar a construir um deck, selecione uma franquia de TCG na barra lateral esquerda.
+          </p>
+        </div>
+        <div className="flex space-x-2 opacity-20">
+           <i className="fas fa-fish-fins text-slate-500"></i>
+           <i className="fas fa-fish-fins text-slate-500"></i>
+           <i className="fas fa-fish-fins text-slate-500"></i>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="h-full flex flex-col space-y-6 animate-in fade-in duration-500">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div className="flex flex-wrap items-center gap-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-xl px-4 py-2 flex items-center space-x-3">
-             <i className="fas fa-gamepad text-purple-400 text-xs"></i>
-             <select 
-              value={selectedGame}
-              onChange={(e) => setSelectedGame(e.target.value as GameType)}
-              className="bg-transparent text-sm font-bold text-white outline-none cursor-pointer"
-             >
-               {Object.values(GameType).map(g => (
-                 <option key={g} value={g} className="bg-slate-900">{g}</option>
-               ))}
-             </select>
+          <div className="bg-purple-600/10 border border-purple-500/20 rounded-xl px-4 py-2 flex items-center space-x-3">
+             <i className="fas fa-shield-halved text-purple-400 text-xs"></i>
+             <span className="text-sm font-black text-white uppercase tracking-widest">{activeGame}</span>
           </div>
           <div className="h-8 w-px bg-slate-800 hidden md:block"></div>
           <input 
             type="text" 
             value={deckName}
             onChange={(e) => setDeckName(e.target.value)}
-            className="bg-slate-900 border border-slate-800 px-4 py-2 rounded-xl text-sm font-bold focus:border-purple-500 outline-none w-64 text-white"
+            className="bg-slate-900 border border-slate-800 px-4 py-2 rounded-xl text-sm font-bold focus:border-purple-500 outline-none w-64 text-white shadow-xl"
             placeholder="Nome do Deck"
           />
         </div>
         <div className="flex space-x-2 w-full md:w-auto">
-          <button className="flex-1 md:flex-none bg-slate-800 hover:bg-slate-700 px-4 py-2 rounded-xl text-xs font-bold transition-all">Importar</button>
-          <button className="flex-1 md:flex-none bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-xl font-black text-xs transition-all shadow-lg">Salvar Deck</button>
+          <button className="flex-1 md:flex-none bg-slate-800 hover:bg-slate-700 px-4 py-2 rounded-xl text-xs font-bold transition-all border border-white/5 shadow-md">Importar</button>
+          <button className="flex-1 md:flex-none bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-xl font-black text-xs transition-all shadow-lg shadow-purple-600/20">Salvar Deck</button>
         </div>
       </div>
 
@@ -130,18 +138,18 @@ export const DeckBuilderPage: React.FC<DeckBuilderProps> = ({ activeGame }) => {
           <div className="flex items-center space-x-4 bg-slate-900 p-4 rounded-3xl border border-slate-800 shadow-xl">
             <div className="flex-1 flex items-center space-x-3">
               <i className="fas fa-search text-slate-600"></i>
-              <input type="text" placeholder={`Buscar cartas de ${selectedGame}...`} className="bg-transparent border-none focus:outline-none w-full text-sm font-medium" />
+              <input type="text" placeholder={`Buscar cartas de ${activeGame}...`} className="bg-transparent border-none focus:outline-none w-full text-sm font-medium" />
             </div>
             <div className="hidden md:flex space-x-2">
-              <div className="bg-purple-600/10 text-purple-400 text-[10px] font-black uppercase px-3 py-1 rounded-full border border-purple-600/20">Eggs</div>
-              <div className="bg-slate-800 text-slate-400 text-[10px] font-black uppercase px-3 py-1 rounded-full">Main</div>
+              <div className="bg-purple-600/10 text-purple-400 text-[10px] font-black uppercase px-3 py-1 rounded-full border border-purple-600/20">Cards</div>
+              <div className="bg-slate-800 text-slate-400 text-[10px] font-black uppercase px-3 py-1 rounded-full">Staples</div>
             </div>
             <button className="bg-purple-600 hover:bg-purple-700 text-white px-5 py-2 rounded-xl text-xs font-black uppercase shadow-lg shadow-purple-600/20 transition-all">Filtrar</button>
           </div>
 
           <div className="flex-1 overflow-y-auto pr-2 scrollbar-hide">
              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
-               {MOCK_CARDS.map(card => (
+               {MOCK_CARDS.filter(c => c.game === activeGame).map(card => (
                  <div key={card.id} className="bg-slate-900 rounded-2xl overflow-hidden border border-slate-800 group hover:border-purple-500 cursor-pointer shadow-lg transition-all active:scale-95">
                    <div className="aspect-[3/4.2] overflow-hidden">
                      <img src={card.imageUrl} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" alt={card.name} />
@@ -149,6 +157,11 @@ export const DeckBuilderPage: React.FC<DeckBuilderProps> = ({ activeGame }) => {
                    <div className="p-3 text-center text-[10px] font-black uppercase tracking-tight truncate bg-slate-950/50 text-slate-400 group-hover:text-white transition-colors">{card.name}</div>
                  </div>
                ))}
+               {MOCK_CARDS.filter(c => c.game === activeGame).length === 0 && (
+                 <div className="col-span-full py-20 text-center opacity-30 italic text-sm">
+                   Nenhuma carta de {activeGame} encontrada para pré-visualização.
+                 </div>
+               )}
              </div>
           </div>
         </div>

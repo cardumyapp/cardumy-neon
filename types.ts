@@ -9,7 +9,9 @@ export enum GameType {
   GUNDAM = 'Gundam',
   RIFTBOUND = 'Riftbound',
   SORCERY = 'Sorcery',
-  LORCANA = 'Disney Lorcana'
+  LORCANA = 'Disney Lorcana',
+  VANGUARD = 'Cardfight!! Vanguard',
+  UNION_ARENA = 'Union Arena'
 }
 
 export enum ProductType {
@@ -17,11 +19,15 @@ export enum ProductType {
   SEALED = 'Produto Selado',
   ACCESSORY = 'Acessório',
   TICKET = 'Ingresso',
-  PROMO = 'Promoção'
+  PROMO = 'Promoção',
+  STARTER_DECK = 'Starter Deck',
+  BOOSTER = 'Booster Box',
+  PREMIUM_BANDAI = 'Premium Bandai'
 }
 
 export interface Product {
   id: string;
+  slug: string;
   name: string;
   type: ProductType;
   price: number;
@@ -29,12 +35,22 @@ export interface Product {
   imageUrl: string;
   storeName: string;
   storeId: string;
+  storeHandle?: string;
+  storeLogo?: string;
   isOfficialPartner: boolean;
   game?: GameType;
+  stock?: number;
 }
 
 export interface CartItem extends Product {
   quantity: number;
+}
+
+export interface OrderComment {
+  user: string;
+  text: string;
+  timestamp: string;
+  isAdmin?: boolean;
 }
 
 export interface Order {
@@ -42,11 +58,30 @@ export interface Order {
   date: string;
   status: 'Pendente' | 'Enviado' | 'Entregue' | 'Cancelado';
   total: number;
+  shippingCost: number;
+  storeName: string;
+  paymentMethod: 'Mercado Pago' | 'Pix Direto' | 'A combinar com vendedor';
+  couponUsed: string | null;
+  comments: OrderComment[];
   items: Array<{
     name: string;
     quantity: number;
     price: number;
   }>;
+}
+
+export interface StoreEvent {
+  id: string;
+  name: string;
+  date: string;
+  price: number;
+  totalSpots: number;
+  filledSpots: number;
+  type: 'Tournament' | 'Prerelease' | 'Special';
+  game: GameType;
+  description?: string;
+  imageUrl?: string;
+  isHighlighted?: boolean;
 }
 
 export interface Ticket {
@@ -101,6 +136,7 @@ export interface Store {
     time: string;
     fee?: string;
   }>;
+  events?: StoreEvent[];
 }
 
 export interface UpdateLog {
