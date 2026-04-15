@@ -1,7 +1,8 @@
 
 import React, { useMemo } from 'react';
-import { GAMES, MOCK_RANKING, MOCK_UPDATES, MOCK_ACTIONS } from '../constants';
+import { GAMES, MOCK_RANKING, MOCK_UPDATES, MOCK_ACTIONS, MOCK_TOURNAMENTS } from '../constants';
 import { GameType } from '../types';
+import { Link } from 'react-router-dom';
 
 interface DashboardProps {
   activeGame: GameType | 'All';
@@ -10,8 +11,12 @@ interface DashboardProps {
 export const Dashboard: React.FC<DashboardProps> = ({ activeGame }) => {
   const filteredActions = useMemo(() => {
     if (activeGame === 'All') return MOCK_ACTIONS;
-    return MOCK_ACTIONS.filter((_, i) => i % 2 === 0);
+    return MOCK_ACTIONS.filter((action) => action.user === 'viped');
   }, [activeGame]);
+
+  const upcomingTournaments = useMemo(() => {
+    return MOCK_TOURNAMENTS.slice(0, 2);
+  }, []);
 
   return (
     <div className="space-y-8 md:space-y-10 animate-in fade-in duration-700 pb-10">
@@ -70,7 +75,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ activeGame }) => {
       {/* FERRAMENTAS SOCIAIS DE ELITE (CardLink e Encontrar Pessoas) */}
       <section className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 px-2">
          {/* Botão CardLink */}
-         <button className="group relative bg-gradient-to-br from-indigo-600/20 to-purple-600/10 border border-indigo-500/30 p-6 md:p-8 rounded-[32px] overflow-hidden transition-all hover:border-indigo-400 hover:scale-[1.02] active:scale-95 shadow-2xl text-left">
+         <Link to="/trocas" className="group relative bg-gradient-to-br from-indigo-600/20 to-purple-600/10 border border-indigo-500/30 p-6 md:p-8 rounded-[32px] overflow-hidden transition-all hover:border-indigo-400 hover:scale-[1.02] active:scale-95 shadow-2xl text-left">
             <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-3xl -mr-10 -mt-10 group-hover:bg-indigo-500/20 transition-all"></div>
             <div className="flex items-center space-x-6">
                <div className="w-16 h-16 rounded-2xl bg-indigo-600/20 flex items-center justify-center text-indigo-400 border border-indigo-500/20 group-hover:scale-110 transition-transform">
@@ -84,10 +89,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ activeGame }) => {
             <div className="absolute bottom-6 right-8 text-indigo-500 opacity-0 group-hover:opacity-100 group-hover:translate-x-2 transition-all">
                <i className="fas fa-arrow-right"></i>
             </div>
-         </button>
+         </Link>
 
          {/* Botão Encontrar Pessoas */}
-         <button className="group relative bg-gradient-to-br from-pink-600/20 to-purple-600/10 border border-pink-500/30 p-6 md:p-8 rounded-[32px] overflow-hidden transition-all hover:border-pink-400 hover:scale-[1.02] active:scale-95 shadow-2xl text-left">
+         <Link to="/comunidade" className="group relative bg-gradient-to-br from-pink-600/20 to-purple-600/10 border border-pink-500/30 p-6 md:p-8 rounded-[32px] overflow-hidden transition-all hover:border-pink-400 hover:scale-[1.02] active:scale-95 shadow-2xl text-left">
             <div className="absolute top-0 right-0 w-32 h-32 bg-pink-500/10 rounded-full blur-3xl -mr-10 -mt-10 group-hover:bg-pink-500/20 transition-all"></div>
             <div className="flex items-center space-x-6">
                <div className="w-16 h-16 rounded-2xl bg-pink-600/20 flex items-center justify-center text-pink-400 border border-pink-500/20 group-hover:scale-110 transition-transform">
@@ -101,7 +106,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ activeGame }) => {
             <div className="absolute bottom-6 right-8 text-pink-500 opacity-0 group-hover:opacity-100 group-hover:translate-x-2 transition-all">
                <i className="fas fa-arrow-right"></i>
             </div>
-         </button>
+         </Link>
       </section>
 
       {/* ESPAÇO PUBLICITÁRIO (Banner de Propaganda) */}
@@ -154,19 +159,20 @@ export const Dashboard: React.FC<DashboardProps> = ({ activeGame }) => {
         </div>
 
         <div className="space-y-4 md:space-y-6">
-          <h3 className="text-lg md:text-xl font-bold flex items-center space-x-3">
-            <div className="w-8 h-8 rounded-lg bg-yellow-500/10 flex items-center justify-center text-yellow-500">
-               <i className="fas fa-bolt text-xs"></i>
-            </div>
-            <span>Atividade</span>
-          </h3>
+          <div className="flex justify-between items-center">
+            <h3 className="text-lg md:text-xl font-bold flex items-center space-x-3">
+              <div className="w-8 h-8 rounded-lg bg-yellow-500/10 flex items-center justify-center text-yellow-500">
+                 <i className="fas fa-bolt text-xs"></i>
+              </div>
+              <span>Atividade</span>
+            </h3>
+            <Link to="/comunidade" className="text-[9px] font-black uppercase text-slate-500 hover:text-white tracking-widest">Ver Feed</Link>
+          </div>
           <div className="bg-slate-900/50 border border-slate-800 rounded-3xl p-3 md:p-4 divide-y divide-slate-800/50 shadow-xl">
             {filteredActions.length > 0 ? filteredActions.map((action, idx) => (
               <div key={idx} className="py-4 flex items-center space-x-3 md:space-x-4 px-2">
                 <div className="relative flex-shrink-0">
-                  <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-purple-400 font-black text-xs md:text-sm">
-                    {action.user[0].toUpperCase()}
-                  </div>
+                  <img src={action.avatar || `https://i.pravatar.cc/150?u=${action.user}`} className="w-8 h-8 md:w-10 md:h-10 rounded-full border border-slate-700" alt="" />
                   <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 border-2 border-slate-900 rounded-full"></div>
                 </div>
                 <div className="flex-1 min-w-0">
@@ -185,27 +191,24 @@ export const Dashboard: React.FC<DashboardProps> = ({ activeGame }) => {
         <div className="md:col-span-2 lg:col-span-1 space-y-4 md:space-y-6">
           <div className="flex justify-between items-center">
             <h3 className="text-lg md:text-xl font-bold flex items-center space-x-3">
-              <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-500">
+              <div className="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center text-purple-500">
                  <i className="fas fa-trophy text-xs"></i>
               </div>
-              <span>Ranking Global</span>
+              <span>Próximos Torneios</span>
             </h3>
-            <button className="text-[9px] font-black uppercase text-slate-500 hover:text-white tracking-widest">Ver todos</button>
+            <Link to="/torneios" className="text-[9px] font-black uppercase text-slate-500 hover:text-white tracking-widest">Ver todos</Link>
           </div>
-          <div className="bg-slate-900/50 border border-slate-800 rounded-3xl overflow-hidden shadow-xl">
-            {MOCK_RANKING.map((rank) => (
-              <div key={rank.rank} className="p-4 flex items-center justify-between border-b border-slate-800/50 last:border-none">
-                <div className="flex items-center space-x-4">
-                  <img src={rank.avatar} className="w-8 h-8 md:w-10 md:h-10 rounded-full border-2 border-slate-900 bg-slate-800" alt={rank.name} />
-                  <div>
-                    <p className="text-xs md:text-sm font-bold text-slate-100">{rank.name}</p>
-                    <p className="text-[9px] text-slate-500 font-black uppercase">{rank.cards} cartas</p>
+          <div className="space-y-4">
+            {upcomingTournaments.map((tourney) => (
+              <Link key={tourney.id} to={`/evento/${tourney.id}`} className="block bg-slate-900/50 border border-slate-800 rounded-2xl overflow-hidden group hover:border-purple-500/30 transition-all">
+                <div className="flex items-center p-3 space-x-4">
+                  <img src={tourney.imageUrl} className="w-16 h-16 rounded-xl object-cover" alt="" />
+                  <div className="flex-1 min-w-0">
+                    <h4 className="text-xs font-bold text-white truncate group-hover:text-purple-400 transition-colors">{tourney.name}</h4>
+                    <p className="text-[10px] text-slate-500 mt-1">{tourney.date} • {tourney.location}</p>
                   </div>
                 </div>
-                <span className={`font-black text-xl ${rank.rank === 1 ? 'text-amber-500 italic' : rank.rank === 2 ? 'text-slate-300' : 'text-amber-700'}`}>
-                  #{rank.rank}
-                </span>
-              </div>
+              </Link>
             ))}
           </div>
         </div>

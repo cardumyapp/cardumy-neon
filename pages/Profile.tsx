@@ -5,8 +5,8 @@ export const Profile: React.FC = () => {
   const stats = [
     { label: 'Coleção', value: '1.248', icon: 'fa-box-archive', color: 'text-purple-400', bg: 'bg-purple-500/10' },
     { label: 'Wishlist', value: '42', icon: 'fa-heart', color: 'text-pink-400', bg: 'bg-pink-500/10' },
-    { label: 'Trocas', value: '15', icon: 'fa-right-left', color: 'text-blue-400', bg: 'bg-blue-500/10' },
-    { label: 'Decks', value: '8', icon: 'fa-layer-group', color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
+    { label: 'Seguidores', value: '850', icon: 'fa-users', color: 'text-blue-400', bg: 'bg-blue-500/10' },
+    { label: 'Seguindo', value: '124', icon: 'fa-user-plus', color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
   ];
 
   const badges = [
@@ -102,6 +102,30 @@ export const Profile: React.FC = () => {
                   <a href="#" className="w-10 h-10 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-center text-slate-400 hover:text-blue-400 hover:border-blue-400/30 transition-all"><i className="fab fa-twitter"></i></a>
                   <a href="#" className="w-10 h-10 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-center text-slate-400 hover:text-indigo-400 hover:border-indigo-400/30 transition-all"><i className="fab fa-discord"></i></a>
                </div>
+            </div>
+          </div>
+
+          <div className="bg-slate-900/30 border border-slate-800 p-6 md:p-8 rounded-2xl md:rounded-3xl space-y-6">
+            <h3 className="text-lg md:text-xl font-bold flex items-center space-x-2">
+              <i className="fas fa-bolt text-purple-500 text-sm md:text-base"></i>
+              <span>Atividade Recente</span>
+            </h3>
+            <div className="space-y-4">
+              {[
+                { action: 'Adicionou a carta', target: 'ST12-12', date: 'Há 2 horas' },
+                { action: 'Criou o deck', target: 'Zoro Aggro', date: 'Há 5 horas' },
+                { action: 'Seguiu', target: 'Matrona TCG', date: 'Ontem' },
+              ].map((activity, i) => (
+                <div key={i} className="flex items-center justify-between py-3 border-b border-slate-800/50 last:border-none">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-2 h-2 rounded-full bg-purple-500"></div>
+                    <p className="text-sm text-slate-300">
+                      {activity.action} <span className="text-white font-bold">{activity.target}</span>
+                    </p>
+                  </div>
+                  <span className="text-[10px] text-slate-500 font-mono">{activity.date}</span>
+                </div>
+              ))}
             </div>
           </div>
         </div>

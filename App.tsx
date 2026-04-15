@@ -14,6 +14,10 @@ import { EventDetails } from './pages/EventDetails';
 import { CartPage } from './pages/Cart';
 import { FoldersPage } from './pages/Folders';
 import { SupportPage } from './pages/Support';
+import { Notifications } from './pages/Notifications';
+import { Trades } from './pages/Trades';
+import { Tournaments } from './pages/Tournaments';
+import { Social } from './pages/Social';
 import { Product, CartItem, GameType } from './types';
 import { GAMES } from './constants';
 
@@ -164,6 +168,9 @@ const AppContent: React.FC = () => {
           <SidebarItem to="/pastas" icon="fa-folder-open" label="Pastas" active={location.pathname === '/pastas'} collapsed={isSidebarCollapsed} />
           <SidebarItem to="/busca" icon="fa-magnifying-glass" label="Cartas" active={location.pathname === '/busca'} collapsed={isSidebarCollapsed} />
           <SidebarItem to="/deckbuilder" icon="fa-hammer" label="Deckbuilder" active={location.pathname === '/deckbuilder'} collapsed={isSidebarCollapsed} />
+          <SidebarItem to="/trocas" icon="fa-right-left" label="Trocas" active={location.pathname === '/trocas'} collapsed={isSidebarCollapsed} />
+          <SidebarItem to="/torneios" icon="fa-trophy" label="Torneios" active={location.pathname === '/torneios'} collapsed={isSidebarCollapsed} />
+          <SidebarItem to="/comunidade" icon="fa-users" label="Comunidade" active={location.pathname === '/comunidade'} collapsed={isSidebarCollapsed} />
           <SidebarItem to="/lojas" icon="fa-shop" label="Lojas" active={location.pathname === '/lojas' || location.pathname.startsWith('/loja/')} collapsed={isSidebarCollapsed} />
           <SidebarItem to="/produtos" icon="fa-bag-shopping" label="Produtos" active={location.pathname === '/produtos'} collapsed={isSidebarCollapsed} />
           <SidebarItem to="/carrinho" icon="fa-shopping-cart" label="Carrinho" active={location.pathname === '/carrinho'} badge={cartCount} collapsed={isSidebarCollapsed} />
@@ -207,6 +214,10 @@ const AppContent: React.FC = () => {
           </div>
 
           <div className="flex items-center space-x-3 md:space-x-6">
+            <Link to="/notificacoes" className="relative p-2 rounded-xl hover:bg-slate-800 group">
+              <i className="fas fa-bell text-slate-400 group-hover:text-purple-400"></i>
+              <span className="absolute top-0 right-0 w-2 h-2 bg-pink-600 rounded-full border border-slate-900"></span>
+            </Link>
             <Link to="/carrinho" className="relative p-2 rounded-xl hover:bg-slate-800 group">
               <i className="fas fa-shopping-cart text-slate-400 group-hover:text-purple-400"></i>
               {cartCount > 0 && (
@@ -236,6 +247,10 @@ const AppContent: React.FC = () => {
             <Route path="/loja/:id" element={<StoreProfile onAddToCart={addToCart} />} />
             <Route path="/evento/:id" element={<EventDetails onAddToCart={addToCart} />} />
             <Route path="/perfil" element={<Profile />} />
+            <Route path="/notificacoes" element={<Notifications />} />
+            <Route path="/trocas" element={<Trades />} />
+            <Route path="/torneios" element={<Tournaments />} />
+            <Route path="/comunidade" element={<Social />} />
             <Route path="/pedidos" element={<Orders />} />
             <Route path="/pedido/:id" element={<OrderDetails />} />
             <Route path="/carrinho" element={<CartPage cart={cart} updateQuantity={updateQuantity} removeFromCart={removeFromCart} />} />

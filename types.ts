@@ -149,6 +149,41 @@ export interface UserAction {
   action: string;
   target: string;
   timestamp: string;
+  avatar?: string;
+}
+
+export interface Notification {
+  id: string;
+  title: string;
+  message: string;
+  type: 'info' | 'success' | 'warning' | 'error';
+  timestamp: string;
+  read: boolean;
+}
+
+export interface Trade {
+  id: string;
+  partner: {
+    name: string;
+    avatar: string;
+  };
+  status: 'Pendente' | 'Aceito' | 'Recusado' | 'Concluído';
+  offering: Card[];
+  requesting: Card[];
+  timestamp: string;
+}
+
+export interface Tournament {
+  id: string;
+  name: string;
+  game: GameType;
+  date: string;
+  location: string;
+  price: number;
+  totalSpots: number;
+  filledSpots: number;
+  status: 'Aberto' | 'Em Andamento' | 'Finalizado';
+  imageUrl: string;
 }
 
 export interface RankingItem {

@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { GameType, RankingItem, UserAction, UpdateLog, Card, Store, Product, ProductType, Order, Ticket } from './types';
+import { GameType, RankingItem, UserAction, UpdateLog, Card, Store, Product, ProductType, Order, Ticket, Notification, Trade, Tournament } from './types';
 
 export const GAMES = [
   { type: GameType.VANGUARD, icon: 'fa-sword' },
@@ -41,6 +41,21 @@ export const MOCK_PRODUCTS: Product[] = [
     id: 't-3', slug: 'prerelease-pokemon', name: 'Prerelease Pokémon: Stellar Crown', type: ProductType.TICKET,
     price: 120.00, imageUrl: 'https://images.unsplash.com/photo-1601987077677-5346c0c57d3f?auto=format&fit=crop&q=80&w=600',
     storeName: 'NewStation Sorocaba', storeId: 's3', isOfficialPartner: true, game: GameType.POKEMON, stock: 24
+  },
+  {
+    id: 't-4', slug: 'fnm-magic-standard', name: 'Friday Night Magic - Standard Showdown', type: ProductType.TICKET,
+    price: 35.00, imageUrl: 'https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&q=80&w=600',
+    storeName: 'Matrona TCG', storeId: 's2', isOfficialPartner: true, game: GameType.MAGIC, stock: 40
+  },
+  {
+    id: 't-5', slug: 'ots-yugioh-championship', name: 'OTS Championship Yu-Gi-Oh! - Qualificatório', type: ProductType.TICKET,
+    price: 60.00, imageUrl: 'https://images.unsplash.com/photo-1620332372374-f108c53d2e03?auto=format&fit=crop&q=80&w=600',
+    storeName: 'Loja do Caos', storeId: 's4', isOfficialPartner: false, game: GameType.YU_GI_OH, stock: 20
+  },
+  {
+    id: 't-6', slug: 'lorcana-intro-event', name: 'Disney Lorcana: Illumineer\'s Quest - Intro', type: ProductType.TICKET,
+    price: 80.00, imageUrl: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&q=80&w=600',
+    storeName: 'Beco da Capivara', storeId: 's1', isOfficialPartner: true, game: GameType.LORCANA, stock: 12
   },
   // PRODUTOS REGULARES
   {
@@ -146,8 +161,51 @@ export const MOCK_UPDATES: UpdateLog[] = [
 ];
 
 export const MOCK_ACTIONS: UserAction[] = [
-  { user: 'viped', action: 'adicionou a carta', target: 'ST12-12', timestamp: '06/01/2026 10:18' },
-  { user: 'MrGabr', action: 'seguiu o usuário', target: 'viped', timestamp: '04/01/2026 20:08' },
+  { user: 'viped', action: 'adicionou a carta', target: 'ST12-12', timestamp: '06/01/2026 10:18', avatar: 'https://i.pravatar.cc/150?u=viped' },
+  { user: 'MrGabr', action: 'seguiu o usuário', target: 'viped', timestamp: '04/01/2026 20:08', avatar: 'https://i.pravatar.cc/150?u=MrGabr' },
+];
+
+export const MOCK_NOTIFICATIONS: Notification[] = [
+  { id: '1', title: 'Nova Proposta de Troca', message: 'MrGabr enviou uma proposta de troca para você.', type: 'info', timestamp: '10/01/2026 14:30', read: false },
+  { id: '2', title: 'Pedido Enviado', message: 'Seu pedido ORD-2026-X1 foi enviado pela loja.', type: 'success', timestamp: '09/01/2026 16:00', read: true },
+];
+
+export const MOCK_TRADES: Trade[] = [
+  {
+    id: 'TRD-001',
+    partner: { name: 'MrGabr', avatar: 'https://i.pravatar.cc/150?u=MrGabr' },
+    status: 'Pendente',
+    offering: [MOCK_CARDS[0], MOCK_CARDS[1]],
+    requesting: [MOCK_CARDS[2]],
+    timestamp: '12/01/2026 10:00'
+  }
+];
+
+export const MOCK_TOURNAMENTS: Tournament[] = [
+  {
+    id: 'tourney-1',
+    name: 'Regional One Piece SP',
+    game: GameType.ONE_PIECE,
+    date: '15/02/2026',
+    location: 'Centro de Convenções SP',
+    price: 150,
+    totalSpots: 128,
+    filledSpots: 96,
+    status: 'Aberto',
+    imageUrl: 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&q=80&w=600'
+  },
+  {
+    id: 'tourney-2',
+    name: 'Store Championship Digimon',
+    game: GameType.DIGIMON,
+    date: '20/02/2026',
+    location: 'Matrona TCG',
+    price: 45,
+    totalSpots: 32,
+    filledSpots: 16,
+    status: 'Aberto',
+    imageUrl: 'https://images.unsplash.com/photo-1614850523296-d8c1af93d400?auto=format&fit=crop&q=80&w=600'
+  }
 ];
 
 export const MOCK_STORES: Store[] = [

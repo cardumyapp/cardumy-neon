@@ -14,7 +14,7 @@ type PaymentMethod = 'Mercado Pago' | 'Pix Direto' | 'A combinar com vendedor';
 export const CartPage: React.FC<CartPageProps> = ({ cart, updateQuantity, removeFromCart }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [paymentSelections, setPaymentSelections] = useState<Record<string, PaymentMethod>>({});
-  const [checkoutStep, setCheckoutStep] = useState<'selection' | 'success'>('selection');
+  const [checkoutStep, setCheckoutStep] = useState<'selection' | 'pix' | 'success'>('selection');
 
   const groupedByStore = useMemo<Record<string, { storeName: string, items: CartItem[] }>>(() => {
     const groups: Record<string, { storeName: string, items: CartItem[] }> = {};
@@ -35,7 +35,13 @@ export const CartPage: React.FC<CartPageProps> = ({ cart, updateQuantity, remove
     setPaymentSelections(prev => ({ ...prev, [storeId]: method }));
   };
 
-  const handleFinish = () => setCheckoutStep('success');
+  const handleFinish = () => {
+    if (Object.values(paymentSelections).includes('Pix Direto')) {
+      setCheckoutStep('pix');
+    } else {
+      setCheckoutStep('success');
+    }
+  };
   const closeModal = () => {
     setIsModalOpen(false);
     setCheckoutStep('selection');
@@ -202,6 +208,42 @@ export const CartPage: React.FC<CartPageProps> = ({ cart, updateQuantity, remove
                     Confirmar Pedidos
                   </button>
                 </div>
+              </div>
+            ) : checkoutStep === 'pix' ? (
+              <div className="p-8 md:p-12 text-center space-y-8 flex flex-col items-center justify-center h-full">
+                <div className="space-y-2">
+                  <h3 className="text-xl md:text-2xl font-black text-white uppercase tracking-tight">Pagamento via Pix</h3>
+                  <p className="text-slate-500 text-[10px] uppercase tracking-widest font-black">Escaneie o QR Code para pagar</p>
+                </div>
+                
+                <div className="bg-white p-4 rounded-3xl shadow-2xl shadow-purple-500/20">
+                  <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=CARDUMY-PIX-PAYMENT" className="w-48 h-48" alt="QR Code Pix" />
+                </div>
+
+                <div className="w-full space-y-4">
+                  <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4 flex items-center justify-between">
+                    <div className="text-left">
+                      <p className="text-[8px] font-black text-slate-500 uppercase">Chave Pix</p>
+                      <p className="text-xs font-bold text-white">pagamentos@cardumy.com.br</p>
+                    </div>
+                    <button className="text-purple-400 hover:text-purple-300 p-2"><i className="fas fa-copy"></i></button>
+                  </div>
+                  
+                  <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4 flex items-center justify-between">
+                    <div className="text-left">
+                      <p className="text-[8px] font-black text-slate-500 uppercase">Valor Total</p>
+                      <p className="text-sm font-black text-emerald-400">R$ {total.toFixed(2)}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <button 
+                  onClick={() => setCheckoutStep('success')}
+                  className="w-full bg-purple-600 hover:bg-purple-500 text-white font-black py-4 rounded-xl transition-all uppercase tracking-widest text-xs shadow-lg shadow-purple-600/20"
+                >
+                  Já realizei o pagamento
+                </button>
+                <button onClick={() => setCheckoutStep('selection')} className="text-slate-500 hover:text-white text-[10px] font-black uppercase tracking-widest">Voltar</button>
               </div>
             ) : (
               <div className="p-10 md:p-12 text-center space-y-6 flex flex-col items-center justify-center h-full">

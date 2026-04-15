@@ -13,21 +13,28 @@ type SortOption = 'newest' | 'price_asc' | 'price_desc' | 'relevance';
 export const Products: React.FC<ProductsProps> = ({ onAddToCart, activeGame }) => {
   const [selectedSlug, setSelectedSlug] = useState<string | null>(null);
   const [itemFilter, setItemFilter] = useState<string>('Todos');
+  const [gameFilter, setGameFilter] = useState<string>('Todos');
   const [sortBy, setSortBy] = useState<SortOption>('relevance');
   const [searchQuery, setSearchQuery] = useState('');
 
   const itemCategories = ['Todos', 'Produto Selado', 'Acessório', 'Premium Bandai', 'Carta Avulsa'];
+  const gameCategories = ['Todos', 'One Piece', 'Magic', 'Pokémon', 'Yu-Gi-Oh!', 'Disney Lorcana', 'Digimon'];
 
   const scopedProducts = useMemo(() => {
     let list = [...MOCK_PRODUCTS];
-    if (activeGame !== 'All') {
-      list = list.filter(p => !p.game || p.game === activeGame);
+    
+    // Respeita o foco global se definido, caso contrário usa o filtro local
+    const targetGame = activeGame !== 'All' ? activeGame : (gameFilter !== 'Todos' ? gameFilter : null);
+    
+    if (targetGame) {
+      list = list.filter(p => !p.game || p.game === targetGame);
     }
+
     if (searchQuery) {
       list = list.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()));
     }
     return list;
-  }, [activeGame, searchQuery]);
+  }, [activeGame, gameFilter, searchQuery]);
 
   const tickets = useMemo(() => scopedProducts.filter(p => p.type === ProductType.TICKET), [scopedProducts]);
   
@@ -106,7 +113,7 @@ export const Products: React.FC<ProductsProps> = ({ onAddToCart, activeGame }) =
                 <div className="flex justify-between items-start mb-4">
                    <h3 className="text-lg font-black text-white leading-tight uppercase line-clamp-2">{ticket.name}</h3>
                    <div className="bg-slate-950/80 px-2 py-2 rounded-xl border border-white/5 flex flex-col items-center">
-                      <span className="text-[10px] font-black text-white">25</span>
+                      <span className="text-[10px] font-black text-white">{ticket.stock || 0}</span>
                       <span className="text-[8px] font-black text-slate-500 uppercase">VAGAS</span>
                    </div>
                 </div>
@@ -130,8 +137,10 @@ export const Products: React.FC<ProductsProps> = ({ onAddToCart, activeGame }) =
       <div className="flex flex-col lg:flex-row gap-8">
         
         {/* Sidebar de Filtros (Desktop) */}
-        <aside className="lg:w-64 space-y-8 flex-shrink-0">
-          <div className="bg-slate-900/40 border border-slate-800 rounded-[32px] p-6 space-y-8">
+        <aside className="lg:w-64 space-y-6 flex-shrink-0">
+          <div className="bg-slate-900/40 border border-slate-800 rounded-[32px] p-6 space-y-8 shadow-xl">
+            
+            {/* FILTRO 1: CATEGORIA (Vem primeiro agora) */}
             <div className="space-y-4">
               <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Categoria</label>
               <div className="space-y-2">
@@ -139,7 +148,7 @@ export const Products: React.FC<ProductsProps> = ({ onAddToCart, activeGame }) =
                   <button 
                     key={cat}
                     onClick={() => setItemFilter(cat)}
-                    className={`w-full text-left px-4 py-3 rounded-xl text-xs font-bold transition-all border ${
+                    className={`w-full text-left px-4 py-3 rounded-xl text-[11px] font-bold transition-all border ${
                       itemFilter === cat ? 'bg-purple-600 border-purple-500 text-white shadow-lg' : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
                     }`}
                   >
@@ -149,6 +158,27 @@ export const Products: React.FC<ProductsProps> = ({ onAddToCart, activeGame }) =
               </div>
             </div>
 
+            {/* FILTRO 2: FRANQUIA (Apenas se o foco global for 'All') */}
+            {activeGame === 'All' && (
+              <div className="space-y-4">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Franquia</label>
+                <div className="space-y-2">
+                  {gameCategories.map(game => (
+                    <button 
+                      key={game}
+                      onClick={() => setGameFilter(game)}
+                      className={`w-full text-left px-4 py-3 rounded-xl text-[11px] font-bold transition-all border ${
+                        gameFilter === game ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg' : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
+                      }`}
+                    >
+                      {game}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* FILTRO 3: ORDENAÇÃO */}
             <div className="space-y-4">
               <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Ordenar Por</label>
               <div className="space-y-2">
@@ -160,7 +190,7 @@ export const Products: React.FC<ProductsProps> = ({ onAddToCart, activeGame }) =
                   <button 
                     key={opt.id}
                     onClick={() => setSortBy(opt.id as SortOption)}
-                    className={`w-full text-left px-4 py-3 rounded-xl text-xs font-bold transition-all border ${
+                    className={`w-full text-left px-4 py-3 rounded-xl text-[11px] font-bold transition-all border ${
                       sortBy === opt.id ? 'bg-slate-800 border-purple-500 text-purple-400' : 'bg-slate-950 border-slate-800 text-slate-500 hover:border-slate-700'
                     }`}
                   >
@@ -193,7 +223,7 @@ export const Products: React.FC<ProductsProps> = ({ onAddToCart, activeGame }) =
                   </div>
                   <div className="p-4 flex-1 flex flex-col justify-between">
                     <div>
-                      <p className="text-[8px] font-black text-slate-600 uppercase mb-1">{product.type}</p>
+                      <p className="text-[8px] font-black text-slate-600 uppercase mb-1">{product.game || 'TCG'}</p>
                       <h4 className="text-[10px] font-bold text-white uppercase line-clamp-2 h-7 group-hover:text-purple-400 transition-colors">{product.name}</h4>
                     </div>
                     <div className="flex items-center justify-between pt-3">
@@ -205,6 +235,12 @@ export const Products: React.FC<ProductsProps> = ({ onAddToCart, activeGame }) =
                   </div>
                 </div>
               ))}
+              {normalItems.length === 0 && (
+                <div className="col-span-full py-24 text-center space-y-4 opacity-30">
+                  <i className="fas fa-box-open text-4xl"></i>
+                  <p className="text-xs font-black uppercase tracking-widest">Nenhum produto encontrado</p>
+                </div>
+              )}
            </div>
         </div>
       </div>
