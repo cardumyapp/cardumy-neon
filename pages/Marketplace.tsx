@@ -1,7 +1,9 @@
 
-import React, { useState, useMemo } from 'react';
-import { MOCK_PRODUCTS } from '../constants';
+import React, { useState, useMemo, useEffect } from 'react';
+import { getProducts } from '../src/services/supabaseService';
 import { ProductType, Product, GameType } from '../types';
+import { useFirebase } from '../src/components/FirebaseProvider';
+import { OfflineWarning } from '../src/components/OfflineWarning';
 
 interface MarketplaceProps {
   onAddToCart: (product: Product) => void;
@@ -9,12 +11,23 @@ interface MarketplaceProps {
 }
 
 export const Marketplace: React.FC<MarketplaceProps> = ({ onAddToCart, activeGame }) => {
+  const { isOffline } = useFirebase();
   const [activeCategory, setActiveCategory] = useState<string>('Tudo');
+  const [products, setProducts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const unsub = getProducts((data) => {
+      setProducts(data);
+      setLoading(false);
+    });
+    return () => unsub();
+  }, []);
   
   const categories = ['Tudo', 'Produto Selado', 'Acessório', 'Ingresso', 'Promoção'];
 
   const filteredProducts = useMemo(() => {
-    let list = MOCK_PRODUCTS;
+    let list = products;
     
     // Global Focus Filter
     if (activeGame !== 'All') {
@@ -27,10 +40,19 @@ export const Marketplace: React.FC<MarketplaceProps> = ({ onAddToCart, activeGam
     }
     
     return list;
-  }, [activeGame, activeCategory]);
+  }, [activeGame, activeCategory, products]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-500"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8 animate-in fade-in duration-700">
+      {isOffline && <OfflineWarning />}
       {/* Dynamic Focus Header */}
       {activeGame !== 'All' && (
         <div className="bg-purple-600 border border-purple-500/50 p-6 rounded-3xl flex items-center justify-between shadow-lg shadow-purple-600/10">
@@ -121,7 +143,7 @@ export const Marketplace: React.FC<MarketplaceProps> = ({ onAddToCart, activeGam
                 className="w-full h-full object-cover rounded-2xl group-hover:scale-110 transition-transform duration-700" 
                 alt={product.name} 
               />
-              {product.type === ProductType.TICKET && (
+              {product.type === 'Ingresso' && (
                 <div className="absolute top-6 right-6 bg-yellow-500 text-slate-950 font-black px-3 py-1 rounded-full text-[9px] uppercase tracking-widest shadow-xl">
                   Evento
                 </div>

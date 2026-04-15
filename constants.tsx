@@ -148,11 +148,11 @@ export const MOCK_TICKETS: Ticket[] = [
 ];
 
 export const MOCK_RANKING: RankingItem[] = [
-  { name: 'Tiago Santos', cards: 51, rank: 1, avatar: 'https://i.pravatar.cc/150?u=tiago', isTop: true },
-  { name: 'Ronaldo Filho', cards: 44, rank: 2, avatar: 'https://i.pravatar.cc/150?u=ronaldo' },
-  { name: 'Matheus Oliveira', cards: 30, rank: 3, avatar: 'https://i.pravatar.cc/150?u=matheus' },
-  { name: 'João Cassiano', cards: 17, rank: 4, avatar: 'https://i.pravatar.cc/150?u=joao' },
-  { name: 'Laura Romarino', cards: 6, rank: 5, avatar: 'https://i.pravatar.cc/150?u=laura' },
+  { name: 'Victoria Pedretti', cards: 1248, rank: 1, avatar: 'https://i.pravatar.cc/150?u=victoria', isTop: true, userId: 'user_01' },
+  { name: 'Matrona TCG', cards: 850, rank: 2, avatar: 'https://i.pravatar.cc/150?u=matrona', userId: 'user_02' },
+  { name: 'Caos Gamer', cards: 720, rank: 3, avatar: 'https://i.pravatar.cc/150?u=caos', userId: 'user_03' },
+  { name: 'Luffy King', cards: 540, rank: 4, avatar: 'https://i.pravatar.cc/150?u=luffy', userId: 'user_04' },
+  { name: 'Zoro Master', cards: 430, rank: 5, avatar: 'https://i.pravatar.cc/150?u=zoro', userId: 'user_05' },
 ];
 
 export const MOCK_UPDATES: UpdateLog[] = [
@@ -161,8 +161,9 @@ export const MOCK_UPDATES: UpdateLog[] = [
 ];
 
 export const MOCK_ACTIONS: UserAction[] = [
-  { user: 'viped', action: 'adicionou a carta', target: 'ST12-12', timestamp: '06/01/2026 10:18', avatar: 'https://i.pravatar.cc/150?u=viped' },
-  { user: 'MrGabr', action: 'seguiu o usuário', target: 'viped', timestamp: '04/01/2026 20:08', avatar: 'https://i.pravatar.cc/150?u=MrGabr' },
+  { user: 'Victoria Pedretti', action: 'adicionou a carta', target: 'ST12-12', timestamp: '06/01/2026 10:18', avatar: 'https://i.pravatar.cc/150?u=victoria', userId: 'user_01' },
+  { user: 'Matrona TCG', action: 'seguiu o usuário', target: 'Victoria Pedretti', timestamp: '04/01/2026 20:08', avatar: 'https://i.pravatar.cc/150?u=matrona', userId: 'user_02' },
+  { user: 'Caos Gamer', action: 'criou o deck', target: 'Zoro Aggro', timestamp: '03/01/2026 15:45', avatar: 'https://i.pravatar.cc/150?u=caos', userId: 'user_03' },
 ];
 
 export const MOCK_NOTIFICATIONS: Notification[] = [

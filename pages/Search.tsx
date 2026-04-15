@@ -2,11 +2,14 @@
 import React, { useState } from 'react';
 import { MOCK_CARDS } from '../constants';
 import { GameType, Card } from '../types';
+import { useFirebase } from '../src/components/FirebaseProvider';
+import { addCardToList } from '../src/services/supabaseService';
 
 interface Folder {
   id: string;
   name: string;
   color: string;
+  listType: 'cards' | 'wishlist' | 'offerlist';
 }
 
 interface SearchProps {
@@ -14,22 +17,29 @@ interface SearchProps {
 }
 
 export const Search: React.FC<SearchProps> = ({ activeGame }) => {
+  const { user } = useFirebase();
   const [searchQuery, setSearchQuery] = useState('');
   const [addingToFolder, setAddingToFolder] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
 
   const folders: Folder[] = [
-    { id: 'f1', name: 'Minha Coleção', color: 'bg-purple-500' },
-    { id: 'f2', name: 'Para Troca', color: 'bg-blue-500' },
-    { id: 'f3', name: 'Wishlist', color: 'bg-pink-500' },
+    { id: 'f1', name: 'Minha Coleção', color: 'bg-purple-500', listType: 'cards' },
+    { id: 'f2', name: 'Para Troca', color: 'bg-blue-500', listType: 'offerlist' },
+    { id: 'f3', name: 'Wishlist', color: 'bg-pink-500', listType: 'wishlist' },
   ];
 
   const [lastAdded, setLastAdded] = useState<{cardId: string, folderName: string} | null>(null);
 
-  const handleAddToFolder = (cardId: string, folderName: string) => {
+  const handleAddToFolder = async (card: any, folder: Folder) => {
+    if (!user) return;
     setAddingToFolder(null);
-    setLastAdded({ cardId, folderName });
-    setTimeout(() => setLastAdded(null), 3000);
+    try {
+      await addCardToList(user.id, folder.listType, card);
+      setLastAdded({ cardId: card.id, folderName: folder.name });
+      setTimeout(() => setLastAdded(null), 3000);
+    } catch (err) {
+      console.error('Error adding card:', err);
+    }
   };
 
   // Se não houver um foco de jogo selecionado, solicita ao usuário (Igual ao Deckbuilder)
@@ -191,7 +201,7 @@ export const Search: React.FC<SearchProps> = ({ activeGame }) => {
                         {folders.map(folder => (
                           <button 
                             key={folder.id}
-                            onClick={() => handleAddToFolder(card.id, folder.name)}
+                            onClick={() => handleAddToFolder(card, folder)}
                             className="w-full text-left px-3 py-2 rounded-xl text-xs hover:bg-slate-700 transition-colors flex items-center space-x-2"
                           >
                             <span className={`w-2 h-2 rounded-full ${folder.color}`}></span>

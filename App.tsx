@@ -18,8 +18,11 @@ import { Notifications } from './pages/Notifications';
 import { Trades } from './pages/Trades';
 import { Tournaments } from './pages/Tournaments';
 import { Social } from './pages/Social';
+import { AdminStats } from './pages/AdminStats';
 import { Product, CartItem, GameType } from './types';
 import { GAMES } from './constants';
+import { FirebaseProvider, useFirebase } from './src/components/FirebaseProvider';
+import { ErrorBoundary } from './src/components/ErrorBoundary';
 
 const SidebarItem: React.FC<{ to: string; icon: string; label: string; active: boolean; collapsed: boolean; badge?: number; onClick?: () => void }> = ({ to, icon, label, active, collapsed, badge, onClick }) => (
   <Link 
@@ -43,6 +46,7 @@ const SidebarItem: React.FC<{ to: string; icon: string; label: string; active: b
 
 const AppContent: React.FC = () => {
   const location = useLocation();
+  const { user, login, logout } = useFirebase();
   const [cart, setCart] = useState<CartItem[]>([]);
   const [activeGame, setActiveGame] = useState<GameType | 'All'>('All');
   const [isGamePickerOpen, setIsGamePickerOpen] = useState(false);
@@ -56,9 +60,8 @@ const AppContent: React.FC = () => {
   const cartCount = useMemo(() => cart.reduce((acc, item) => acc + item.quantity, 0), [cart]);
 
   const currentGameInfo = useMemo(() => {
-    if (activeGame === 'All') return { label: 'Todos os Jogos', icon: 'fa-layer-group', color: 'text-slate-400' };
-    const found = GAMES.find(g => g.type === activeGame);
-    return { label: activeGame, icon: found?.icon || 'fa-cards', color: 'text-purple-400' };
+    if (activeGame === 'All') return { label: 'Todos os Jogos', color: 'text-slate-400' };
+    return { label: activeGame, color: 'text-purple-400' };
   }, [activeGame]);
 
   const addToCart = (product: Product) => {
@@ -127,7 +130,6 @@ const AppContent: React.FC = () => {
               className="w-full bg-slate-800/50 hover:bg-slate-800 border border-slate-700/50 rounded-xl p-3 flex items-center justify-between transition-all group"
             >
               <div className="flex items-center space-x-3">
-                <i className={`fas ${currentGameInfo.icon} ${currentGameInfo.color}`}></i>
                 <div className="text-left">
                   <p className="text-[9px] font-black uppercase tracking-widest text-slate-500 leading-none mb-1">Foco Global</p>
                   <p className="text-xs font-bold text-white truncate max-w-[120px]">{currentGameInfo.label}</p>
@@ -143,7 +145,6 @@ const AppContent: React.FC = () => {
                     onClick={() => { setActiveGame('All'); setIsGamePickerOpen(false); }}
                     className={`w-full text-left px-3 py-2.5 rounded-lg text-xs font-bold transition-colors mb-1 flex items-center space-x-3 ${activeGame === 'All' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:bg-slate-700 hover:text-white'}`}
                   >
-                    <i className="fas fa-layer-group w-5 text-center"></i>
                     <span>Ver Tudo</span>
                   </button>
                   {GAMES.map(game => (
@@ -152,7 +153,6 @@ const AppContent: React.FC = () => {
                       onClick={() => { setActiveGame(game.type); setIsGamePickerOpen(false); }}
                       className={`w-full text-left px-3 py-2.5 rounded-lg text-xs font-bold transition-colors mb-1 flex items-center space-x-3 ${activeGame === game.type ? 'bg-purple-600 text-white' : 'text-slate-400 hover:bg-slate-700 hover:text-white'}`}
                     >
-                      <i className={`fas ${game.icon} w-5 text-center`}></i>
                       <span>{game.type}</span>
                     </button>
                   ))}
@@ -176,6 +176,7 @@ const AppContent: React.FC = () => {
           <SidebarItem to="/carrinho" icon="fa-shopping-cart" label="Carrinho" active={location.pathname === '/carrinho'} badge={cartCount} collapsed={isSidebarCollapsed} />
           <SidebarItem to="/pedidos" icon="fa-clipboard-list" label="Pedidos" active={location.pathname === '/pedidos' || location.pathname.startsWith('/pedido/')} collapsed={isSidebarCollapsed} />
           <SidebarItem to="/suporte" icon="fa-circle-question" label="Suporte" active={location.pathname === '/suporte'} collapsed={isSidebarCollapsed} />
+          <SidebarItem to="/admin/stats" icon="fa-chart-pie" label="Admin Stats" active={location.pathname === '/admin/stats'} collapsed={isSidebarCollapsed} />
         </nav>
 
         {/* Social Links Sidebar - Only shown when NOT collapsed and NOT on small height */}
@@ -226,13 +227,29 @@ const AppContent: React.FC = () => {
                 </span>
               )}
             </Link>
-            <div className="flex items-center space-x-2 md:space-x-3 bg-slate-800/50 pr-2 md:pr-4 pl-1 py-1 rounded-full border border-white/5 cursor-pointer">
-              <img src="https://i.pravatar.cc/150?u=viped" className="w-7 h-7 md:w-8 md:h-8 rounded-full border border-purple-500" alt="Avatar" />
-              <div className="hidden sm:flex flex-col">
-                 <span className="text-xs font-bold leading-none">viped</span>
-                 <span className="text-[10px] text-slate-500 uppercase font-black">Lendário</span>
+            
+            {user ? (
+              <div className="flex items-center space-x-2 md:space-x-3 bg-slate-800/50 pr-2 md:pr-4 pl-1 py-1 rounded-full border border-white/5 cursor-pointer group relative">
+                <img src={user.photoURL || "https://i.pravatar.cc/150?u=viped"} className="w-7 h-7 md:w-8 md:h-8 rounded-full border border-purple-500" alt="Avatar" />
+                <div className="hidden sm:flex flex-col">
+                   <span className="text-xs font-bold leading-none">{user.displayName || 'Usuário'}</span>
+                   <span className="text-[10px] text-slate-500 uppercase font-black">Lendário</span>
+                </div>
+                
+                <div className="absolute top-full right-0 mt-2 w-48 bg-slate-900 border border-slate-800 rounded-xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 p-2">
+                  <button onClick={logout} className="w-full text-left px-4 py-2 text-xs font-bold text-red-400 hover:bg-red-500/10 rounded-lg transition-colors">
+                    <i className="fas fa-sign-out-alt mr-2"></i> Sair
+                  </button>
+                </div>
               </div>
-            </div>
+            ) : (
+              <button 
+                onClick={login}
+                className="bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold px-4 py-2 rounded-xl transition-all shadow-lg shadow-purple-600/20"
+              >
+                Entrar
+              </button>
+            )}
           </div>
         </header>
 
@@ -247,6 +264,7 @@ const AppContent: React.FC = () => {
             <Route path="/loja/:id" element={<StoreProfile onAddToCart={addToCart} />} />
             <Route path="/evento/:id" element={<EventDetails onAddToCart={addToCart} />} />
             <Route path="/perfil" element={<Profile />} />
+            <Route path="/perfil/:userId" element={<Profile />} />
             <Route path="/notificacoes" element={<Notifications />} />
             <Route path="/trocas" element={<Trades />} />
             <Route path="/torneios" element={<Tournaments />} />
@@ -255,6 +273,7 @@ const AppContent: React.FC = () => {
             <Route path="/pedido/:id" element={<OrderDetails />} />
             <Route path="/carrinho" element={<CartPage cart={cart} updateQuantity={updateQuantity} removeFromCart={removeFromCart} />} />
             <Route path="/suporte" element={<SupportPage />} />
+            <Route path="/admin/stats" element={<AdminStats />} />
           </Routes>
         </div>
       </main>
@@ -264,9 +283,13 @@ const AppContent: React.FC = () => {
 
 const App: React.FC = () => {
   return (
-    <Router>
-      <AppContent />
-    </Router>
+    <ErrorBoundary>
+      <FirebaseProvider>
+        <Router>
+          <AppContent />
+        </Router>
+      </FirebaseProvider>
+    </ErrorBoundary>
   );
 };
 

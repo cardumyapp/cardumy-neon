@@ -2,6 +2,7 @@
 import React from 'react';
 import { MOCK_RANKING, MOCK_ACTIONS } from '../constants';
 import { motion } from 'motion/react';
+import { Link } from 'react-router-dom';
 
 export const Social: React.FC = () => {
   return (
@@ -22,10 +23,12 @@ export const Social: React.FC = () => {
               transition={{ delay: idx * 0.1 }}
               className="bg-slate-900/40 border border-slate-800 p-4 rounded-2xl flex items-center space-x-4 group hover:border-purple-500/30 transition-all"
             >
-              <img src={action.avatar || `https://i.pravatar.cc/150?u=${action.user}`} className="w-12 h-12 rounded-full border-2 border-slate-800 group-hover:border-purple-500 transition-all" alt="" />
+              <Link to={`/perfil/${action.userId}`}>
+                <img src={action.avatar || `https://i.pravatar.cc/150?u=${action.user}`} className="w-12 h-12 rounded-full border-2 border-slate-800 group-hover:border-purple-500 transition-all" alt="" />
+              </Link>
               <div className="flex-1">
                 <p className="text-sm text-slate-300">
-                  <span className="font-bold text-white hover:text-purple-400 cursor-pointer transition-colors">{action.user}</span>
+                  <Link to={`/perfil/${action.userId}`} className="font-bold text-white hover:text-purple-400 cursor-pointer transition-colors">{action.user}</Link>
                   {' '}{action.action}{' '}
                   <span className="font-bold text-purple-400 cursor-pointer hover:underline">{action.target}</span>
                 </p>
@@ -48,7 +51,7 @@ export const Social: React.FC = () => {
           </h3>
           <div className="space-y-4">
             {MOCK_RANKING.map((item) => (
-              <div key={item.rank} className="flex items-center justify-between group cursor-pointer">
+              <Link key={item.rank} to={`/perfil/${item.userId}`} className="flex items-center justify-between group cursor-pointer">
                 <div className="flex items-center space-x-3">
                   <div className={`w-6 text-center font-mono text-xs ${item.rank <= 3 ? 'text-purple-400 font-bold' : 'text-slate-600'}`}>
                     {item.rank}
@@ -60,7 +63,7 @@ export const Social: React.FC = () => {
                   <span className="text-xs font-bold text-white">{item.cards}</span>
                   <span className="text-[9px] text-slate-500 uppercase block leading-none">Cartas</span>
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
           <button className="w-full mt-8 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all border border-white/5">

@@ -1,7 +1,9 @@
 
-import React, { useState, useMemo } from 'react';
-import { MOCK_PRODUCTS } from '../constants';
+import React, { useState, useMemo, useEffect } from 'react';
+import { getProducts } from '../src/services/supabaseService';
 import { ProductType, Product, GameType } from '../types';
+import { useFirebase } from '../src/components/FirebaseProvider';
+import { OfflineWarning } from '../src/components/OfflineWarning';
 
 interface ProductsProps {
   onAddToCart: (product: Product) => void;
@@ -11,17 +13,28 @@ interface ProductsProps {
 type SortOption = 'newest' | 'price_asc' | 'price_desc' | 'relevance';
 
 export const Products: React.FC<ProductsProps> = ({ onAddToCart, activeGame }) => {
+  const { isOffline } = useFirebase();
   const [selectedSlug, setSelectedSlug] = useState<string | null>(null);
   const [itemFilter, setItemFilter] = useState<string>('Todos');
   const [gameFilter, setGameFilter] = useState<string>('Todos');
   const [sortBy, setSortBy] = useState<SortOption>('relevance');
   const [searchQuery, setSearchQuery] = useState('');
+  const [products, setProducts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const unsub = getProducts((data) => {
+      setProducts(data);
+      setLoading(false);
+    });
+    return () => unsub();
+  }, []);
 
   const itemCategories = ['Todos', 'Produto Selado', 'Acessório', 'Premium Bandai', 'Carta Avulsa'];
   const gameCategories = ['Todos', 'One Piece', 'Magic', 'Pokémon', 'Yu-Gi-Oh!', 'Disney Lorcana', 'Digimon'];
 
   const scopedProducts = useMemo(() => {
-    let list = [...MOCK_PRODUCTS];
+    let list = [...products];
     
     // Respeita o foco global se definido, caso contrário usa o filtro local
     const targetGame = activeGame !== 'All' ? activeGame : (gameFilter !== 'Todos' ? gameFilter : null);
@@ -34,24 +47,15 @@ export const Products: React.FC<ProductsProps> = ({ onAddToCart, activeGame }) =
       list = list.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()));
     }
     return list;
-  }, [activeGame, gameFilter, searchQuery]);
+  }, [activeGame, gameFilter, searchQuery, products]);
 
-  const tickets = useMemo(() => scopedProducts.filter(p => p.type === ProductType.TICKET), [scopedProducts]);
+  const tickets = useMemo(() => scopedProducts.filter(p => p.type === 'Ingresso'), [scopedProducts]);
   
   const normalItems = useMemo(() => {
-    let list = scopedProducts.filter(p => p.type !== ProductType.TICKET);
+    let list = scopedProducts.filter(p => p.type !== 'Ingresso');
     
     if (itemFilter !== 'Todos') {
-      const filterToType: Record<string, ProductType> = {
-        'Produto Selado': ProductType.BOOSTER,
-        'Acessório': ProductType.ACCESSORY,
-        'Premium Bandai': ProductType.PREMIUM_BANDAI,
-        'Carta Avulsa': ProductType.CARD
-      };
-      const targetType = filterToType[itemFilter];
-      if (targetType) {
-        list = list.filter(p => p.type === targetType || (itemFilter === 'Produto Selado' && p.type === ProductType.STARTER_DECK));
-      }
+      list = list.filter(p => p.type === itemFilter || (itemFilter === 'Produto Selado' && p.type === 'Booster Box'));
     }
 
     return list.sort((a, b) => {
@@ -63,10 +67,18 @@ export const Products: React.FC<ProductsProps> = ({ onAddToCart, activeGame }) =
 
   const productOffers = useMemo(() => {
     if (!selectedSlug) return [];
-    return MOCK_PRODUCTS.filter(p => p.slug === selectedSlug);
-  }, [selectedSlug]);
+    return products.filter(p => p.slug === selectedSlug);
+  }, [selectedSlug, products]);
 
   const selectedBaseProduct = useMemo(() => productOffers[0] || null, [productOffers]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-500"></div>
+      </div>
+    );
+  }
 
   if (selectedSlug && selectedBaseProduct) {
     return (
@@ -93,6 +105,7 @@ export const Products: React.FC<ProductsProps> = ({ onAddToCart, activeGame }) =
 
   return (
     <div className="max-w-7xl mx-auto space-y-12 pb-20 animate-in fade-in duration-500">
+      {isOffline && <OfflineWarning />}
       
       {/* SEÇÃO DESTAQUE: INGRESSOS */}
       <section className="space-y-6">

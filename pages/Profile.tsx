@@ -1,7 +1,47 @@
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { useParams } from 'react-router-dom';
+import { useFirebase } from '../src/components/FirebaseProvider';
+import { getUserProfile } from '../src/services/supabaseService';
 
 export const Profile: React.FC = () => {
+  const { userId } = useParams();
+  const { user: currentUser } = useFirebase();
+  const [profileUser, setProfileUser] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      setLoading(true);
+      if (userId) {
+        // Fetch specific user
+        const data = await getUserProfile(userId);
+        if (data) {
+          setProfileUser(data);
+        }
+      } else if (currentUser) {
+        // Show current user (own profile)
+        const data = await getUserProfile(currentUser.id);
+        if (data) {
+          setProfileUser(data);
+        } else {
+          // Fallback to auth user if doc doesn't exist yet
+          setProfileUser({
+            displayName: currentUser.displayName,
+            photoURL: currentUser.photoURL,
+            email: currentUser.email,
+            id: currentUser.id,
+            codename: currentUser.displayName || 'Usuário',
+            username: currentUser.displayName?.split(' ')[0].toLowerCase() || 'user'
+          });
+        }
+      }
+      setLoading(false);
+    };
+
+    fetchProfile();
+  }, [userId, currentUser]);
+
   const stats = [
     { label: 'Coleção', value: '1.248', icon: 'fa-box-archive', color: 'text-purple-400', bg: 'bg-purple-500/10' },
     { label: 'Wishlist', value: '42', icon: 'fa-heart', color: 'text-pink-400', bg: 'bg-pink-500/10' },
@@ -14,6 +54,25 @@ export const Profile: React.FC = () => {
     { name: 'Colecionador Pro', icon: 'fa-gem', color: 'text-blue-400' },
     { name: 'Top 100', icon: 'fa-crown', color: 'text-yellow-500' },
   ];
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-500"></div>
+      </div>
+    );
+  }
+
+  if (!profileUser) {
+    return (
+      <div className="text-center py-20">
+        <h2 className="text-2xl font-bold text-white">Usuário não encontrado</h2>
+        <p className="text-slate-400 mt-2">O perfil que você está procurando não existe ou foi removido.</p>
+      </div>
+    );
+  }
+
+  const isOwnProfile = currentUser?.id === profileUser.id;
 
   return (
     <div className="max-w-6xl mx-auto pb-20 md:pb-12 animate-in fade-in duration-500">
@@ -37,7 +96,7 @@ export const Profile: React.FC = () => {
           <div className="relative group flex-shrink-0">
             <div className="absolute -inset-1 bg-gradient-to-r from-purple-600 to-pink-600 rounded-full blur opacity-75 group-hover:opacity-100 transition duration-1000"></div>
             <img 
-              src="https://i.pravatar.cc/300?u=victoria" 
+              src={profileUser.avatar || profileUser.photoURL || "https://i.pravatar.cc/300?u=victoria"} 
               className="relative w-28 h-28 md:w-40 md:h-40 rounded-full border-4 border-slate-950 shadow-2xl object-cover bg-slate-900" 
               alt="Profile" 
             />
@@ -46,10 +105,10 @@ export const Profile: React.FC = () => {
 
           <div className="text-center md:text-left flex-1 min-w-0 pb-1">
             <div className="flex items-center justify-center md:justify-start space-x-2 mb-1">
-              <h1 className="text-2xl md:text-4xl font-black tracking-tight text-white leading-tight truncate">Victoria Pedretti</h1>
+              <h1 className="text-2xl md:text-4xl font-black tracking-tight text-white leading-tight truncate">{profileUser.codename || profileUser.displayName}</h1>
               <i className="fas fa-circle-check text-blue-400 text-sm md:text-xl" title="Verificada"></i>
             </div>
-            <p className="text-slate-400 text-xs md:text-sm font-medium mb-3">@viped • Colecionador Lendário</p>
+            <p className="text-slate-400 text-xs md:text-sm font-medium mb-3">@{profileUser.username} • {profileUser.role === 'admin' ? 'Administrador' : 'Colecionador Lendário'}</p>
             <div className="flex flex-wrap justify-center md:justify-start gap-1.5 md:gap-2">
               {badges.map(badge => (
                 <span key={badge.name} className="flex items-center space-x-1.5 bg-slate-900/80 backdrop-blur-md border border-slate-800 px-2.5 py-1 rounded-full text-[8px] md:text-[10px] font-bold uppercase tracking-wider text-slate-300">
@@ -61,9 +120,15 @@ export const Profile: React.FC = () => {
           </div>
 
           <div className="flex md:ml-auto md:pb-4 space-x-2 w-full md:w-auto justify-center md:justify-start px-4 md:px-0">
-             <button className="flex-1 md:flex-none bg-purple-600 hover:bg-purple-700 text-white font-bold px-6 py-2.5 rounded-xl transition-all shadow-lg text-xs md:text-sm active:scale-95">
-               Editar Perfil
-             </button>
+             {isOwnProfile ? (
+               <button className="flex-1 md:flex-none bg-purple-600 hover:bg-purple-700 text-white font-bold px-6 py-2.5 rounded-xl transition-all shadow-lg text-xs md:text-sm active:scale-95">
+                 Editar Perfil
+               </button>
+             ) : (
+               <button className="flex-1 md:flex-none bg-pink-600 hover:bg-pink-700 text-white font-bold px-6 py-2.5 rounded-xl transition-all shadow-lg text-xs md:text-sm active:scale-95">
+                 Seguir
+               </button>
+             )}
              <button className="bg-slate-800 hover:bg-slate-700 text-white w-10 h-10 flex items-center justify-center rounded-xl transition-all border border-slate-700">
                <i className="fas fa-share-nodes text-sm"></i>
              </button>
@@ -138,7 +203,7 @@ export const Profile: React.FC = () => {
                 <input 
                   type="text" 
                   readOnly 
-                  value="cardumy.com/viped" 
+                  value={`cardumy.com/${profileUser.username}`} 
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-4 pr-12 py-3 text-xs md:text-sm font-mono text-purple-400 focus:outline-none"
                 />
                 <button className="absolute right-2 top-2 bottom-2 bg-slate-800 hover:bg-slate-700 px-3 rounded-lg text-slate-300 transition-colors">
@@ -151,7 +216,7 @@ export const Profile: React.FC = () => {
               <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4 text-left w-full">QR de Trocas</h4>
               <div className="bg-white p-3 md:p-4 inline-block rounded-xl md:rounded-2xl shadow-xl shadow-white/5 group hover:scale-105 transition-transform duration-500">
                 <img 
-                  src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=http://cardumy.com/perfil/viped&bgcolor=ffffff&color=0f172a" 
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=http://cardumy.com/perfil/${profileUser.id}&bgcolor=ffffff&color=0f172a`} 
                   className="w-28 h-28 md:w-36 md:h-36" 
                   alt="QR Code" 
                 />

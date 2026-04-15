@@ -1,14 +1,31 @@
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { GAMES, MOCK_RANKING, MOCK_UPDATES, MOCK_ACTIONS, MOCK_TOURNAMENTS } from '../constants';
 import { GameType } from '../types';
 import { Link } from 'react-router-dom';
+import { getProducts, getStores } from '../src/services/supabaseService';
+import { useFirebase } from '../src/components/FirebaseProvider';
+import { OfflineWarning } from '../src/components/OfflineWarning';
 
 interface DashboardProps {
   activeGame: GameType | 'All';
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({ activeGame }) => {
+  const { user, login, isOffline } = useFirebase();
+  const [products, setProducts] = useState<any[]>([]);
+  const [stores, setStores] = useState<any[]>([]);
+
+  useEffect(() => {
+    const unsubProducts = getProducts(setProducts);
+    const unsubStores = getStores(setStores);
+    
+    return () => {
+      unsubProducts();
+      unsubStores();
+    };
+  }, []);
+
   const filteredActions = useMemo(() => {
     if (activeGame === 'All') return MOCK_ACTIONS;
     return MOCK_ACTIONS.filter((action) => action.user === 'viped');
@@ -20,6 +37,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ activeGame }) => {
 
   return (
     <div className="space-y-8 md:space-y-10 animate-in fade-in duration-700 pb-10">
+      {isOffline && <OfflineWarning />}
       
       {/* Dynamic Context Banner */}
       {activeGame !== 'All' && (
@@ -171,13 +189,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ activeGame }) => {
           <div className="bg-slate-900/50 border border-slate-800 rounded-3xl p-3 md:p-4 divide-y divide-slate-800/50 shadow-xl">
             {filteredActions.length > 0 ? filteredActions.map((action, idx) => (
               <div key={idx} className="py-4 flex items-center space-x-3 md:space-x-4 px-2">
-                <div className="relative flex-shrink-0">
+                <Link to={`/perfil/${action.userId}`} className="relative flex-shrink-0">
                   <img src={action.avatar || `https://i.pravatar.cc/150?u=${action.user}`} className="w-8 h-8 md:w-10 md:h-10 rounded-full border border-slate-700" alt="" />
                   <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 border-2 border-slate-900 rounded-full"></div>
-                </div>
+                </Link>
                 <div className="flex-1 min-w-0">
                   <p className="text-xs md:text-sm truncate">
-                    <span className="font-bold text-white">{action.user}</span> <span className="text-slate-400">{action.action}</span>
+                    <Link to={`/perfil/${action.userId}`} className="font-bold text-white hover:text-purple-400 transition-colors">{action.user}</Link> <span className="text-slate-400">{action.action}</span>
                   </p>
                   <p className="text-[9px] text-slate-600 font-bold uppercase tracking-tight">{action.timestamp}</p>
                 </div>

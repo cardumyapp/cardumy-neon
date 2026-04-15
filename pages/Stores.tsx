@@ -1,32 +1,62 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { MOCK_STORES, MOCK_PRODUCTS } from '../constants';
+import { getStores, getProducts } from '../src/services/supabaseService';
+import { useFirebase } from '../src/components/FirebaseProvider';
+import { OfflineWarning } from '../src/components/OfflineWarning';
 
 export const Stores: React.FC = () => {
+  const { isOffline } = useFirebase();
   const [searchQuery, setSearchQuery] = useState('');
   const [onlyAvailable, setOnlyAvailable] = useState(false);
+  const [stores, setStores] = useState<any[]>([]);
+  const [products, setProducts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const unsubStores = getStores((data) => {
+      setStores(data);
+      setLoading(false);
+    });
+    const unsubProducts = getProducts((data) => {
+      setProducts(data);
+    });
+
+    return () => {
+      unsubStores();
+      unsubProducts();
+    };
+  }, []);
 
   // Identifica quais IDs de loja possuem produtos no marketplace
   const storesWithProducts = useMemo(() => {
-    return new Set(MOCK_PRODUCTS.map(p => p.storeId));
-  }, []);
+    return new Set(products.map(p => p.storeId || p.slug)); // Using slug as fallback if storeId is missing in seed
+  }, [products]);
 
   const filteredStores = useMemo(() => {
-    return MOCK_STORES.filter(store => {
+    return stores.filter(store => {
       // Filtro de Busca (Nome ou Cidade)
       const searchMatch = store.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                         store.location.toLowerCase().includes(searchQuery.toLowerCase());
+                         (store.cidade || '').toLowerCase().includes(searchQuery.toLowerCase());
       
       // Filtro de "Compra disponível" (Apenas lojas com produtos no estoque)
-      const availabilityMatch = onlyAvailable ? storesWithProducts.has(store.id) : true;
+      const availabilityMatch = onlyAvailable ? storesWithProducts.has(store.id || store.slug) : true;
 
       return searchMatch && availabilityMatch;
     });
-  }, [searchQuery, onlyAvailable, storesWithProducts]);
+  }, [searchQuery, onlyAvailable, storesWithProducts, stores]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-500"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-7xl mx-auto pb-20 animate-in fade-in duration-700 px-4 md:px-0">
+      {isOffline && <OfflineWarning />}
       {/* Hero Header Simples */}
       <div className="relative mb-8 rounded-2xl md:rounded-3xl overflow-hidden bg-slate-900 border border-slate-800 shadow-2xl">
         <div className="absolute inset-0 bg-gradient-to-br from-purple-600/10 via-transparent to-pink-600/5"></div>
@@ -117,7 +147,7 @@ export const Stores: React.FC = () => {
               <div className="mb-4">
                 <div className="relative inline-block">
                   <div className="absolute -inset-1 bg-gradient-to-br from-purple-600 to-pink-600 rounded-2xl blur opacity-20 group-hover:opacity-40 transition duration-500"></div>
-                  <img src={store.logo} className="relative w-20 h-20 rounded-2xl object-cover border-4 border-slate-950 bg-slate-800 shadow-xl" alt={store.name} />
+                  <img src={store.logo || `https://ui-avatars.com/api/?name=${store.name}`} className="relative w-20 h-20 rounded-2xl object-cover border-4 border-slate-950 bg-slate-800 shadow-xl" alt={store.name} />
                 </div>
               </div>
 
@@ -125,12 +155,12 @@ export const Stores: React.FC = () => {
                 <h3 className="text-xl font-black text-white group-hover:text-purple-400 transition-colors truncate">{store.name}</h3>
                 <div className="flex items-center text-slate-500 text-[10px] md:text-xs space-x-2 font-medium">
                   <i className="fas fa-location-dot text-pink-500/70"></i>
-                  <span className="truncate uppercase tracking-tight">{store.location}</span>
+                  <span className="truncate uppercase tracking-tight">{store.cidade || 'Localização não informada'} - {store.estado || ''}</span>
                 </div>
               </div>
 
               <Link 
-                to={`/loja/${store.id}`}
+                to={`/loja/${store.slug || store.id}`}
                 className="w-full bg-slate-800 hover:bg-purple-600 text-white font-bold py-3.5 rounded-2xl transition-all shadow-lg active:scale-[0.98] flex items-center justify-center space-x-2 border border-white/5 text-xs uppercase tracking-widest"
               >
                 <span>Acessar Loja</span>

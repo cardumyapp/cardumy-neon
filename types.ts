@@ -146,6 +146,7 @@ export interface UpdateLog {
 
 export interface UserAction {
   user: string;
+  userId?: string;
   action: string;
   target: string;
   timestamp: string;
@@ -188,6 +189,7 @@ export interface Tournament {
 
 export interface RankingItem {
   name: string;
+  userId?: string;
   cards: number;
   rank: number;
   avatar: string;
