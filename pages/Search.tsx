@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { MOCK_CARDS } from '../constants';
 import { GameType, Card } from '../types';
-import { useFirebase } from '../src/components/FirebaseProvider';
+import { useAuth } from '../src/components/AuthProvider';
 import { addCardToList } from '../src/services/supabaseService';
 
 interface Folder {
@@ -17,7 +17,7 @@ interface SearchProps {
 }
 
 export const Search: React.FC<SearchProps> = ({ activeGame }) => {
-  const { user } = useFirebase();
+  const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [addingToFolder, setAddingToFolder] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
@@ -177,7 +177,7 @@ export const Search: React.FC<SearchProps> = ({ activeGame }) => {
                   </div>
                 </div>
                 <div className="absolute top-4 left-4 bg-slate-950/80 backdrop-blur-md px-3 py-1 rounded-lg border border-white/10 shadow-lg">
-                  <span className="text-[10px] font-black text-emerald-400">R$ {card.price?.toFixed(2)}</span>
+                  <span className="text-[10px] font-black text-emerald-400">R$ {(card.price || 0).toFixed(2)}</span>
                 </div>
               </div>
 

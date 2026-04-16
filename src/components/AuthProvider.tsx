@@ -1,9 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { onAuthStateChanged, User, signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
-import { auth } from '../../firebase';
 import { syncUser } from '../services/supabaseService';
 
-interface FirebaseContextType {
+interface AuthContextType {
   user: any;
   loading: boolean;
   isOffline: boolean;
@@ -11,7 +9,7 @@ interface FirebaseContextType {
   logout: () => Promise<void>;
 }
 
-const FirebaseContext = createContext<FirebaseContextType | undefined>(undefined);
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const MOCK_USERS_POOL = [
   { id: 1, displayName: 'Victoria Pedretti', email: 'viped@cardumy.com', photoURL: 'https://i.pravatar.cc/150?u=victoria' },
@@ -26,7 +24,7 @@ const MOCK_USERS_POOL = [
   { id: 10, displayName: 'Franky Shipwright', email: 'franky@cardumy.com', photoURL: 'https://i.pravatar.cc/150?u=franky' },
 ];
 
-export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isOffline, setIsOffline] = useState(!window.navigator.onLine);
@@ -58,7 +56,6 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   }, []);
 
   const login = async () => {
-    // Manual login disabled for now as per request
     console.log("Manual login disabled. Using auto-pool.");
   };
 
@@ -67,16 +64,16 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   return (
-    <FirebaseContext.Provider value={{ user, loading, isOffline, login, logout }}>
+    <AuthContext.Provider value={{ user, loading, isOffline, login, logout }}>
       {!loading && children}
-    </FirebaseContext.Provider>
+    </AuthContext.Provider>
   );
 };
 
-export const useFirebase = () => {
-  const context = useContext(FirebaseContext);
+export const useAuth = () => {
+  const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error('useFirebase must be used within a FirebaseProvider');
+    throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
 };

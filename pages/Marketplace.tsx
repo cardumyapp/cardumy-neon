@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { getProducts } from '../src/services/supabaseService';
 import { ProductType, Product, GameType } from '../types';
-import { useFirebase } from '../src/components/FirebaseProvider';
+import { useAuth } from '../src/components/AuthProvider';
 import { OfflineWarning } from '../src/components/OfflineWarning';
 
 interface MarketplaceProps {
@@ -11,7 +11,7 @@ interface MarketplaceProps {
 }
 
 export const Marketplace: React.FC<MarketplaceProps> = ({ onAddToCart, activeGame }) => {
-  const { isOffline } = useFirebase();
+  const { isOffline } = useAuth();
   const [activeCategory, setActiveCategory] = useState<string>('Tudo');
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -163,9 +163,9 @@ export const Marketplace: React.FC<MarketplaceProps> = ({ onAddToCart, activeGam
                 <div className="flex items-end space-x-2">
                   <div className="flex flex-col">
                     {product.originalPrice && (
-                      <span className="text-xs text-slate-600 line-through">R$ {product.originalPrice.toFixed(2)}</span>
+                      <span className="text-xs text-slate-600 line-through">R$ {(product.originalPrice || 0).toFixed(2)}</span>
                     )}
-                    <span className="text-xl font-black text-emerald-400">R$ {product.price.toFixed(2)}</span>
+                    <span className="text-xl font-black text-emerald-400">R$ {(product.price || 0).toFixed(2)}</span>
                   </div>
                 </div>
 

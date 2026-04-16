@@ -30,7 +30,7 @@ export class ErrorBoundary extends Component<Props, State> {
       try {
         const parsedError = JSON.parse(this.state.error?.message || "");
         if (parsedError.error) {
-          errorMessage = `Erro no Firestore: ${parsedError.error} (${parsedError.operationType} em ${parsedError.path})`;
+          errorMessage = `Erro no Banco de Dados: ${parsedError.error} (${parsedError.operationType} em ${parsedError.path})`;
         }
       } catch (e) {
         // Not a JSON error

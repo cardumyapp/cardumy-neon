@@ -294,50 +294,22 @@ export const getUserProfile = async (userId: string) => {
 
 export const syncUser = async (userData: any) => {
   try {
-    // Try to find user by email
-    const { data: existing, error: fetchError } = await supabase
-      .from('users')
-      .select('*')
-      .eq('email', userData.email)
-      .single();
+    const response = await fetch('/api/sync-user', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ userData })
+    });
     
-    if (fetchError && fetchError.code !== 'PGRST116') throw fetchError;
-
-    const isAdmin = userData.email === 'cardumyapp@gmail.com';
-
-    if (existing) {
-      const { data, error: updateError } = await supabase
-        .from('users')
-        .update({
-          avatar: userData.photoURL,
-          codename: userData.displayName,
-          role_id: isAdmin ? 1 : (existing.role_id || 7),
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', existing.id)
-        .select()
-        .single();
-      if (updateError) throw updateError;
-      return data;
-    } else {
-      const { data, error: insertError } = await supabase
-        .from('users')
-        .insert({
-          username: userData.displayName.split(' ')[0].toLowerCase() + Math.floor(Math.random() * 1000),
-          codename: userData.displayName,
-          email: userData.email,
-          password: 'social-login', // Placeholder as per schema requirement
-          avatar: userData.photoURL,
-          vip: false,
-          role_id: isAdmin ? 1 : 7
-        })
-        .select()
-        .single();
-      if (insertError) throw insertError;
-      return data;
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to sync user');
     }
+    
+    return await response.json();
   } catch (error) {
-    console.error('Error syncing user with Supabase:', error);
+    console.error('Error syncing user with Supabase via backend:', error);
     return null;
   }
 };

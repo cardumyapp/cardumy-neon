@@ -100,7 +100,7 @@ export const CartPage: React.FC<CartPageProps> = ({ cart, updateQuantity, remove
                       <div className="flex-1 min-w-0">
                         <p className="text-[8px] font-black text-slate-500 uppercase mb-1">{item.type}</p>
                         <h4 className="font-bold text-white truncate text-[11px] md:text-sm mb-1">{item.name}</h4>
-                        <p className="text-[10px] md:text-xs font-black text-emerald-400">R$ {item.price.toFixed(2)}</p>
+                        <p className="text-[10px] md:text-xs font-black text-emerald-400">R$ {(item.price || 0).toFixed(2)}</p>
                       </div>
 
                       <div className="flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-4">
@@ -126,13 +126,13 @@ export const CartPage: React.FC<CartPageProps> = ({ cart, updateQuantity, remove
             <div className="space-y-4">
               <div className="flex justify-between text-xs md:text-sm">
                 <span className="text-slate-500 uppercase tracking-widest font-black text-[9px] md:text-[10px]">Subtotal</span>
-                <span className="text-slate-300 font-bold">R$ {total.toFixed(2)}</span>
+                <span className="text-slate-300 font-bold">R$ {(total || 0).toFixed(2)}</span>
               </div>
               <div className="h-px bg-slate-800"></div>
               <div className="flex justify-between items-end">
                 <span className="text-[10px] md:text-sm font-black text-white uppercase tracking-widest">Total</span>
                 <div className="text-right">
-                  <p className="text-xl md:text-3xl font-black text-emerald-400 leading-none">R$ {total.toFixed(2)}</p>
+                  <p className="text-xl md:text-3xl font-black text-emerald-400 leading-none">R$ {(total || 0).toFixed(2)}</p>
                   <p className="text-[8px] md:text-[9px] text-slate-600 uppercase font-black mt-1">Sincronizado com lojas</p>
                 </div>
               </div>
@@ -195,7 +195,7 @@ export const CartPage: React.FC<CartPageProps> = ({ cart, updateQuantity, remove
                   <div className="flex items-center justify-between mb-6">
                     <div className="text-left">
                       <p className="text-[8px] md:text-[10px] font-black text-slate-500 uppercase">Total</p>
-                      <p className="text-lg md:text-2xl font-black text-emerald-400 leading-none">R$ {total.toFixed(2)}</p>
+                      <p className="text-lg md:text-2xl font-black text-emerald-400 leading-none">R$ {(total || 0).toFixed(2)}</p>
                     </div>
                   </div>
                   <button
@@ -232,7 +232,7 @@ export const CartPage: React.FC<CartPageProps> = ({ cart, updateQuantity, remove
                   <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4 flex items-center justify-between">
                     <div className="text-left">
                       <p className="text-[8px] font-black text-slate-500 uppercase">Valor Total</p>
-                      <p className="text-sm font-black text-emerald-400">R$ {total.toFixed(2)}</p>
+                      <p className="text-sm font-black text-emerald-400">R$ {(total || 0).toFixed(2)}</p>
                     </div>
                   </div>
                 </div>

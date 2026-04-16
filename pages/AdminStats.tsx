@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { getGlobalStats, seedDatabase } from '../src/services/supabaseService';
 import { motion } from 'motion/react';
-import { useFirebase } from '../src/components/FirebaseProvider';
+import { useAuth } from '../src/components/AuthProvider';
 import { OfflineWarning } from '../src/components/OfflineWarning';
 
 export const AdminStats: React.FC = () => {
-  const { isOffline } = useFirebase();
+  const { isOffline } = useAuth();
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [seeding, setSeeding] = useState(false);

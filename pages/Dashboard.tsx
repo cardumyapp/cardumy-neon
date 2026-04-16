@@ -4,7 +4,7 @@ import { GAMES, MOCK_RANKING, MOCK_UPDATES, MOCK_ACTIONS, MOCK_TOURNAMENTS } fro
 import { GameType } from '../types';
 import { Link } from 'react-router-dom';
 import { getProducts, getStores } from '../src/services/supabaseService';
-import { useFirebase } from '../src/components/FirebaseProvider';
+import { useAuth } from '../src/components/AuthProvider';
 import { OfflineWarning } from '../src/components/OfflineWarning';
 
 interface DashboardProps {
@@ -12,7 +12,7 @@ interface DashboardProps {
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({ activeGame }) => {
-  const { user, login, isOffline } = useFirebase();
+  const { user, login, isOffline } = useAuth();
   const [products, setProducts] = useState<any[]>([]);
   const [stores, setStores] = useState<any[]>([]);
 

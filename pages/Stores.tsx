@@ -2,11 +2,11 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { getStores, getProducts } from '../src/services/supabaseService';
-import { useFirebase } from '../src/components/FirebaseProvider';
+import { useAuth } from '../src/components/AuthProvider';
 import { OfflineWarning } from '../src/components/OfflineWarning';
 
 export const Stores: React.FC = () => {
-  const { isOffline } = useFirebase();
+  const { isOffline } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [onlyAvailable, setOnlyAvailable] = useState(false);
   const [stores, setStores] = useState<any[]>([]);

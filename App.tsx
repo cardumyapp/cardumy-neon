@@ -21,7 +21,7 @@ import { Social } from './pages/Social';
 import { AdminStats } from './pages/AdminStats';
 import { Product, CartItem, GameType } from './types';
 import { GAMES } from './constants';
-import { FirebaseProvider, useFirebase } from './src/components/FirebaseProvider';
+import { AuthProvider, useAuth } from './src/components/AuthProvider';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
 
 const SidebarItem: React.FC<{ to: string; icon: string; label: string; active: boolean; collapsed: boolean; badge?: number; onClick?: () => void }> = ({ to, icon, label, active, collapsed, badge, onClick }) => (
@@ -46,7 +46,7 @@ const SidebarItem: React.FC<{ to: string; icon: string; label: string; active: b
 
 const AppContent: React.FC = () => {
   const location = useLocation();
-  const { user, login, logout } = useFirebase();
+  const { user, login, logout } = useAuth();
   const [cart, setCart] = useState<CartItem[]>([]);
   const [activeGame, setActiveGame] = useState<GameType | 'All'>('All');
   const [isGamePickerOpen, setIsGamePickerOpen] = useState(false);
@@ -284,11 +284,11 @@ const AppContent: React.FC = () => {
 const App: React.FC = () => {
   return (
     <ErrorBoundary>
-      <FirebaseProvider>
+      <AuthProvider>
         <Router>
           <AppContent />
         </Router>
-      </FirebaseProvider>
+      </AuthProvider>
     </ErrorBoundary>
   );
 };

@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { useFirebase } from '../src/components/FirebaseProvider';
+import { useAuth } from '../src/components/AuthProvider';
 import { getBinders, createBinder } from '../src/services/supabaseService';
 import { GAMES } from '../constants';
 import { OfflineWarning } from '../src/components/OfflineWarning';
@@ -18,7 +18,7 @@ interface Folder {
 }
 
 export const FoldersPage: React.FC = () => {
-  const { user, isOffline } = useFirebase();
+  const { user, isOffline } = useAuth();
   const [folders, setFolders] = useState<Folder[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
@@ -186,7 +186,7 @@ const FolderCard: React.FC<{ folder: Folder }> = ({ folder }) => (
        </div>
        <div className="text-right">
           <p className="text-[9px] font-black text-slate-600 uppercase tracking-widest mb-1">Valor Est.</p>
-          <p className="text-lg font-black text-emerald-400">R$ {folder.estimatedValue.toFixed(2)}</p>
+          <p className="text-lg font-black text-emerald-400">R$ {(folder.estimatedValue || 0).toFixed(2)}</p>
        </div>
     </div>
   </div>

@@ -81,7 +81,7 @@ export const Orders: React.FC = () => {
                              <span className="text-[10px] text-slate-500 font-black uppercase">Qtd: {item.quantity}</span>
                            </div>
                         </div>
-                        <span className="text-sm font-black text-slate-300">R$ {item.price.toFixed(2)}</span>
+                        <span className="text-sm font-black text-slate-300">R$ {(item.price || 0).toFixed(2)}</span>
                       </div>
                     ))}
                   </div>
@@ -91,7 +91,7 @@ export const Orders: React.FC = () => {
                     <div className="space-y-3">
                        <div className="flex justify-between items-center text-xs">
                           <span className="text-slate-500 font-bold uppercase tracking-widest">Subtotal</span>
-                          <span className="text-slate-300 font-bold">R$ {(order.total - order.shippingCost).toFixed(2)}</span>
+                          <span className="text-slate-300 font-bold">R$ {((order.total || 0) - (order.shippingCost || 0)).toFixed(2)}</span>
                        </div>
                        
                        {/* Destaque do Frete */}
@@ -100,14 +100,14 @@ export const Orders: React.FC = () => {
                              <i className="fas fa-truck-ramp-box text-xs"></i>
                              <span className="text-[10px] font-black uppercase tracking-widest">Valor do Frete</span>
                           </div>
-                          <span className="text-sm font-black text-white">R$ {order.shippingCost.toFixed(2)}</span>
+                          <span className="text-sm font-black text-white">R$ {(order.shippingCost || 0).toFixed(2)}</span>
                        </div>
 
                        <div className="h-px bg-slate-800 my-4"></div>
 
                        <div className="flex justify-between items-center">
                           <span className="text-sm font-black text-white uppercase tracking-widest">Total do Pedido</span>
-                          <span className="text-2xl font-black text-emerald-400">R$ {order.total.toFixed(2)}</span>
+                          <span className="text-2xl font-black text-emerald-400">R$ {(order.total || 0).toFixed(2)}</span>
                        </div>
                     </div>
 

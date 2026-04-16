@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { getProducts } from '../src/services/supabaseService';
 import { ProductType, Product, GameType } from '../types';
-import { useFirebase } from '../src/components/FirebaseProvider';
+import { useAuth } from '../src/components/AuthProvider';
 import { OfflineWarning } from '../src/components/OfflineWarning';
 
 interface ProductsProps {
@@ -13,7 +13,7 @@ interface ProductsProps {
 type SortOption = 'newest' | 'price_asc' | 'price_desc' | 'relevance';
 
 export const Products: React.FC<ProductsProps> = ({ onAddToCart, activeGame }) => {
-  const { isOffline } = useFirebase();
+  const { isOffline } = useAuth();
   const [selectedSlug, setSelectedSlug] = useState<string | null>(null);
   const [itemFilter, setItemFilter] = useState<string>('Todos');
   const [gameFilter, setGameFilter] = useState<string>('Todos');
@@ -131,7 +131,7 @@ export const Products: React.FC<ProductsProps> = ({ onAddToCart, activeGame }) =
                    </div>
                 </div>
                 <div className="flex items-center justify-between mt-auto">
-                   <span className="text-xl font-black text-white">R$ {ticket.price.toFixed(2)}</span>
+                   <span className="text-xl font-black text-white">R$ {(ticket.price || 0).toFixed(2)}</span>
                    <div className="w-10 h-10 bg-indigo-600 text-white rounded-xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
                      <i className="fas fa-arrow-right text-xs"></i>
                    </div>
@@ -240,7 +240,7 @@ export const Products: React.FC<ProductsProps> = ({ onAddToCart, activeGame }) =
                       <h4 className="text-[10px] font-bold text-white uppercase line-clamp-2 h-7 group-hover:text-purple-400 transition-colors">{product.name}</h4>
                     </div>
                     <div className="flex items-center justify-between pt-3">
-                      <span className="text-sm font-black text-emerald-400">R$ {product.price.toFixed(2)}</span>
+                      <span className="text-sm font-black text-emerald-400">R$ {(product.price || 0).toFixed(2)}</span>
                       <div className="w-7 h-7 rounded-lg bg-slate-800 flex items-center justify-center text-slate-500 group-hover:bg-purple-600 group-hover:text-white transition-all">
                         <i className="fas fa-plus text-[10px]"></i>
                       </div>
@@ -275,7 +275,7 @@ const OfferRow: React.FC<{ offer: Product; onAddToCart: (p: Product) => void }> 
         </div>
       </div>
       <div className="flex items-center space-x-6 w-full md:w-auto justify-between md:justify-end">
-        <span className="text-xl font-black text-emerald-400">R$ {offer.price.toFixed(2)}</span>
+        <span className="text-xl font-black text-emerald-400">R$ {(offer.price || 0).toFixed(2)}</span>
         <button 
           onClick={() => onAddToCart({ ...offer, quantity: qty } as any)}
           className="bg-purple-600 hover:bg-purple-700 text-white font-black text-[10px] uppercase px-8 py-3.5 rounded-xl transition-all shadow-lg active:scale-95"

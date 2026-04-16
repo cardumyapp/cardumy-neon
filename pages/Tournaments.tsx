@@ -77,7 +77,7 @@ export const Tournaments: React.FC = () => {
               <div className="mt-auto flex items-center justify-between">
                 <div className="text-white">
                   <span className="text-[10px] text-slate-500 uppercase font-black block leading-none mb-1">Inscrição</span>
-                  <span className="text-lg font-bold">R$ {tourney.price.toFixed(2)}</span>
+                  <span className="text-lg font-bold">R$ {(tourney.price || 0).toFixed(2)}</span>
                 </div>
                 <Link 
                   to={`/evento/${tourney.id}`}

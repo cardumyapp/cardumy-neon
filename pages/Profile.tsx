@@ -1,12 +1,12 @@
 
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { useFirebase } from '../src/components/FirebaseProvider';
+import { useAuth } from '../src/components/AuthProvider';
 import { getUserProfile } from '../src/services/supabaseService';
 
 export const Profile: React.FC = () => {
   const { userId } = useParams();
-  const { user: currentUser } = useFirebase();
+  const { user: currentUser } = useAuth();
   const [profileUser, setProfileUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
