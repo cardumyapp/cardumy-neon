@@ -20,8 +20,8 @@ export const Profile: React.FC = () => {
           setProfileUser(data);
         }
       } else if (currentUser) {
-        // Show current user (own profile)
-        const data = await getUserProfile(currentUser.id);
+        // Show current user (own profile) using email for consistent lookup
+        const data = await getUserProfile(currentUser.email);
         if (data) {
           setProfileUser(data);
         } else {

@@ -65,7 +65,7 @@ export const addCardToList = async (userId: any, listType: 'cards' | 'wishlist' 
       .eq('user_id', userId)
       .eq('card_id', card.id || card.cardId)
       .eq('game', gameSlug)
-      .single();
+      .maybeSingle();
 
     if (fetchError && fetchError.code !== 'PGRST116') throw fetchError;
 
@@ -105,7 +105,7 @@ export const addCardToList = async (userId: any, listType: 'cards' | 'wishlist' 
   }
 };
 
-export const getListCards = (userId: string, listType: 'cards' | 'wishlist' | 'offerlist', callback: (cards: any[]) => void) => {
+export const getListCards = (userId: string | number, listType: 'cards' | 'wishlist' | 'offerlist', callback: (cards: any[]) => void) => {
   const table = listType === 'cards' ? 'user_cards' : listType;
 
   const fetchList = async () => {
@@ -138,7 +138,7 @@ export const getListCards = (userId: string, listType: 'cards' | 'wishlist' | 'o
   };
 };
 
-export const createBinder = async (userId: string, name: string, gameId: string, gameName: string) => {
+export const createBinder = async (userId: string | number, name: string, gameId: string, gameName: string) => {
   try {
     const { data, error } = await supabase
       .from('user_binders')
@@ -148,17 +148,17 @@ export const createBinder = async (userId: string, name: string, gameId: string,
         game_id: gameId
       })
       .select()
-      .single();
+      .maybeSingle();
 
     if (error) throw error;
-    return data.id;
+    return data?.id;
   } catch (error) {
     console.error('Error creating binder:', error);
     throw error;
   }
 };
 
-export const getBinders = (userId: string, callback: (binders: any[]) => void) => {
+export const getBinders = (userId: string | number, callback: (binders: any[]) => void) => {
   const fetchBinders = async () => {
     const { data, error } = await supabase
       .from('user_binders')
@@ -204,7 +204,7 @@ export const addCardToBinder = async (userId: any, binderId: any, card: any) => 
       .eq('user_id', userId)
       .eq('card_id', card.cardId || card.id)
       .eq('game', gameSlug)
-      .single();
+      .maybeSingle();
     
     if (existingCard) {
       cardRecordId = existingCard.id;
@@ -220,9 +220,9 @@ export const addCardToBinder = async (userId: any, binderId: any, card: any) => 
           quantidade: 1
         })
         .select()
-        .single();
+        .maybeSingle();
       if (insertError) throw insertError;
-      cardRecordId = newCard.id;
+      cardRecordId = newCard?.id;
     }
 
     const { error } = await supabase
@@ -276,16 +276,48 @@ export const getGlobalStats = async () => {
   return stats;
 };
 
-export const getUserProfile = async (userId: string) => {
+export const getUserProfile = async (userId: string | number) => {
   try {
+    // Determine if we should search by ID, Email, or Username
+    const isNumeric = !isNaN(Number(userId)) && !String(userId).includes('@') && !String(userId).includes('-');
+    
+    if (isNumeric) {
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', userId)
+        .limit(1);
+      
+      if (data && data.length > 0) return data[0];
+      if (error) throw error;
+    }
+
+    // Try finding by email
+    if (String(userId).includes('@')) {
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('email', userId)
+        .limit(1);
+      
+      if (data && data.length > 0) return data[0];
+      if (error) throw error;
+    }
+
+    // Finally try finding by username
     const { data, error } = await supabase
       .from('users')
       .select('*')
-      .eq('id', userId)
-      .single();
+      .eq('username', userId)
+      .limit(1);
     
     if (error) throw error;
-    return data;
+    
+    const user = (data && data.length > 0) ? data[0] : null;
+    if (!user) {
+      console.warn(`User profile not found for identifier: ${userId}`);
+    }
+    return user;
   } catch (error) {
     console.error('Error fetching user profile:', error);
     return null;
@@ -315,22 +347,6 @@ export const syncUser = async (userData: any) => {
 };
 
 export const seedDatabase = async () => {
-  try {
-    const response = await fetch('/api/seed', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    });
-    
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to seed database');
-    }
-    
-    return true;
-  } catch (error) {
-    console.error('Error seeding database:', error);
-    throw error;
-  }
+  console.warn('Database seeding functionality has been removed.');
+  return true;
 };

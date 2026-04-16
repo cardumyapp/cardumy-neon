@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { getGlobalStats, seedDatabase } from '../src/services/supabaseService';
+import { getGlobalStats } from '../src/services/supabaseService';
 import { motion } from 'motion/react';
 import { useAuth } from '../src/components/AuthProvider';
 import { OfflineWarning } from '../src/components/OfflineWarning';
@@ -8,28 +8,12 @@ export const AdminStats: React.FC = () => {
   const { isOffline } = useAuth();
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [seeding, setSeeding] = useState(false);
 
   const fetchStats = async () => {
     setLoading(true);
     const data = await getGlobalStats();
     setStats(data);
     setLoading(false);
-  };
-
-  const handleSeed = async () => {
-    if (confirm('Deseja realmente semear o banco de dados com dados de teste?')) {
-      setSeeding(true);
-      try {
-        await seedDatabase();
-        alert('Banco de dados semeado com sucesso!');
-        fetchStats();
-      } catch (error) {
-        alert('Erro ao semear banco de dados. Verifique o console.');
-      } finally {
-        setSeeding(false);
-      }
-    }
   };
 
   useEffect(() => {
@@ -61,14 +45,6 @@ export const AdminStats: React.FC = () => {
           <p className="text-slate-400">Visão geral em tempo real do ecossistema Cardumy.</p>
         </div>
         <div className="flex items-center space-x-4">
-          <button 
-            onClick={handleSeed}
-            disabled={seeding}
-            className="bg-purple-600 hover:bg-purple-700 text-white font-black px-8 py-3.5 rounded-2xl transition-all border border-purple-500 active:scale-95 flex items-center justify-center space-x-3 disabled:opacity-50"
-          >
-            <i className={`fas ${seeding ? 'fa-spinner fa-spin' : 'fa-seedling'}`}></i>
-            <span>{seeding ? 'Semeando...' : 'Semear Banco'}</span>
-          </button>
           <button 
             onClick={fetchStats}
             className="bg-slate-800 hover:bg-slate-700 text-white font-black px-8 py-3.5 rounded-2xl transition-all border border-slate-700 active:scale-95 flex items-center justify-center space-x-3"
