@@ -19,6 +19,7 @@ import { Trades } from './pages/Trades';
 import { Tournaments } from './pages/Tournaments';
 import { Social } from './pages/Social';
 import { AdminStats } from './pages/AdminStats';
+import { EditProfile } from './pages/EditProfile';
 import { Product, CartItem, GameType } from './types';
 import { GAMES } from './constants';
 import { AuthProvider, useAuth } from './src/components/AuthProvider';
@@ -56,6 +57,28 @@ const AppContent: React.FC = () => {
   useEffect(() => {
     setIsMobileMenuOpen(false);
   }, [location.pathname]);
+
+  useEffect(() => {
+    const handleImageError = (event: Event) => {
+      const target = event.target as HTMLImageElement;
+      if (target && target.tagName === 'IMG' && !(target as any)._isFallbackApplied) {
+        (target as any)._isFallbackApplied = true;
+        const FALLBACK_IMAGES = [
+          'https://images.unsplash.com/photo-1614850523296-d8c1af93d400?auto=format&fit=crop&q=80&w=800',
+          'https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&q=80&w=800',
+          'https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&q=80&w=800',
+          'https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&q=80&w=800',
+          'https://images.unsplash.com/photo-1606103920295-9a091573f160?auto=format&fit=crop&q=80&w=800'
+        ];
+        const randomIndex = Math.floor(Math.random() * FALLBACK_IMAGES.length);
+        target.src = FALLBACK_IMAGES[randomIndex];
+        // Also ensure no-referrer if we suspect external images might block
+        target.referrerPolicy = "no-referrer";
+      }
+    };
+    window.addEventListener('error', handleImageError, true);
+    return () => window.removeEventListener('error', handleImageError, true);
+  }, []);
 
   const cartCount = useMemo(() => cart.reduce((acc, item) => acc + item.quantity, 0), [cart]);
 
@@ -230,13 +253,22 @@ const AppContent: React.FC = () => {
             
             {user ? (
               <div className="flex items-center space-x-2 md:space-x-3 bg-slate-800/50 pr-2 md:pr-4 pl-1 py-1 rounded-full border border-white/5 cursor-pointer group relative">
-                <img src={user.photoURL || "https://i.pravatar.cc/150?u=viped"} className="w-7 h-7 md:w-8 md:h-8 rounded-full border border-purple-500" alt="Avatar" />
+                <img 
+                  src={user.avatar || user.photoURL || "https://i.pravatar.cc/150?u=viped"} 
+                  className="w-7 h-7 md:w-8 md:h-8 rounded-full border border-purple-500 object-cover" 
+                  alt="Avatar" 
+                />
                 <div className="hidden sm:flex flex-col">
-                   <span className="text-xs font-bold leading-none">{user.displayName || 'Usuário'}</span>
-                   <span className="text-[10px] text-slate-500 uppercase font-black">Lendário</span>
+                   <span className="text-xs font-bold leading-none">{user.username || user.codename || user.displayName || 'Usuário'}</span>
+                   <span className="text-[10px] text-slate-500 uppercase font-black">
+                     {user.role_id === 6 ? 'Loja' : 'Mestre'}
+                   </span>
                 </div>
                 
                 <div className="absolute top-full right-0 mt-2 w-48 bg-slate-900 border border-slate-800 rounded-xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 p-2">
+                  <Link to="/perfil" className="block w-full text-left px-4 py-2 text-xs font-bold text-slate-300 hover:bg-slate-800 rounded-lg transition-colors mb-1">
+                    <i className="fas fa-user-circle mr-2"></i> Ver Perfil
+                  </Link>
                   <button onClick={logout} className="w-full text-left px-4 py-2 text-xs font-bold text-red-400 hover:bg-red-500/10 rounded-lg transition-colors">
                     <i className="fas fa-sign-out-alt mr-2"></i> Sair
                   </button>
@@ -265,6 +297,7 @@ const AppContent: React.FC = () => {
             <Route path="/evento/:id" element={<EventDetails onAddToCart={addToCart} />} />
             <Route path="/perfil" element={<Profile />} />
             <Route path="/perfil/:userId" element={<Profile />} />
+            <Route path="/perfil/editar" element={<EditProfile />} />
             <Route path="/notificacoes" element={<Notifications />} />
             <Route path="/trocas" element={<Trades />} />
             <Route path="/torneios" element={<Tournaments />} />

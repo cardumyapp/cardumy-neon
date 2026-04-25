@@ -1,14 +1,41 @@
 
-import React, { useState } from 'react';
-import { MOCK_TOURNAMENTS, GAMES } from '../constants';
-import { GameType } from '../types';
+import React, { useState, useEffect } from 'react';
+import { GAMES } from '../constants';
+import { GameType, Tournament } from '../types';
 import { motion } from 'motion/react';
 import { Link } from 'react-router-dom';
+import { getAllTournaments } from '../src/services/supabaseService';
 
 export const Tournaments: React.FC = () => {
   const [activeGame, setActiveGame] = useState<GameType | 'All'>('All');
+  const [torneios, setTorneios] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const filteredTournaments = MOCK_TOURNAMENTS.filter(t => activeGame === 'All' || t.game === activeGame);
+  useEffect(() => {
+    const fetchTourneys = async () => {
+      setLoading(true);
+      const data = await getAllTournaments();
+      if (data) {
+        const mapped = data.map((t: any) => ({
+          id: t.id,
+          name: t.name,
+          game: t.cardgames?.name as GameType,
+          date: new Date(t.start_date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }),
+          location: 'Local da Loja',
+          price: 0, // Not in table as per error report
+          totalSpots: t.max_players || 0,
+          filledSpots: 0,
+          status: t.status === 'scheduled' ? 'Agendado' : 'Aberto',
+          imageUrl: t.image_url || 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&q=80&w=600'
+        }));
+        setTorneios(mapped);
+      }
+      setLoading(false);
+    };
+    fetchTourneys();
+  }, []);
+
+  const filteredTournaments = torneios.filter(t => activeGame === 'All' || t.game === activeGame);
 
   return (
     <div className="space-y-8">
@@ -38,8 +65,19 @@ export const Tournaments: React.FC = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredTournaments.map((tourney, idx) => (
+      {loading ? (
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-500"></div>
+        </div>
+      ) : filteredTournaments.length === 0 ? (
+        <div className="text-center py-20 bg-slate-900/20 border border-dashed border-slate-800 rounded-3xl">
+          <i className="fas fa-calendar-times text-4xl text-slate-700 mb-4"></i>
+          <h3 className="text-xl font-bold text-white">Nenhum evento encontrado</h3>
+          <p className="text-slate-500 mt-2">Tente mudar o filtro ou volte mais tarde.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredTournaments.map((tourney, idx) => (
           <motion.div
             key={tourney.id}
             initial={{ opacity: 0, scale: 0.95 }}
@@ -90,6 +128,7 @@ export const Tournaments: React.FC = () => {
           </motion.div>
         ))}
       </div>
+    )}
     </div>
   );
 };

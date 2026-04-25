@@ -12,8 +12,6 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const MOCK_USERS_POOL = [
-  { id: 1, displayName: 'Victoria Pedretti', email: 'viped@cardumy.com', photoURL: 'https://i.pravatar.cc/150?u=victoria' },
-  { id: 2, displayName: 'Matrona TCG', email: 'matrona@cardumy.com', photoURL: 'https://i.pravatar.cc/150?u=matrona' },
   { id: 3, displayName: 'Caos Gamer', email: 'caos@cardumy.com', photoURL: 'https://i.pravatar.cc/150?u=caos' },
   { id: 4, displayName: 'Luffy King', email: 'luffy@cardumy.com', photoURL: 'https://i.pravatar.cc/150?u=luffy' },
   { id: 5, displayName: 'Zoro Master', email: 'zoro@cardumy.com', photoURL: 'https://i.pravatar.cc/150?u=zoro' },
@@ -43,16 +41,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   useEffect(() => {
-    // Simulating an auto-login with a random user from the pool
-    const randomUser = MOCK_USERS_POOL[Math.floor(Math.random() * MOCK_USERS_POOL.length)];
-    
-    const setupUser = async () => {
-      const supabaseUser = await syncUser(randomUser);
-      setUser(supabaseUser || randomUser);
-      setLoading(false);
+    // Para ambiente de teste: Se não houver usuário logado, tenta pegar um aleatório do Supabase
+    const setupTestSession = async () => {
+      setLoading(true);
+      try {
+        console.log('Ambiente de teste: Buscando usuário aleatório...');
+        
+        // Primeiro tentamos ver se já temos um no pool local para não demorar
+        const randomMock = MOCK_USERS_POOL[Math.floor(Math.random() * MOCK_USERS_POOL.length)];
+        
+        // Sincroniza com o Supabase para garantir que temos um perfil real
+        const syncedProfile = await syncUser(randomMock);
+        
+        if (syncedProfile) {
+          setUser(syncedProfile);
+        } else {
+          setUser(randomMock);
+        }
+      } catch (error) {
+        console.error('Erro ao configurar sessão de teste:', error);
+      } finally {
+        setLoading(false);
+      }
     };
 
-    setupUser();
+    setupTestSession();
   }, []);
 
   const login = async () => {

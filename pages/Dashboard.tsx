@@ -1,11 +1,12 @@
 
 import React, { useMemo, useState, useEffect } from 'react';
-import { GAMES, MOCK_RANKING, MOCK_UPDATES, MOCK_ACTIONS, MOCK_TOURNAMENTS } from '../constants';
+import { GAMES, MOCK_UPDATES } from '../constants';
 import { GameType } from '../types';
 import { Link } from 'react-router-dom';
-import { getProducts, getStores } from '../src/services/supabaseService';
+import { getProducts, getStores, getActivities, getAllTournaments } from '../src/services/supabaseService';
 import { useAuth } from '../src/components/AuthProvider';
 import { OfflineWarning } from '../src/components/OfflineWarning';
+import { fetchLatestPosts, BlogPost } from '../src/services/blogService';
 
 interface DashboardProps {
   activeGame: GameType | 'All';
@@ -15,11 +16,27 @@ export const Dashboard: React.FC<DashboardProps> = ({ activeGame }) => {
   const { user, login, isOffline } = useAuth();
   const [products, setProducts] = useState<any[]>([]);
   const [stores, setStores] = useState<any[]>([]);
+  const [activities, setActivities] = useState<any[]>([]);
+  const [tournaments, setTournaments] = useState<any[]>([]);
+  const [blogPosts, setBlogPosts] = useState<BlogPost[]>([]);
+  const [loadingBlog, setLoadingBlog] = useState(true);
 
   useEffect(() => {
     const unsubProducts = getProducts(setProducts);
     const unsubStores = getStores(setStores);
     
+    // Fetch real activities
+    getActivities(5).then(setActivities);
+    
+    // Fetch real tournaments
+    getAllTournaments().then(setTournaments);
+    
+    // Fetch real blog posts from WordPress
+    fetchLatestPosts(3).then(posts => {
+      setBlogPosts(posts);
+      setLoadingBlog(false);
+    });
+
     return () => {
       unsubProducts();
       unsubStores();
@@ -27,13 +44,26 @@ export const Dashboard: React.FC<DashboardProps> = ({ activeGame }) => {
   }, []);
 
   const filteredActions = useMemo(() => {
-    if (activeGame === 'All') return MOCK_ACTIONS;
-    return MOCK_ACTIONS.filter((action) => action.user === 'viped');
-  }, [activeGame]);
+    if (activeGame === 'All') return activities;
+    // For now, if activeGame is set, we might not have a direct filter on activity_type 
+    // but we can try to find relevant strings in target or action if we wanted.
+    // Simplifying to just show latest activities for now as requested.
+    return activities;
+  }, [activeGame, activities]);
 
   const upcomingTournaments = useMemo(() => {
-    return MOCK_TOURNAMENTS.slice(0, 2);
-  }, []);
+    return tournaments
+      .filter(t => t.status === 'scheduled' || t.status === 'Aberto')
+      .slice(0, 2)
+      .map(t => ({
+        id: t.id,
+        name: t.name,
+        game: t.cardgames?.name || 'TCG',
+        date: new Date(t.start_date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
+        location: 'Local da Loja',
+        imageUrl: t.image_url || 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&q=80&w=400'
+      }));
+  }, [tournaments]);
 
   return (
     <div className="space-y-8 md:space-y-10 animate-in fade-in duration-700 pb-10">
@@ -231,6 +261,87 @@ export const Dashboard: React.FC<DashboardProps> = ({ activeGame }) => {
           </div>
         </div>
       </div>
+
+      {/* Últimas postagens */}
+      <section className="space-y-6 px-2">
+        <div className="flex justify-between items-end">
+          <div className="space-y-2">
+            <h3 className="text-2xl md:text-3xl font-black text-white uppercase tracking-tighter">Últimas postagens</h3>
+            <div className="h-1 w-12 bg-purple-600 rounded-full"></div>
+          </div>
+          <a 
+            href="https://cardumy.blog/" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="bg-slate-800 hover:bg-slate-700 text-white font-black text-[10px] tracking-widest px-6 py-2.5 rounded-xl border border-white/5 transition-all active:scale-95 uppercase"
+          >
+            Ver Todos
+          </a>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {loadingBlog ? (
+            Array(3).fill(0).map((_, i) => (
+              <div key={i} className="bg-slate-900/40 border border-slate-800 rounded-[32px] overflow-hidden h-[400px] animate-pulse">
+                <div className="h-48 bg-slate-800"></div>
+                <div className="p-6 space-y-4">
+                  <div className="h-4 w-12 bg-slate-800 rounded"></div>
+                  <div className="h-6 w-full bg-slate-800 rounded"></div>
+                  <div className="h-6 w-2/3 bg-slate-800 rounded"></div>
+                </div>
+              </div>
+            ))
+          ) : blogPosts.length > 0 ? (
+            blogPosts.map((post) => {
+              const featuredImage = post._embedded?.['wp:featuredmedia']?.[0]?.source_url || 'https://images.unsplash.com/photo-1614850523296-d8c1af93d400?auto=format&fit=crop&q=80&w=800';
+              const categories = post._embedded?.['wp:term']?.[0] || [];
+              const categoryName = categories.length > 0 ? categories[0].name : 'Post';
+              const formattedDate = new Date(post.date).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
+
+              return (
+                <a 
+                  key={post.id} 
+                  href={post.link} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="group bg-slate-900/40 border border-slate-800 rounded-[32px] overflow-hidden hover:border-purple-500/30 transition-all flex flex-col h-full shadow-lg"
+                  id={`blog-post-${post.id}`}
+                >
+                  <div className="relative h-48 overflow-hidden">
+                    <img 
+                      src={featuredImage} 
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" 
+                      alt={post.title.rendered} 
+                    />
+                    <div className="absolute top-4 left-4">
+                      <span className="bg-purple-600 text-white text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-lg shadow-lg">
+                        {categoryName}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="p-6 space-y-4 flex flex-col flex-1">
+                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{formattedDate}</span>
+                    <h4 
+                      className="text-lg font-black text-white leading-tight group-hover:text-purple-400 transition-colors line-clamp-2"
+                      dangerouslySetInnerHTML={{ __html: post.title.rendered }}
+                    />
+                    <div className="pt-2 mt-auto">
+                      <span className="text-[10px] font-black text-purple-500 uppercase tracking-widest flex items-center space-x-2">
+                        <span>Ler mais</span>
+                        <i className="fas fa-arrow-right text-[8px] group-hover:translate-x-1 transition-transform"></i>
+                      </span>
+                    </div>
+                  </div>
+                </a>
+              );
+            })
+          ) : (
+            <div className="col-span-full py-12 text-center text-slate-500 italic border border-dashed border-slate-800 rounded-[32px]">
+              Nenhuma postagem encontrada no blog.
+            </div>
+          )}
+        </div>
+      </section>
     </div>
   );
 };

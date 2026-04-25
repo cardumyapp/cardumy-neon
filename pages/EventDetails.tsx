@@ -27,7 +27,7 @@ export const EventDetails: React.FC<EventDetailsProps> = ({ onAddToCart }) => {
       slug: event.id,
       name: `Ingresso: ${event.name}`,
       type: ProductType.TICKET,
-      price: event.price,
+      price: event.price || 0,
       imageUrl: event.imageUrl || 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&q=80&w=300',
       storeName: store.name,
       storeId: store.id,
@@ -180,7 +180,7 @@ export const EventDetails: React.FC<EventDetailsProps> = ({ onAddToCart }) => {
                  <div className="flex justify-between items-end">
                     <div>
                        <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Preço do Ingresso</p>
-                       <p className="text-4xl font-black text-white">R$ {event.price}</p>
+                       <p className="text-4xl font-black text-white">R$ {(event.price || 0).toFixed(2)}</p>
                     </div>
                     <div className="text-right">
                        <p className="text-[9px] font-black text-emerald-500 uppercase tracking-widest mb-1">Pagamento Seguro</p>

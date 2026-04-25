@@ -1,7 +1,7 @@
 
-import React, { useState } from 'react';
-import { GameType } from '../types';
-import { MOCK_CARDS } from '../constants';
+import React, { useState, useEffect } from 'react';
+import { GameType, Card } from '../types';
+import { getCards } from '../src/services/supabaseService';
 
 interface DeckBuilderPageProps {
   activeGame: GameType | 'All';
@@ -9,6 +9,20 @@ interface DeckBuilderPageProps {
 
 export const DeckBuilderPage: React.FC<DeckBuilderPageProps> = ({ activeGame }) => {
   const [deckName, setDeckName] = useState('Novo Deck 1');
+  const [cards, setCards] = useState<Card[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchCards = async () => {
+      setLoading(true);
+      const data = await getCards(activeGame);
+      setCards(data);
+      setLoading(false);
+    };
+    if (activeGame !== 'All') {
+      fetchCards();
+    }
+  }, [activeGame]);
 
   // Se não houver um foco de jogo selecionado, solicita ao usuário
   if (activeGame === 'All') {
@@ -104,21 +118,27 @@ export const DeckBuilderPage: React.FC<DeckBuilderPageProps> = ({ activeGame }) 
           </div>
 
           <div className="flex-1 overflow-y-auto pr-2 scrollbar-hide">
-             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
-               {MOCK_CARDS.filter(c => c.game === activeGame).map(card => (
-                 <div key={card.id} className="bg-slate-900 rounded-2xl overflow-hidden border border-slate-800 group hover:border-purple-500 cursor-pointer shadow-lg transition-all active:scale-95">
-                   <div className="aspect-[3/4.2] overflow-hidden">
-                     <img src={card.imageUrl} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" alt={card.name} />
+             {loading ? (
+               <div className="flex items-center justify-center h-40">
+                 <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-purple-500"></div>
+               </div>
+             ) : (
+               <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                 {cards.map(card => (
+                   <div key={card.id} className="bg-slate-900 rounded-2xl overflow-hidden border border-slate-800 group hover:border-purple-500 cursor-pointer shadow-lg transition-all active:scale-95">
+                     <div className="aspect-[3/4.2] overflow-hidden">
+                       <img src={card.imageUrl} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" alt={card.name} />
+                     </div>
+                     <div className="p-3 text-center text-[10px] font-black uppercase tracking-tight truncate bg-slate-950/50 text-slate-400 group-hover:text-white transition-colors">{card.name}</div>
                    </div>
-                   <div className="p-3 text-center text-[10px] font-black uppercase tracking-tight truncate bg-slate-950/50 text-slate-400 group-hover:text-white transition-colors">{card.name}</div>
-                 </div>
-               ))}
-               {MOCK_CARDS.filter(c => c.game === activeGame).length === 0 && (
-                 <div className="col-span-full py-20 text-center opacity-30 italic text-sm">
-                   Nenhuma carta de {activeGame} encontrada.
-                 </div>
-               )}
-             </div>
+                 ))}
+                 {cards.length === 0 && (
+                   <div className="col-span-full py-20 text-center opacity-30 italic text-sm">
+                     Nenhuma carta de {activeGame} encontrada.
+                   </div>
+                 )}
+               </div>
+             )}
           </div>
         </div>
       </div>

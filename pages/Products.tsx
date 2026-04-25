@@ -21,6 +21,8 @@ export const Products: React.FC<ProductsProps> = ({ onAddToCart, activeGame }) =
   const [searchQuery, setSearchQuery] = useState('');
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 12;
 
   useEffect(() => {
     const unsub = getProducts((data) => {
@@ -33,21 +35,31 @@ export const Products: React.FC<ProductsProps> = ({ onAddToCart, activeGame }) =
   const itemCategories = ['Todos', 'Produto Selado', 'Acessório', 'Premium Bandai', 'Carta Avulsa'];
   const gameCategories = ['Todos', 'One Piece', 'Magic', 'Pokémon', 'Yu-Gi-Oh!', 'Disney Lorcana', 'Digimon'];
 
+  const mappedProducts = useMemo(() => {
+    return products.map(p => ({
+      ...p,
+      imageUrl: p.image_url || p.imageUrl || 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&q=80&w=400',
+      name: p.beauty_name || p.name,
+      price: p.msrp || p.price || 0,
+      type: p.product_type || p.type
+    }));
+  }, [products]);
+
   const scopedProducts = useMemo(() => {
-    let list = [...products];
+    let list = [...mappedProducts];
     
     // Respeita o foco global se definido, caso contrário usa o filtro local
     const targetGame = activeGame !== 'All' ? activeGame : (gameFilter !== 'Todos' ? gameFilter : null);
     
     if (targetGame) {
-      list = list.filter(p => !p.game || p.game === targetGame);
+      list = list.filter(p => !p.game || p.game === targetGame || p.cardgames?.name === targetGame);
     }
 
     if (searchQuery) {
       list = list.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()));
     }
     return list;
-  }, [activeGame, gameFilter, searchQuery, products]);
+  }, [activeGame, gameFilter, searchQuery, mappedProducts]);
 
   const tickets = useMemo(() => scopedProducts.filter(p => p.type === 'Ingresso'), [scopedProducts]);
   
@@ -64,6 +76,17 @@ export const Products: React.FC<ProductsProps> = ({ onAddToCart, activeGame }) =
       return 0;
     });
   }, [scopedProducts, itemFilter, sortBy]);
+
+  const totalPages = Math.ceil(normalItems.length / itemsPerPage);
+  
+  const paginatedItems = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return normalItems.slice(startIndex, startIndex + itemsPerPage);
+  }, [normalItems, currentPage]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [itemFilter, gameFilter, searchQuery, sortBy, activeGame]);
 
   const productOffers = useMemo(() => {
     if (!selectedSlug) return [];
@@ -229,7 +252,7 @@ export const Products: React.FC<ProductsProps> = ({ onAddToCart, activeGame }) =
            </div>
 
            <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-6">
-              {normalItems.map(product => (
+              {paginatedItems.map(product => (
                 <div key={product.id} onClick={() => setSelectedSlug(product.slug)} className="group bg-slate-900/40 border border-slate-800 rounded-3xl overflow-hidden transition-all duration-300 hover:border-purple-500/50 hover:-translate-y-1 cursor-pointer flex flex-col shadow-lg">
                   <div className="aspect-[3/4] p-4 bg-slate-950/20 relative flex items-center justify-center">
                     <img src={product.imageUrl} className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-700" alt={product.name} />
@@ -248,13 +271,63 @@ export const Products: React.FC<ProductsProps> = ({ onAddToCart, activeGame }) =
                   </div>
                 </div>
               ))}
-              {normalItems.length === 0 && (
+              {paginatedItems.length === 0 && (
                 <div className="col-span-full py-24 text-center space-y-4 opacity-30">
                   <i className="fas fa-box-open text-4xl"></i>
                   <p className="text-xs font-black uppercase tracking-widest">Nenhum produto encontrado</p>
                 </div>
               )}
            </div>
+
+           {/* Paginação */}
+           {totalPages > 1 && (
+             <div className="flex items-center justify-center space-x-2 pt-8">
+               <button
+                 disabled={currentPage === 1}
+                 onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                 className="w-10 h-10 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-400 hover:border-purple-500 hover:text-white transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+               >
+                 <i className="fas fa-chevron-left text-xs"></i>
+               </button>
+               
+               <div className="flex items-center space-x-1">
+                 {Array.from({ length: totalPages }, (_, i) => i + 1)
+                   .filter(page => {
+                     // Mostrar primeira, última e algumas ao redor da atual
+                     return page === 1 || page === totalPages || Math.abs(page - currentPage) <= 1;
+                   })
+                   .map((page, index, array) => {
+                     const isFirst = index === 0;
+                     const prevPage = array[index - 1];
+                     const showEllipsis = !isFirst && page - prevPage > 1;
+
+                     return (
+                       <React.Fragment key={page}>
+                         {showEllipsis && <span className="text-slate-600 px-1">...</span>}
+                         <button
+                           onClick={() => setCurrentPage(page)}
+                           className={`w-10 h-10 rounded-xl border font-bold text-xs transition-all ${
+                             currentPage === page 
+                               ? 'bg-purple-600 border-purple-500 text-white shadow-lg' 
+                               : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'
+                           }`}
+                         >
+                           {page}
+                         </button>
+                       </React.Fragment>
+                     );
+                   })}
+               </div>
+
+               <button
+                 disabled={currentPage === totalPages}
+                 onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                 className="w-10 h-10 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-400 hover:border-purple-500 hover:text-white transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+               >
+                 <i className="fas fa-chevron-right text-xs"></i>
+               </button>
+             </div>
+           )}
         </div>
       </div>
     </div>

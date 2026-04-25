@@ -15,6 +15,8 @@ export const Marketplace: React.FC<MarketplaceProps> = ({ onAddToCart, activeGam
   const [activeCategory, setActiveCategory] = useState<string>('Tudo');
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 12;
 
   useEffect(() => {
     const unsub = getProducts((data) => {
@@ -26,12 +28,21 @@ export const Marketplace: React.FC<MarketplaceProps> = ({ onAddToCart, activeGam
   
   const categories = ['Tudo', 'Produto Selado', 'Acessório', 'Ingresso', 'Promoção'];
 
+  const mappedProducts = useMemo(() => {
+    return products.map(p => ({
+      ...p,
+      imageUrl: p.image_url || p.imageUrl || 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&q=80&w=400',
+      name: p.beauty_name || p.name,
+      price: p.msrp || p.price || 0
+    }));
+  }, [products]);
+
   const filteredProducts = useMemo(() => {
-    let list = products;
+    let list = mappedProducts;
     
     // Global Focus Filter
     if (activeGame !== 'All') {
-      list = list.filter(p => !p.game || p.game === activeGame);
+      list = list.filter(p => !p.game || p.game === activeGame || p.cardgames?.name === activeGame);
     }
     
     // Category Filter
@@ -40,7 +51,18 @@ export const Marketplace: React.FC<MarketplaceProps> = ({ onAddToCart, activeGam
     }
     
     return list;
-  }, [activeGame, activeCategory, products]);
+  }, [activeGame, activeCategory, mappedProducts]);
+
+  const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
+  
+  const paginatedItems = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return filteredProducts.slice(startIndex, startIndex + itemsPerPage);
+  }, [filteredProducts, currentPage]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeCategory, activeGame]);
 
   if (loading) {
     return (
@@ -123,7 +145,7 @@ export const Marketplace: React.FC<MarketplaceProps> = ({ onAddToCart, activeGam
 
       {/* Product Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-        {filteredProducts.length > 0 ? filteredProducts.map(product => (
+        {paginatedItems.length > 0 ? paginatedItems.map(product => (
           <div key={product.id} className="group bg-slate-900/40 rounded-3xl border border-slate-800 hover:border-purple-500/50 transition-all duration-300 flex flex-col overflow-hidden relative">
             <div className="p-4 bg-slate-950/50 flex items-center justify-between border-b border-slate-800/50">
                <div className="flex items-center space-x-2">
@@ -145,12 +167,12 @@ export const Marketplace: React.FC<MarketplaceProps> = ({ onAddToCart, activeGam
               />
               {product.type === 'Ingresso' && (
                 <div className="absolute top-6 right-6 bg-yellow-500 text-slate-950 font-black px-3 py-1 rounded-full text-[9px] uppercase tracking-widest shadow-xl">
-                  Evento
+                   Evento
                 </div>
               )}
               {product.originalPrice && (
                 <div className="absolute top-6 left-6 bg-pink-600 text-white font-black px-3 py-1 rounded-full text-[9px] uppercase tracking-widest shadow-xl">
-                  PROMO
+                   PROMO
                 </div>
               )}
             </div>
@@ -187,15 +209,66 @@ export const Marketplace: React.FC<MarketplaceProps> = ({ onAddToCart, activeGam
           </div>
         )}
 
-        <div className="border-2 border-dashed border-slate-800 rounded-3xl p-8 flex flex-col items-center justify-center text-center space-y-4 hover:border-purple-500/30 hover:bg-purple-500/5 transition-all">
-          <div className="w-16 h-16 rounded-full bg-slate-900 flex items-center justify-center text-slate-600">
-            <i className="fas fa-shop text-2xl"></i>
+        {paginatedItems.length > 0 && paginatedItems.length < 4 && (
+          <div className="border-2 border-dashed border-slate-800 rounded-3xl p-8 flex flex-col items-center justify-center text-center space-y-4 hover:border-purple-500/30 hover:bg-purple-500/5 transition-all">
+            <div className="w-16 h-16 rounded-full bg-slate-900 flex items-center justify-center text-slate-600">
+              <i className="fas fa-shop text-2xl"></i>
+            </div>
+            <h4 className="font-bold text-slate-200">Sua Loja aqui!</h4>
+            <p className="text-xs text-slate-500">Venda cartas, produtos e ingressos para a maior comunidade de TCG.</p>
+            <button className="text-purple-400 text-xs font-bold hover:underline">Começar agora →</button>
           </div>
-          <h4 className="font-bold text-slate-200">Sua Loja aqui!</h4>
-          <p className="text-xs text-slate-500">Venda cartas, produtos e ingressos para a maior comunidade de TCG.</p>
-          <button className="text-purple-400 text-xs font-bold hover:underline">Começar agora →</button>
-        </div>
+        )}
       </div>
+
+      {/* Paginação */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center space-x-2 pt-8">
+          <button
+            disabled={currentPage === 1}
+            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+            className="w-10 h-10 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-400 hover:border-purple-500 hover:text-white transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+          >
+            <i className="fas fa-chevron-left text-xs"></i>
+          </button>
+          
+          <div className="flex items-center space-x-1">
+            {Array.from({ length: totalPages }, (_, i) => i + 1)
+              .filter(page => {
+                return page === 1 || page === totalPages || Math.abs(page - currentPage) <= 1;
+              })
+              .map((page, index, array) => {
+                const isFirst = index === 0;
+                const prevPage = array[index - 1];
+                const showEllipsis = !isFirst && page - prevPage > 1;
+
+                return (
+                  <React.Fragment key={page}>
+                    {showEllipsis && <span className="text-slate-600 px-1">...</span>}
+                    <button
+                      onClick={() => setCurrentPage(page)}
+                      className={`w-10 h-10 rounded-xl border font-bold text-xs transition-all ${
+                        currentPage === page 
+                          ? 'bg-purple-600 border-purple-500 text-white shadow-lg' 
+                          : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  </React.Fragment>
+                );
+              })}
+          </div>
+
+          <button
+            disabled={currentPage === totalPages}
+            onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+            className="w-10 h-10 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-400 hover:border-purple-500 hover:text-white transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+          >
+            <i className="fas fa-chevron-right text-xs"></i>
+          </button>
+        </div>
+      )}
     </div>
   );
 };
