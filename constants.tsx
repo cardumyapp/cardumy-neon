@@ -21,7 +21,7 @@ export const MOCK_CARDS: Card[] = Array.from({ length: 20 }, (_, i) => ({
   imageUrl: `https://images.unsplash.com/photo-1613771404721-1f92d799e49f?auto=format&fit=crop&q=80&w=300`,
   game: GameType.ONE_PIECE,
   set: "PREMIUM BOOSTER -ONE PIECE CARD THE BEST vol.2-",
-  variants: 1,
+  variants: [],
   price: Math.floor(Math.random() * 50) + 10,
 }));
 

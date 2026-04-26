@@ -25,6 +25,36 @@ async function startServer() {
     : null;
 
   // API Routes
+  app.get("/api/cards", async (req: express.Request, res: express.Response) => {
+    const { game, ...rest } = req.query;
+    if (!game) {
+      return res.status(400).json({ error: "game obrigatório" });
+    }
+
+    const token = process.env.HOMURA_TOKEN;
+    const baseUrl = process.env.HOMURA_URL || "https://homura-cards.vercel.app";
+
+    try {
+      const searchParams = new URLSearchParams();
+      Object.entries(rest).forEach(([key, value]) => {
+        if (value) searchParams.append(key, String(value));
+      });
+
+      const url = `${baseUrl}/api/${game}/cards?${searchParams.toString()}`;
+      const response = await fetch(url, {
+        headers: {
+          "Authorization": `Bearer ${token}`
+        }
+      });
+
+      const data = await response.json();
+      res.status(response.status).json(data);
+    } catch (error: any) {
+      console.error("Error fetching cards:", error);
+      res.status(500).json({ error: "Erro ao buscar cartas" });
+    }
+  });
+
   app.post("/api/seed", async (req: express.Request, res: express.Response) => {
     res.json({ message: "Seeding disabled" });
   });

@@ -503,6 +503,54 @@ export const getCards = async (game?: string): Promise<any[]> => {
   }
 };
 
+export const searchExternalCards = async (game: string, query: string, page: number = 1, limit: number = 20): Promise<{ data: any[], total: number, totalPages: number }> => {
+  try {
+    // Map frontend game names to API game IDs if needed
+    const gameMap: Record<string, string> = {
+      'One Piece': 'one-piece',
+      'Magic': 'magic',
+      'Pokémon': 'pokemon',
+      'Yu-Gi-Oh!': 'yugioh',
+      'Disney Lorcana': 'lorcana',
+      'Digimon': 'digimon'
+    };
+
+    const gameId = gameMap[game] || game.toLowerCase();
+    const url = `/api/cards?game=${encodeURIComponent(gameId)}&q=${encodeURIComponent(query)}&page=${page}&limit=${limit}`;
+    
+    const response = await fetch(url);
+    if (!response.ok) throw new Error('Failed to fetch external cards');
+    const data = await response.json();
+    
+    // The API might return directly an array or a structured object
+    const list = Array.isArray(data) ? data : (data.data || data.cards || []);
+    const total = typeof data.total === 'number' ? data.total : list.length;
+    const totalPages = typeof data.totalPages === 'number' ? data.totalPages : 1;
+    
+    const mappedCards = list.map((c: any) => ({
+      id: c.id || c.code || Math.random().toString(),
+      name: c.name,
+      game: game,
+      code: c.code || c.number || 'N/A',
+      rarity: c.rarity || 'Common',
+      price: c.price || 0,
+      imageUrl: c.image || c.imageUrl || c.images?.small || c.images?.normal || 'https://images.unsplash.com/photo-1614850523296-d8c1af93d400?auto=format&fit=crop&q=80&w=400',
+      set: c.set_name || c.set || 'Desconhecido',
+      description: c.text || c.effect || '',
+      variants: c.variants || []
+    }));
+
+    return {
+      data: mappedCards,
+      total,
+      totalPages
+    };
+  } catch (error) {
+    console.error('Error searching external cards:', error);
+    return { data: [], total: 0, totalPages: 0 };
+  }
+};
+
 export const getStoreTournaments = async (username: string) => {
   try {
     const response = await fetch(`/api/lojas/${username}/torneios`);

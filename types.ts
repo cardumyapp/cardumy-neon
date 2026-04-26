@@ -100,7 +100,7 @@ export interface Card {
   imageUrl: string;
   game: GameType;
   set: string;
-  variants?: number;
+  variants?: any[];
   rarity?: string;
   price?: number;
 }

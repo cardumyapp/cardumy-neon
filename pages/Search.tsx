@@ -1,9 +1,9 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { GameType, Card } from '../types';
 import { useAuth } from '../src/components/AuthProvider';
-import { addCardToList, getCards } from '../src/services/supabaseService';
+import { addCardToList, searchExternalCards } from '../src/services/supabaseService';
 
 interface Folder {
   id: string;
@@ -45,22 +45,31 @@ export const Search: React.FC<SearchProps> = ({ activeGame }) => {
   const [showFilters, setShowFilters] = useState(false);
   const [expandedCard, setExpandedCard] = useState<Card | null>(null);
   const [cards, setCards] = useState<Card[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [totalPages, setTotalPages] = useState(0);
+  const [totalResults, setTotalResults] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 8;
+  const itemsPerPage = 20;
+
+  const fetchCards = useCallback(async (game: string, query: string, page: number) => {
+    if (game === 'All') return;
+    setLoading(true);
+    const response = await searchExternalCards(game, query, page, itemsPerPage);
+    setCards(response.data);
+    setTotalPages(response.totalPages);
+    setTotalResults(response.total);
+    setLoading(false);
+  }, []);
 
   useEffect(() => {
-    const fetchCards = async () => {
-      setLoading(true);
-      const data = await getCards(activeGame);
-      setCards(data);
-      setLoading(false);
-    };
-    if (activeGame !== 'All') {
-      fetchCards();
-    }
-  }, [activeGame]);
+    const timer = setTimeout(() => {
+      fetchCards(activeGame, searchQuery, currentPage);
+    }, 500);
 
+    return () => clearTimeout(timer);
+  }, [activeGame, searchQuery, currentPage, fetchCards]);
+
+  // Reset to page 1 when game or search query changes
   useEffect(() => {
     setCurrentPage(1);
   }, [searchQuery, activeGame]);
@@ -111,14 +120,7 @@ export const Search: React.FC<SearchProps> = ({ activeGame }) => {
   }
 
   // Filtragem respeitando o foco global (activeGame nunca será 'All' aqui)
-  const filteredCards = cards.filter(card => {
-    const searchMatch = card.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                       card.code.toLowerCase().includes(searchQuery.toLowerCase());
-    return searchMatch;
-  });
-
-  const totalPages = Math.ceil(filteredCards.length / itemsPerPage);
-  const paginatedCards = filteredCards.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  const paginatedCards = Array.isArray(cards) ? cards : [];
 
   return (
     <div className="flex flex-col lg:flex-row gap-8 animate-in fade-in duration-500">
@@ -188,7 +190,7 @@ export const Search: React.FC<SearchProps> = ({ activeGame }) => {
         {/* Results Info */}
         <div className="flex items-center justify-between text-sm px-2">
           <p className="text-slate-400 text-xs uppercase font-bold tracking-tight">
-            <span className="text-white">{filteredCards.length}</span> resultados em {activeGame}
+            <span className="text-white">{totalResults}</span> resultados encontrados em {activeGame}
           </p>
           <div className="flex items-center space-x-2">
             <span className="text-slate-500 text-[10px] font-black uppercase tracking-widest">Ordenar:</span>
@@ -202,7 +204,12 @@ export const Search: React.FC<SearchProps> = ({ activeGame }) => {
         </div>
 
         {/* Cards Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-6">
+        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-6 relative min-h-[400px]">
+          {loading && (
+            <div className="absolute inset-0 z-50 flex items-center justify-center bg-slate-950/20 backdrop-blur-sm rounded-3xl">
+              <div className="w-10 h-10 border-4 border-purple-500 border-t-transparent rounded-full animate-spin"></div>
+            </div>
+          )}
           {paginatedCards.map((card) => (
             <div key={card.id} className="group bg-slate-900/40 rounded-3xl border border-slate-800 hover:border-purple-500/50 transition-all duration-300 flex flex-col overflow-hidden relative shadow-lg">
               <div className="relative aspect-[3/4.2] p-2">
@@ -244,6 +251,15 @@ export const Search: React.FC<SearchProps> = ({ activeGame }) => {
                     <span className="text-[10px] font-bold text-purple-500/80 uppercase">{card.game}</span>
                   </div>
                 </div>
+
+                {card.variants && card.variants.length > 0 && (
+                  <div className="mb-4 bg-slate-950/40 rounded-xl p-2 border border-white/5 flex items-center justify-between">
+                    <span className="text-[10px] text-slate-500 font-bold uppercase">{card.variants.length} variantes</span>
+                    <button className="text-[10px] font-black text-purple-400 hover:text-purple-300 transition-colors uppercase tracking-widest">
+                      Ver Preços
+                    </button>
+                  </div>
+                )}
 
                 <div className="mt-auto relative">
                   {addingToFolder === card.id ? (
