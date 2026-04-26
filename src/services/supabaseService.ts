@@ -604,14 +604,18 @@ export const getStoreEvents = async (storeId: string) => {
 };
 
 export const getActivities = async (limit: number = 10) => {
+  console.log(`[DEBUG] Fetching activities with limit: ${limit}`);
   try {
     const response = await fetch(`/api/atividades?limit=${limit}`);
+    console.log(`[DEBUG] Activities response status: ${response.status}`);
     if (!response.ok) {
       const errorText = await response.text();
       console.error('Activities fetch error response:', errorText);
       throw new Error(`Failed to fetch activities: ${response.status}`);
     }
-    return await response.json();
+    const data = await response.json();
+    console.log(`[DEBUG] Activities fetched successfully, count: ${data?.length || 0}`);
+    return data;
   } catch (error: any) {
     console.error('Error fetching activities:', error?.message || error);
     return [];
@@ -818,10 +822,14 @@ export const submitUserReview = async (username: string, reviewerId: string, isP
 };
 
 export const getCollectionRanking = async (limit: number = 5) => {
+  console.log(`[DEBUG] Fetching collection ranking with limit: ${limit}`);
   try {
     const response = await fetch(`/api/rankings/colecao?limit=${limit}`);
+    console.log(`[DEBUG] Collection ranking response status: ${response.status}`);
     if (!response.ok) throw new Error('Failed to fetch ranking');
-    return await response.json();
+    const data = await response.json();
+    console.log(`[DEBUG] Collection ranking fetched, count: ${data?.length || 0}`);
+    return data;
   } catch (error) {
     console.error('Error fetching collection ranking:', error);
     return [];
@@ -829,10 +837,14 @@ export const getCollectionRanking = async (limit: number = 5) => {
 };
 
 export const getOffersRanking = async (limit: number = 5) => {
+  console.log(`[DEBUG] Fetching offers ranking with limit: ${limit}`);
   try {
     const response = await fetch(`/api/rankings/ofertas?limit=${limit}`);
+    console.log(`[DEBUG] Offers ranking response status: ${response.status}`);
     if (!response.ok) throw new Error('Failed to fetch ranking');
-    return await response.json();
+    const data = await response.json();
+    console.log(`[DEBUG] Offers ranking fetched, count: ${data?.length || 0}`);
+    return data;
   } catch (error) {
     console.error('Error fetching offers ranking:', error);
     return [];

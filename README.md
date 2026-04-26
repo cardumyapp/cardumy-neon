@@ -1,20 +1,44 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# Cardumy TCG 🎴
 
-# Run and deploy your AI Studio app
+Cardumy é a plataforma definitiva para colecionadores de Card Games. Organize sua coleção, crie wishlists, gerencie trocas e conecte-se com outros entusiastas.
 
-This contains everything you need to run your app locally.
+## 🚀 Tecnologias e Dependências Cruciais
 
-View your app in AI Studio: https://ai.studio/apps/67349f92-3ab2-440b-8101-b79879cc0b06
+O projeto foi construído utilizando as seguintes ferramentas fundamentais:
 
-## Run Locally
+### Frontend
+- **React 19 & TypeScript**: Framework robusto para interfaces dinâmicas e tipagem segura.
+- **Vite**: Build tool ultra-rápida para desenvolvimento moderno.
+- **Tailwind CSS**: Estilização baseada em utilitários para um design consistente e responsivo.
+- **Motion (motion/react)**: Responsável pelas animações fluidas e transições de página.
+- **React Router Dom (v7)**: Gerenciamento de rotas e navegação complexa (SPAs).
 
-**Prerequisites:**  Node.js
+### Backend & Persistência
+- **Supabase (@supabase/supabase-js)**: Integração crucial para Autenticação, Banco de Dados (PostgreSQL) e Real-time.
+- **Express (Node.js)**: Servidor back-end que sustenta a aplicação em modo full-stack.
+- **tsx**: Execução do servidor TypeScript diretamente em tempo de desenvolvimento.
 
+### Iconografia
+- **Font Awesome & Lucide React**: Biblioteca de ícones consistente para toda a interface.
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+## 🛠️ Como Iniciar
+
+1. Instale as dependências:
+   ```bash
+   npm install
+   ```
+2. Configure as variáveis de ambiente (`.env` baseado no `.env.example`).
+3. Inicie o servidor de desenvolvimento:
+   ```bash
+   npm run dev
+   ```
+
+## 📂 Estrutura do Projeto
+
+- `/src/components`: Componentes reutilizáveis de UI.
+- `/src/services`: Lógica de integração com Supabase e APIs externas.
+- `/pages`: Visualizações principais da aplicação.
+- `server.ts`: Ponto de entrada do servidor Node.js/Express.
+
+---
+Desenvolvido com ❤️ para a comunidade TCG.

@@ -172,35 +172,30 @@ async function startServer() {
 
   // Store Routes - Replicating Python logic
   app.get("/api/rankings/colecao", async (req: express.Request, res: express.Response) => {
+    console.log("[DEBUG] API: /api/rankings/colecao hitting");
     if (!supabaseAdmin) return res.status(500).json({ error: "Supabase not configured" });
     const limit = parseInt(req.query.limit as string) || 5;
     try {
-      // Logic from Python: count user_cards grouped by user_id
-      const { data, error } = await supabaseAdmin.rpc('get_collection_ranking', { row_limit: limit });
+      // Fallback to JS aggregation as the primary logic since RPC is missing
+      const { data: users, error: uError } = await supabaseAdmin.from('users').select('id, username, codename, avatar');
+      if (uError) throw uError;
       
-      if (error) {
-        // Fallback to JS aggregation if RPC fails/doesn't exist
-        const { data: users, error: uError } = await supabaseAdmin.from('users').select('id, username, codename, avatar');
-        if (uError) throw uError;
-        
-        const { data: counts, error: cError } = await supabaseAdmin.rpc('count_user_cards_per_user');
-        // This is complex without RPC. Let's try a safer way using select with count.
-        
-        const ranking = await Promise.all(users.map(async (u) => {
-          const { count } = await supabaseAdmin.from('user_cards').select('*', { count: 'exact', head: true }).eq('user_id', u.id);
-          return { ...u, total_cards: count || 0 };
-        }));
-        
-        return res.json(ranking.sort((a, b) => b.total_cards - a.total_cards).slice(0, limit));
-      }
+      const ranking = await Promise.all(users.map(async (u) => {
+        const { count } = await supabaseAdmin.from('user_cards').select('*', { count: 'exact', head: true }).eq('user_id', u.id);
+        return { ...u, total_cards: count || 0 };
+      }));
       
-      res.json(data);
+      const result = ranking.sort((a, b) => b.total_cards - a.total_cards).slice(0, limit);
+      console.log(`[DEBUG] Collection ranking returned ${result.length} items`);
+      res.json(result);
     } catch (error: any) {
+      console.error('[DEBUG] Error in /api/rankings/colecao:', error);
       res.status(500).json({ error: error.message });
     }
   });
 
   app.get("/api/rankings/ofertas", async (req: express.Request, res: express.Response) => {
+    console.log("[DEBUG] API: /api/rankings/ofertas hitting");
     if (!supabaseAdmin) return res.status(500).json({ error: "Supabase not configured" });
     const limit = parseInt(req.query.limit as string) || 5;
     try {
@@ -209,12 +204,16 @@ async function startServer() {
       if (uError) throw uError;
       
       const ranking = await Promise.all(users.map(async (u) => {
-        const { count } = await supabaseAdmin.from('offerlist').select('*', { count: 'exact', head: true }).eq('user_id', u.id);
+        // Checking if 'trade_offers' or 'offerlist' is the correct table
+        const { count } = await supabaseAdmin.from('trade_offers').select('*', { count: 'exact', head: true }).eq('user_id', u.id);
         return { ...u, offers_count: count || 0 };
       }));
       
-      res.json(ranking.sort((a, b) => b.offers_count - a.offers_count).slice(0, limit));
+      const result = ranking.sort((a, b) => b.offers_count - a.offers_count).slice(0, limit);
+      console.log(`[DEBUG] Offers ranking returned ${result.length} items`);
+      res.json(result);
     } catch (error: any) {
+      console.error('[DEBUG] Error in /api/rankings/ofertas:', error);
       res.status(500).json({ error: error.message });
     }
   });
@@ -365,6 +364,7 @@ async function startServer() {
   });
 
   app.get("/api/atividades", async (req: express.Request, res: express.Response) => {
+    console.log("[DEBUG] API: /api/atividades hitting");
     if (!supabaseAdmin) return res.status(500).json({ error: "Supabase not configured" });
     const limit = parseInt(req.query.limit as string) || 10;
     try {
@@ -379,7 +379,7 @@ async function startServer() {
         .limit(limit);
 
       if (error) {
-        console.warn('Error fetching from action_logs with joins, trying without joins:', error.message);
+        console.warn('[DEBUG] Error fetching from action_logs with joins, trying without joins:', error.message);
         const { data: dataLog, error: errorLog } = await supabaseAdmin
           .from('action_logs')
           .select('*')
@@ -397,10 +397,11 @@ async function startServer() {
              timestamp: new Date(item.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
              date: new Date(item.created_at).toLocaleDateString('pt-BR')
            }));
+           console.log(`[DEBUG] Activities (action_logs simple) returned ${formatted.length} items`);
            return res.json(formatted);
         }
 
-        console.warn('Error fetching from action_logs completely, trying social_feeds as fallback:', errorLog.message);
+        console.warn('[DEBUG] Error fetching from action_logs completely, trying social_feeds as fallback:', errorLog.message);
         // Fallback or just throw
         const { data: data2, error: error2 } = await supabaseAdmin
           .from('social_feeds')
@@ -411,7 +412,10 @@ async function startServer() {
           .order('created_at', { ascending: false })
           .limit(limit);
         
-        if (error2) throw error2;
+        if (error2) {
+          console.error('[DEBUG] Both action_logs and social_feeds failed');
+          throw error2;
+        }
 
         const formatted = (data2 || []).map(item => ({
           id: item.id,
@@ -423,6 +427,7 @@ async function startServer() {
           timestamp: new Date(item.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
           date: new Date(item.created_at).toLocaleDateString('pt-BR')
         }));
+        console.log(`[DEBUG] Activities (social_feeds) returned ${formatted.length} items`);
         return res.json(formatted);
       }
 
@@ -440,9 +445,10 @@ async function startServer() {
         };
       });
 
+      console.log(`[DEBUG] Activities (action_logs joined) returned ${formatted.length} items`);
       res.json(formatted);
     } catch (error: any) {
-      console.error('Error fetching activities:', error);
+      console.error('[DEBUG] Error in /api/atividades:', error);
       res.status(500).json({ error: error.message });
     }
   });

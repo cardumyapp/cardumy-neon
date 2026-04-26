@@ -8,18 +8,23 @@ export const Social: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
-  const [rankingType, setRankingType] = useState<'colecao' | 'ofertas'>('colecao');
-  const [rankings, setRankings] = useState<any[]>([]);
   const [rankLoading, setRankLoading] = useState(false);
   const [activities, setActivities] = useState<any[]>([]);
   const [activitiesLoading, setActivitiesLoading] = useState(true);
 
   useEffect(() => {
     const fetchActivities = async () => {
+      console.log('[DEBUG] Social component: fetchActivities starting');
       setActivitiesLoading(true);
-      const data = await getActivities(10);
-      setActivities(data);
-      setActivitiesLoading(false);
+      try {
+        const data = await getActivities(5);
+        console.log(`[DEBUG] Social component: fetchActivities received ${data?.length || 0} items`);
+        setActivities(data);
+      } catch (err) {
+        console.error('[DEBUG] Social component: fetchActivities error:', err);
+      } finally {
+        setActivitiesLoading(false);
+      }
     };
     fetchActivities();
   }, []);
@@ -39,185 +44,237 @@ export const Social: React.FC = () => {
     return () => clearTimeout(delayDebounceFn);
   }, [searchTerm]);
 
+  const [collectionRankings, setCollectionRankings] = useState<any[]>([]);
+  const [offersRankings, setOffersRankings] = useState<any[]>([]);
+
   useEffect(() => {
-    const fetchRankings = async () => {
+    const fetchAllRankings = async () => {
+      console.log('[DEBUG] Social component: fetchAllRankings starting');
       setRankLoading(true);
-      if (rankingType === 'colecao') {
-        const data = await getCollectionRanking(5);
-        setRankings(data);
-      } else {
-        const data = await getOffersRanking(5);
-        setRankings(data);
+      try {
+        const [collData, offData] = await Promise.all([
+          getCollectionRanking(5),
+          getOffersRanking(5)
+        ]);
+        console.log(`[DEBUG] Social component: rankings received. Collection: ${collData?.length || 0}, Offers: ${offData?.length || 0}`);
+        setCollectionRankings(collData);
+        setOffersRankings(offData);
+      } catch (err) {
+        console.error('[DEBUG] Social component: fetchAllRankings error:', err);
+      } finally {
+        setRankLoading(false);
       }
-      setRankLoading(false);
     };
-    fetchRankings();
-  }, [rankingType]);
+    fetchAllRankings();
+  }, []);
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-      {/* Feed de Atividade */}
-      <div className="lg:col-span-2 space-y-6">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+      {/* Rankings - Now primary focus on the left */}
+      <div className="lg:col-span-8 space-y-8">
+        <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-white tracking-tight">Comunidade</h1>
-            <p className="text-slate-400 text-sm mt-1">Veja o que o cardume está fazendo agora.</p>
+            <h1 className="text-3xl font-black text-white tracking-tight uppercase italic">Hall da Fama</h1>
+            <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest mt-1">Os maiores colecionadores e negociantes do cardume</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Ranking de Coleção */}
+          <div className="bg-slate-900/40 border border-slate-800 rounded-[32px] p-6 backdrop-blur-sm relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-48 h-48 bg-purple-600/10 blur-3xl -mr-24 -mt-24 group-hover:bg-purple-600/20 transition-colors"></div>
+            
+            <div className="flex items-center justify-between mb-8 relative">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-purple-600/20 rounded-2xl flex items-center justify-center text-purple-400 border border-purple-500/20">
+                  <i className="fas fa-crown"></i>
+                </div>
+                <div>
+                  <h3 className="text-xs font-black uppercase tracking-[0.2em] text-white">Colecionadores</h3>
+                  <p className="text-[8px] text-slate-500 font-black uppercase tracking-widest mt-0.5">Maior volume de cartas</p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="space-y-4 relative">
+              {rankLoading ? (
+                <div className="space-y-4">
+                  {[1,2,3,4,5].map(i => <div key={i} className="h-12 bg-slate-800/50 rounded-2xl animate-pulse"></div>)}
+                </div>
+              ) : collectionRankings.length > 0 ? (
+                collectionRankings.map((item, idx) => (
+                  <Link key={item.id} to={`/perfil/${item.username}`} className="flex items-center justify-between p-3 rounded-2xl hover:bg-white/5 transition-all group/item border border-transparent hover:border-white/5">
+                    <div className="flex items-center space-x-4">
+                      <div className={`w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-black ${idx === 0 ? 'bg-yellow-500 text-black shadow-lg shadow-yellow-500/20 scale-110' : idx === 1 ? 'bg-slate-300 text-black' : idx === 2 ? 'bg-orange-600 text-white' : 'bg-slate-800 text-slate-500'}`}>
+                        {idx + 1}
+                      </div>
+                      <img 
+                        src={item.avatar || `https://ui-avatars.com/api/?name=${item.username}&background=8b5cf6&color=fff`} 
+                        className="w-10 h-10 rounded-xl border-2 border-slate-700 group-hover/item:border-purple-500 transition-all object-cover shadow-xl" 
+                        alt="" 
+                      />
+                      <span className="text-sm font-bold text-slate-200 group-hover/item:text-white transition-colors truncate max-w-[100px]">{item.username}</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-sm font-black text-white">{item.total_cards}</span>
+                      <span className="text-[8px] text-slate-500 uppercase block font-black leading-none mt-1">Cards</span>
+                    </div>
+                  </Link>
+                ))
+              ) : (
+                <div className="text-center py-10 text-slate-500 text-[10px] italic uppercase font-black tracking-widest">Nenhum dado...</div>
+              )}
+            </div>
           </div>
 
-          <div className="relative w-full md:w-64 group">
-            <i className="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-purple-500 transition-colors"></i>
+          {/* Ranking de Ofertas */}
+          <div className="bg-slate-900/40 border border-slate-800 rounded-[32px] p-6 backdrop-blur-sm relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-48 h-48 bg-pink-600/10 blur-3xl -mr-24 -mt-24 group-hover:bg-pink-600/20 transition-colors"></div>
+            
+            <div className="flex items-center justify-between mb-8 relative">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-pink-600/20 rounded-2xl flex items-center justify-center text-pink-400 border border-pink-500/20">
+                  <i className="fas fa-right-left"></i>
+                </div>
+                <div>
+                  <h3 className="text-xs font-black uppercase tracking-[0.2em] text-white">Negociantes</h3>
+                  <p className="text-[8px] text-slate-500 font-black uppercase tracking-widest mt-0.5">Ofertas ativas no mercado</p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="space-y-4 relative">
+              {rankLoading ? (
+                <div className="space-y-4">
+                  {[1,2,3,4,5].map(i => <div key={i} className="h-12 bg-slate-800/50 rounded-2xl animate-pulse"></div>)}
+                </div>
+              ) : offersRankings.length > 0 ? (
+                offersRankings.map((item, idx) => (
+                  <Link key={item.id} to={`/perfil/${item.username}`} className="flex items-center justify-between p-3 rounded-2xl hover:bg-white/5 transition-all group/item border border-transparent hover:border-white/5">
+                    <div className="flex items-center space-x-4">
+                      <div className={`w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-black ${idx === 0 ? 'bg-yellow-500 text-black shadow-lg shadow-yellow-500/20 scale-110' : idx === 1 ? 'bg-slate-300 text-black' : idx === 2 ? 'bg-orange-600 text-white' : 'bg-slate-800 text-slate-500'}`}>
+                        {idx + 1}
+                      </div>
+                      <img 
+                        src={item.avatar || `https://ui-avatars.com/api/?name=${item.username}&background=ec4899&color=fff`} 
+                        className="w-10 h-10 rounded-xl border-2 border-slate-700 group-hover/item:border-pink-500 transition-all object-cover shadow-xl" 
+                        alt="" 
+                      />
+                      <span className="text-sm font-bold text-slate-200 group-hover/item:text-white transition-colors truncate max-w-[100px]">{item.username}</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-sm font-black text-white">{item.offers_count}</span>
+                      <span className="text-[8px] text-slate-500 uppercase block font-black leading-none mt-1">Ofertas</span>
+                    </div>
+                  </Link>
+                ))
+              ) : (
+                <div className="text-center py-10 text-slate-500 text-[10px] italic uppercase font-black tracking-widest">Nenhum dado...</div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Promo Section */}
+        <div className="bg-gradient-to-r from-purple-600 to-pink-600 rounded-[40px] p-8 md:p-10 relative overflow-hidden group shadow-2xl shadow-purple-500/20">
+          <div className="absolute top-0 right-0 w-80 h-80 bg-white/20 blur-3xl -mr-40 -mt-40 group-hover:scale-125 transition-transform duration-1000"></div>
+          <div className="relative flex flex-col md:flex-row items-center justify-between gap-8">
+            <div className="max-w-md text-center md:text-left space-y-3">
+              <h3 className="text-3xl font-black text-white uppercase italic tracking-tight">Convide Amigos</h3>
+              <p className="text-white/80 text-sm font-medium leading-relaxed">Ajude o cardume a crescer! Ganhe badges exclusivos de pioneiro e suba no ranking global por cada novas amizade trazida.</p>
+            </div>
+            <button className="px-10 py-5 bg-white text-black font-black uppercase tracking-[0.2em] text-[10px] rounded-2xl hover:scale-105 active:scale-95 transition-all shadow-2xl">
+              Copiar Link de Convite
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Feed de Atividade - Right sidebar */}
+      <div className="lg:col-span-4 space-y-6">
+        <div className="space-y-4">
+          <div className="flex items-center justify-between px-2">
+            <h2 className="text-xl font-black text-white tracking-tight uppercase italic flex items-center">
+              <i className="fas fa-bolt text-purple-500 mr-2 text-sm italic"></i>
+              Feed
+            </h2>
+          </div>
+
+          <div className="relative group">
+            <i className="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within:text-purple-500 transition-colors"></i>
             <input 
               type="text" 
               placeholder="Buscar usuário..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-slate-900/60 border border-slate-800 rounded-2xl py-3 pl-12 pr-4 text-sm text-white focus:outline-none focus:border-purple-500/50 focus:ring-1 focus:ring-purple-500/20 transition-all"
+              className="w-full bg-slate-900 border border-slate-800 rounded-2xl py-3 pl-12 pr-4 text-xs text-white focus:outline-none focus:border-purple-500/50 transition-all placeholder:text-slate-600"
             />
-
-            <AnimatePresence>
-              {searchTerm.length >= 2 && (
-                <motion.div 
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 10 }}
-                  className="absolute top-full left-0 right-0 mt-2 bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl z-50 overflow-hidden"
-                >
-                  {isSearching ? (
-                    <div className="p-4 text-center text-slate-500 text-xs">Buscando...</div>
-                  ) : searchResults.length > 0 ? (
-                    <div className="max-h-64 overflow-y-auto">
-                      {searchResults.map((user) => (
-                        <Link 
-                          key={user.id} 
-                          to={`/perfil/${user.username || user.id}`}
-                          className="flex items-center space-x-3 p-3 hover:bg-slate-800 transition-colors border-b border-slate-800 last:border-0"
-                          onClick={() => setSearchTerm('')}
-                        >
-                          <img 
-                            src={user.avatar || `https://ui-avatars.com/api/?name=${user.username}&background=8b5cf6&color=fff`} 
-                            className="w-8 h-8 rounded-full border border-slate-700"
-                            alt=""
-                          />
-                          <div>
-                            <div className="text-xs font-bold text-white">{user.username}</div>
-                            <div className="text-[10px] text-slate-500">{user.codename || 'Novato'}</div>
-                          </div>
-                        </Link>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="p-4 text-center text-slate-500 text-xs">Nenhum usuário encontrado</div>
-                  )}
-                </motion.div>
-              )}
-            </AnimatePresence>
           </div>
         </div>
 
+        <AnimatePresence>
+          {searchTerm.length >= 2 && (
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-slate-900/60 border border-slate-800 rounded-2xl p-2 space-y-1"
+            >
+              {isSearching ? (
+                <div className="p-4 text-center text-slate-500 text-[10px] font-bold uppercase tracking-widest animate-pulse">Buscando...</div>
+              ) : searchResults.length > 0 ? (
+                searchResults.map(user => (
+                  <Link key={user.id} to={`/perfil/${user.username}`} className="flex items-center space-x-3 p-3 rounded-xl hover:bg-white/5 transition-all group">
+                    <img src={user.avatar || `https://ui-avatars.com/api/?name=${user.username}`} className="w-8 h-8 rounded-lg object-cover border border-slate-800 group-hover:border-purple-500 transition-all" alt="" />
+                    <span className="text-xs font-bold text-white group-hover:text-purple-400 transition-colors">@{user.username}</span>
+                  </Link>
+                ))
+              ) : (
+                <div className="p-4 text-center text-slate-500 text-[10px] font-bold uppercase tracking-widest">Nenhum peixe encontrado</div>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         <div className="space-y-4">
           {activitiesLoading ? (
-            <div className="py-20 text-center animate-pulse">
-               <i className="fas fa-spinner fa-spin text-2xl text-purple-500 mb-4"></i>
-               <p className="text-slate-500 text-sm italic">Carregando feed...</p>
+            <div className="space-y-4">
+              {[1,2,3,4,5].map(i => <div key={i} className="h-24 bg-slate-900/20 rounded-3xl border border-slate-800/50 animate-pulse"></div>)}
             </div>
           ) : activities.length > 0 ? activities.map((action, idx) => (
             <motion.div
               key={idx}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
               transition={{ delay: idx * 0.1 }}
-              className="bg-slate-900/40 border border-slate-800 p-4 rounded-2xl flex items-center space-x-4 group hover:border-purple-500/30 transition-all"
+              className="bg-slate-900/40 border border-slate-800 p-5 rounded-[28px] hover:border-slate-700 transition-all group"
             >
-              <Link to={`/perfil/${action.user}`}>
-                <img src={action.avatar || `https://i.pravatar.cc/150?u=${action.user}`} className="w-12 h-12 rounded-full border-2 border-slate-800 group-hover:border-purple-500 transition-all" alt="" />
-              </Link>
-              <div className="flex-1">
-                <p className="text-sm text-slate-300">
-                  <Link to={`/perfil/${action.user}`} className="font-bold text-white hover:text-purple-400 cursor-pointer transition-colors">{action.user}</Link>
-                  {' '}{action.action}{' '}
-                  <span className="font-bold text-purple-400 cursor-pointer hover:underline">{action.target}</span>
-                </p>
-                <span className="text-[10px] text-slate-500 font-mono mt-1 block">{action.date} {action.timestamp}</span>
+              <div className="flex items-start justify-between mb-3">
+                <Link to={`/perfil/${action.user}`} className="flex items-center space-x-3">
+                  <img 
+                    src={action.avatar || `https://ui-avatars.com/api/?name=${action.user}`} 
+                    className="w-8 h-8 rounded-xl object-cover border border-slate-800 group-hover:border-purple-500 transition-all" 
+                    alt="" 
+                  />
+                  <span className="text-xs font-black text-white hover:text-purple-400 transition-colors">@{action.user}</span>
+                </Link>
+                <button className="text-slate-600 hover:text-pink-500 transition-colors">
+                  <i className="far fa-heart text-[10px]"></i>
+                </button>
               </div>
-              <button className="p-2 text-slate-500 hover:text-pink-500 transition-colors">
-                <i className="far fa-heart"></i>
-              </button>
+              <p className="text-xs text-slate-400 font-medium leading-relaxed">
+                {action.action}{' '}
+                <span className="font-bold text-purple-400 cursor-pointer hover:underline">{action.target}</span>
+              </p>
+              <div className="mt-3 pt-3 border-t border-slate-800/50">
+                <span className="text-[9px] text-slate-600 font-black uppercase tracking-wider">{action.timestamp}</span>
+              </div>
             </motion.div>
           )) : (
-            <div className="py-20 text-center bg-slate-900/20 border border-dashed border-slate-800 rounded-3xl">
-               <i className="fas fa-ghost text-4xl text-slate-700 mb-4"></i>
-               <p className="text-slate-500 text-sm">O silêncio do cardume... Nada por aqui ainda.</p>
+            <div className="text-center py-10 bg-slate-950 border border-dashed border-slate-800 rounded-[32px]">
+              <p className="text-slate-600 text-[10px] font-black uppercase tracking-widest italic">Nada por aqui</p>
             </div>
           )}
-        </div>
-      </div>
-
-      {/* Ranking & Sugestões */}
-      <div className="space-y-8">
-        <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-sm font-black uppercase tracking-widest text-slate-500 flex items-center space-x-2">
-              <i className="fas fa-trophy text-yellow-500 mr-2"></i>
-              Ranking
-            </h3>
-            <div className="flex bg-slate-950 rounded-lg p-1 border border-slate-800">
-              <button 
-                onClick={() => setRankingType('colecao')}
-                className={`text-[8px] font-black uppercase px-2 py-1 rounded-md transition-all ${rankingType === 'colecao' ? 'bg-purple-600 text-white' : 'text-slate-500 hover:text-slate-300'}`}
-              >
-                Col.
-              </button>
-              <button 
-                onClick={() => setRankingType('ofertas')}
-                className={`text-[8px] font-black uppercase px-2 py-1 rounded-md transition-all ${rankingType === 'ofertas' ? 'bg-pink-600 text-white' : 'text-slate-500 hover:text-slate-300'}`}
-              >
-                Of.
-              </button>
-            </div>
-          </div>
-          
-          <div className="space-y-4">
-            {rankLoading ? (
-              <div className="text-center py-10 text-slate-500 text-xs animate-pulse italic">Carregando rankings...</div>
-            ) : rankings.length > 0 ? (
-              rankings.map((item, idx) => (
-                <Link key={item.id} to={`/perfil/${item.username}`} className="flex items-center justify-between group cursor-pointer">
-                  <div className="flex items-center space-x-3">
-                    <div className={`w-6 text-center font-mono text-xs ${idx < 3 ? 'text-purple-400 font-bold' : 'text-slate-600'}`}>
-                      {idx + 1}
-                    </div>
-                    <img 
-                      src={item.avatar || `https://ui-avatars.com/api/?name=${item.username}&background=8b5cf6&color=fff`} 
-                      className="w-8 h-8 rounded-full border border-slate-800 group-hover:border-purple-500 transition-all object-cover" 
-                      alt="" 
-                    />
-                    <span className="text-xs font-bold text-slate-300 group-hover:text-white transition-colors truncate max-w-[100px]">{item.username}</span>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-xs font-bold text-white">
-                      {rankingType === 'colecao' ? item.total_cards : item.offers_count}
-                    </span>
-                    <span className="text-[9px] text-slate-500 uppercase block leading-none">
-                      {rankingType === 'colecao' ? 'Cartas' : 'Ofertas'}
-                    </span>
-                  </div>
-                </Link>
-              ))
-            ) : (
-              <div className="text-center py-6 text-slate-500 text-xs italic">Nenhum dado encontrado</div>
-            )}
-          </div>
-          <button className="w-full mt-8 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all border border-white/5">
-            Ver Ranking Completo
-          </button>
-        </div>
-
-        <div className="bg-gradient-to-br from-purple-600/20 to-pink-600/20 border border-purple-500/20 rounded-2xl p-6">
-          <h3 className="text-white font-bold mb-2">Convide Amigos</h3>
-          <p className="text-slate-400 text-xs mb-4 leading-relaxed">Ganhe badges exclusivos e suba no ranking ao trazer novos membros para o cardume.</p>
-          <button className="w-full py-2.5 bg-white text-slate-950 text-xs font-bold rounded-xl hover:bg-slate-200 transition-all">
-            Gerar Link de Convite
-          </button>
         </div>
       </div>
     </div>
