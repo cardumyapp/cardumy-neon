@@ -119,7 +119,7 @@ export const Profile: React.FC = () => {
       <div className="relative mb-32 md:mb-32">
         <div className="h-40 md:h-64 w-full rounded-2xl md:rounded-3xl overflow-hidden relative">
           <img 
-            src={profileUser.cover_url || "https://images.unsplash.com/photo-1614850523296-d8c1af93d400?auto=format&fit=crop&q=80&w=1200"} 
+            src={profileUser.banner_url || profileUser.cover_url || "https://images.unsplash.com/photo-1614850523296-d8c1af93d400?auto=format&fit=crop&q=80&w=1200"} 
             className="w-full h-full object-cover" 
             alt="Cover" 
           />
@@ -143,14 +143,22 @@ export const Profile: React.FC = () => {
               <h1 className="text-2xl md:text-4xl font-black tracking-tight text-white leading-tight truncate">{profileUser.codename || profileUser.displayName}</h1>
               <i className="fas fa-circle-check text-blue-400 text-sm md:text-xl" title="Verificada"></i>
             </div>
-            <p className="text-slate-400 text-xs md:text-sm font-medium mb-3">@{profileUser.username} • {profileUser.role === 'admin' ? 'Administrador' : (profileUser.favorite_game || 'Colecionador Lendário')}</p>
+            <p className="text-slate-400 text-xs md:text-sm font-medium mb-3">@{profileUser.username} • {profileUser.role === 'admin' ? 'Administrador' : (profileUser.cardgames?.name || profileUser.favorite_game || 'Colecionador Lendário')}</p>
             <div className="flex flex-wrap justify-center md:justify-start gap-1.5 md:gap-2">
-              {Array.isArray(profileUser.fighter_tags) && profileUser.fighter_tags.map((tag: string) => (
-                <span key={tag} className="flex items-center space-x-1.5 bg-purple-600/10 border border-purple-500/20 px-2.5 py-1 rounded-full text-[8px] md:text-[10px] font-bold uppercase tracking-wider text-purple-400">
-                  <i className="fas fa-tag"></i>
-                  <span>{tag}</span>
-                </span>
-              ))}
+              {(() => {
+                let tags: string[] = [];
+                if (Array.isArray(profileUser.fighter_tags)) {
+                  tags = profileUser.fighter_tags;
+                } else if (typeof profileUser.fighter_tags === 'string') {
+                  tags = profileUser.fighter_tags.split(',').map((t: string) => t.trim()).filter((t: string) => t !== '');
+                }
+                return tags.map((tag: string) => (
+                  <span key={tag} className="flex items-center space-x-1.5 bg-purple-600/10 border border-purple-500/20 px-2.5 py-1 rounded-full text-[8px] md:text-[10px] font-bold uppercase tracking-wider text-purple-400">
+                    <i className="fas fa-tag"></i>
+                    <span>{tag}</span>
+                  </span>
+                ));
+              })()}
               {badges.map(badge => (
                 <span key={badge.name} className="flex items-center space-x-1.5 bg-slate-900/80 backdrop-blur-md border border-slate-800 px-2.5 py-1 rounded-full text-[8px] md:text-[10px] font-bold uppercase tracking-wider text-slate-300">
                   <i className={`fas ${badge.icon} ${badge.color}`}></i>

@@ -86,8 +86,7 @@ export const addCardToList = async (userId: any, listType: 'cards' | 'wishlist' 
           card_id: card.id || card.cardId,
           name: card.name,
           image_url: card.imageUrl || card.images?.small,
-          quantidade: quantity,
-          raridade: card.rarity || ''
+          quantidade: quantity
         });
       if (insertError) throw insertError;
     }
@@ -239,6 +238,162 @@ export const addCardToBinder = async (userId: any, binderId: any, card: any) => 
     if (error) throw error;
   } catch (error) {
     console.error('Error adding card to binder:', error);
+    throw error;
+  }
+};
+
+export const removeCardFromList = async (userId: string | number, listType: 'cards' | 'wishlist' | 'offerlist', cardId: string) => {
+  const table = listType === 'cards' ? 'user_cards' : listType;
+  try {
+    const { error } = await supabase
+      .from(table)
+      .delete()
+      .eq('user_id', userId)
+      .eq('card_id', cardId);
+    
+    if (error) throw error;
+  } catch (error) {
+    console.error(`Error removing card from ${listType}:`, error);
+    throw error;
+  }
+};
+
+export const moveCardBetweenLists = async (userId: string | number, fromList: 'cards' | 'wishlist' | 'offerlist', toList: 'cards' | 'wishlist' | 'offerlist', cardId: string) => {
+  const fromTable = fromList === 'cards' ? 'user_cards' : fromList;
+  const toTable = toList === 'cards' ? 'user_cards' : toList;
+  
+  try {
+    // 1. Fetch card data from source list
+    const { data: cardData, error: fetchError } = await supabase
+      .from(fromTable)
+      .select('*')
+      .eq('user_id', userId)
+      .eq('card_id', cardId)
+      .maybeSingle();
+    
+    if (fetchError) throw fetchError;
+    if (!cardData) throw new Error('Card not found in source list');
+
+    // 2. Insert into destination list (using upsert logic similar to addCardToList)
+    const { data: existing, error: checkError } = await supabase
+      .from(toTable)
+      .select('*')
+      .eq('user_id', userId)
+      .eq('card_id', cardId)
+      .eq('game', cardData.game)
+      .maybeSingle();
+    
+    if (checkError && checkError.code !== 'PGRST116') throw checkError;
+
+    if (existing) {
+      await supabase
+        .from(toTable)
+        .update({ quantidade: existing.quantidade + cardData.quantidade })
+        .eq('id', existing.id);
+    } else {
+      await supabase
+        .from(toTable)
+        .insert({
+          user_id: userId,
+          game: cardData.game,
+          card_id: cardId,
+          name: cardData.name,
+          image_url: cardData.image_url,
+          quantidade: cardData.quantidade
+        });
+    }
+
+    // 3. Delete from source list
+    await supabase
+      .from(fromTable)
+      .delete()
+      .eq('id', cardData.id);
+
+  } catch (error) {
+    console.error(`Error moving card from ${fromList} to ${toList}:`, error);
+    throw error;
+  }
+};
+
+export const deleteBinder = async (userId: string | number, binderId: string | number) => {
+  try {
+    // 1. Delete associations in binder_cards first
+    const { error: relError } = await supabase
+      .from('binder_cards')
+      .delete()
+      .eq('binder_id', binderId);
+    
+    if (relError) throw relError;
+
+    // 2. Delete the binder itself
+    const { error: binderError } = await supabase
+      .from('user_binders')
+      .delete()
+      .eq('id', binderId)
+      .eq('user_id', userId);
+    
+    if (binderError) throw binderError;
+  } catch (error) {
+    console.error('Error deleting binder:', error);
+    throw error;
+  }
+};
+
+export const getBinderWithCards = async (userId: string | number, binderId: string | number) => {
+  try {
+    // Fetch binder info first
+    const { data: binder, error: binderError } = await supabase
+      .from('user_binders')
+      .select(`
+        id, 
+        name, 
+        game_id,
+        cardgames (name)
+      `)
+      .eq('id', binderId)
+      .eq('user_id', userId)
+      .maybeSingle();
+    
+    if (binderError) throw binderError;
+    if (!binder) return null;
+
+    // Fetch cards linked to this binder
+    // In Python it joins binder_cards with user_cards
+    const { data: cards, error: cardsError } = await supabase
+      .from('binder_cards')
+      .select(`
+        card:user_cards (*)
+      `)
+      .eq('binder_id', binderId);
+    
+    if (cardsError) throw cardsError;
+
+    const gameName = Array.isArray(binder.cardgames) 
+      ? (binder.cardgames as any)[0]?.name 
+      : (binder.cardgames as any)?.name;
+
+    return {
+      ...binder,
+      game_name: gameName,
+      cards: cards?.map(c => c.card) || []
+    };
+  } catch (error) {
+    console.error('Error fetching binder with cards:', error);
+    return null;
+  }
+};
+
+export const removeCardFromBinder = async (binderId: string | number, cardId: string | number) => {
+  try {
+    const { error } = await supabase
+      .from('binder_cards')
+      .delete()
+      .eq('binder_id', binderId)
+      .eq('card_id', cardId); // This cardId refers to the ID in user_cards
+    
+    if (error) throw error;
+  } catch (error) {
+    console.error('Error removing card from binder:', error);
     throw error;
   }
 };
@@ -503,23 +658,44 @@ export const getCards = async (game?: string): Promise<any[]> => {
   }
 };
 
+export const getCardgames = async () => {
+  try {
+    const { data, error } = await supabase
+      .from('cardgames')
+      .select('id, name, slug')
+      .order('name', { ascending: true });
+    
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching cardgames:', error);
+    return [];
+  }
+};
+
 export const searchExternalCards = async (game: string, query: string, page: number = 1, limit: number = 20): Promise<{ data: any[], total: number, totalPages: number }> => {
   try {
-    // Map frontend game names to API game IDs if needed
+    // Map to API game IDs (standard slugs expected by Homura API)
     const gameMap: Record<string, string> = {
-      'One Piece': 'one-piece',
+      'One Piece': 'onepiece',
       'Magic': 'magic',
       'Pokémon': 'pokemon',
       'Yu-Gi-Oh!': 'yugioh',
       'Disney Lorcana': 'lorcana',
-      'Digimon': 'digimon'
+      'Digimon': 'digimon',
+      'Union Arena': 'unionarena',
+      'Dragon Ball': 'dragonballfussion'
     };
 
-    const gameId = gameMap[game] || game.toLowerCase();
+    const gameId = gameMap[game] || game.toLowerCase().replace(/\s+/g, '');
     const url = `/api/cards?game=${encodeURIComponent(gameId)}&q=${encodeURIComponent(query)}&page=${page}&limit=${limit}`;
     
     const response = await fetch(url);
-    if (!response.ok) throw new Error('Failed to fetch external cards');
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      console.error('Failed to fetch external cards. Status:', response.status, 'Body:', errorData);
+      throw new Error(`Failed to fetch external cards: ${response.status}`);
+    }
     const data = await response.json();
     
     // The API might return directly an array or a structured object
@@ -527,18 +703,36 @@ export const searchExternalCards = async (game: string, query: string, page: num
     const total = typeof data.total === 'number' ? data.total : list.length;
     const totalPages = typeof data.totalPages === 'number' ? data.totalPages : 1;
     
-    const mappedCards = list.map((c: any) => ({
-      id: c.id || c.code || Math.random().toString(),
-      name: c.name,
-      game: game,
-      code: c.code || c.number || 'N/A',
-      rarity: c.rarity || 'Common',
-      price: c.price || 0,
-      imageUrl: c.image || c.imageUrl || c.images?.small || c.images?.normal || 'https://images.unsplash.com/photo-1614850523296-d8c1af93d400?auto=format&fit=crop&q=80&w=400',
-      set: c.set_name || c.set || 'Desconhecido',
-      description: c.text || c.effect || '',
-      variants: c.variants || []
-    }));
+    const mappedCards = list.map((c: any) => {
+      // Extract a string for the set name
+      let setName = 'Desconhecido';
+      if (typeof c.set === 'string') {
+        setName = c.set;
+      } else if (c.set && typeof c.set === 'object') {
+        setName = c.set.beauty_name || c.set.name || c.set.set_code || setName;
+      } else if (c.set_name) {
+        setName = c.set_name;
+      }
+
+      const safeString = (val: any, fallback: string = '') => {
+        if (typeof val === 'string') return val;
+        if (val && typeof val === 'object') return val.name || val.text || val.beauty_name || JSON.stringify(val);
+        return fallback;
+      };
+
+      return {
+        id: c.id || c.code || Math.random().toString(),
+        name: safeString(c.name, 'Carta sem nome'),
+        game: game,
+        code: safeString(c.code || c.number, 'N/A'),
+        rarity: safeString(c.rarity, 'Common'),
+        price: c.price || 0,
+        imageUrl: c.image || c.imageUrl || c.images?.small || c.images?.normal || 'https://images.unsplash.com/photo-1614850523296-d8c1af93d400?auto=format&fit=crop&q=80&w=400',
+        set: setName,
+        description: safeString(c.text || c.effect, ''),
+        variants: c.variants || []
+      };
+    });
 
     return {
       data: mappedCards,

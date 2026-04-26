@@ -213,8 +213,11 @@ export interface UserProfile {
   phone?: string;
   birth_date?: string;
   favorite_game?: string;
-  fighter_tags?: string[];
+  favorite_cardgame_id?: number | string;
+  fighter_tags?: string | string[];
+  banner_url?: string;
   cover_url?: string;
+  gender?: string;
   role?: string;
 }
 

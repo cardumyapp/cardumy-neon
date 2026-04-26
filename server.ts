@@ -41,17 +41,26 @@ async function startServer() {
       });
 
       const url = `${baseUrl}/api/${game}/cards?${searchParams.toString()}`;
+      console.log("Hitting external API:", url);
+      
       const response = await fetch(url, {
         headers: {
           "Authorization": `Bearer ${token}`
         }
       });
 
-      const data = await response.json();
-      res.status(response.status).json(data);
+      const contentType = response.headers.get("content-type");
+      if (contentType && contentType.includes("application/json")) {
+        const data = await response.json();
+        res.status(response.status).json(data);
+      } else {
+        const text = await response.text();
+        console.error("External API returned non-JSON response:", text);
+        res.status(response.status).json({ error: "External API error", detail: text });
+      }
     } catch (error: any) {
-      console.error("Error fetching cards:", error);
-      res.status(500).json({ error: "Erro ao buscar cartas" });
+      console.error("Error fetching cards from external API:", error);
+      res.status(500).json({ error: "Erro interno ao buscar cartas", message: error.message });
     }
   });
 
@@ -70,44 +79,48 @@ async function startServer() {
         return res.status(400).json({ error: "User ID is required" });
       }
 
-      // Fetch sample user to detect available columns
-      const { data: sampleUser } = await supabaseAdmin
-        .from('users')
-        .select('*')
-        .limit(1)
-        .maybeSingle();
+      // Basic info fields allowed to be updated by the user
+      const allowedFields = [
+        'username', 
+        'codename', 
+        'avatar', 
+        'banner_url', 
+        'favorite_cardgame_id', 
+        'gender', 
+        'birth_date', 
+        'phone', 
+        'fighter_tags'
+      ];
 
-      const availableColumns = sampleUser ? Object.keys(sampleUser) : [];
-      console.log('Available columns in users table:', availableColumns);
-
-      // Filter updates to columns that actually exist in the DB
+      // Filter updates to restricted basic info list
       const filteredUpdates: any = {};
       Object.keys(updates).forEach(key => {
-        // Map some common variations if needed
         let targetKey = key;
-        if (key === 'photoURL' && !availableColumns.includes('photoURL') && availableColumns.includes('avatar')) {
-          targetKey = 'avatar';
-        }
+        
+        // Map some common frontend field names to database columns
+        if (key === 'photoURL' || key === 'avatar') targetKey = 'avatar';
+        if (key === 'cover_url' || key === 'banner_url') targetKey = 'banner_url';
+        if (key === 'favorite_game' || key === 'favorite_cardgame_id') targetKey = 'favorite_cardgame_id';
 
-        if (availableColumns.includes(targetKey)) {
+        if (allowedFields.includes(targetKey)) {
           let val = updates[key];
-          // Fix for date fields: if empty string, set to null to avoid invalid input syntax error
-          if (targetKey.toLowerCase().includes('date') && val === "") {
-            val = null;
+          
+          // Data normalization
+          if (targetKey === 'birth_date' && val === "") val = null;
+          if (targetKey === 'fighter_tags' && Array.isArray(val)) {
+            val = val.join(', '); // Convert array to comma-separated string for text field
           }
+          
           filteredUpdates[targetKey] = val;
         }
       });
 
-      // Ensure updated_at is set if column exists
-      if (availableColumns.includes('updated_at')) {
-        filteredUpdates.updated_at = new Date().toISOString();
+      if (Object.keys(filteredUpdates).length === 0) {
+        return res.status(400).json({ error: "No valid basic information provided for update" });
       }
 
-      if (Object.keys(filteredUpdates).length === 0) {
-        console.warn('No valid columns to update');
-        // If we can't update anything, just return the current user to satisfy the frontend
-      }
+      // Always set updated_at
+      filteredUpdates.updated_at = new Date().toISOString();
 
       console.log('Updating user profile for ID:', userId);
       console.log('Filtered updates:', filteredUpdates);
@@ -212,7 +225,7 @@ async function startServer() {
     const { follower_id } = req.query;
     try {
       // 1. Get user by username or ID
-      let query = supabaseAdmin.from('users').select('*');
+      let query = supabaseAdmin.from('users').select('*, cardgames(id, name)');
       if (!isNaN(Number(username))) {
         query = query.eq('id', username);
       } else {

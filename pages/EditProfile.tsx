@@ -13,18 +13,27 @@ export const EditProfile: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
+  const [dbGames, setDbGames] = useState<{id: any, name: string}[]>([]);
   const [formData, setFormData] = useState({
     username: '',
     codename: '',
-    password: '',
     phone: '',
     birth_date: '',
-    favorite_game: '',
-    bio: '',
+    gender: '',
+    favorite_cardgame_id: '',
     avatar: '',
-    cover_url: '',
+    banner_url: '',
     fighter_tags: [] as string[]
   });
+
+  useEffect(() => {
+    const fetchGames = async () => {
+      const { getCardgames } = await import('../src/services/supabaseService');
+      const games = await getCardgames();
+      setDbGames(games);
+    };
+    fetchGames();
+  }, []);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -32,17 +41,23 @@ export const EditProfile: React.FC = () => {
         setLoading(true);
         const profile = await getUserProfile(currentUser.email);
         if (profile) {
+          let tags: string[] = [];
+          if (Array.isArray(profile.fighter_tags)) {
+            tags = profile.fighter_tags;
+          } else if (typeof profile.fighter_tags === 'string') {
+            tags = profile.fighter_tags.split(',').map((t: string) => t.trim()).filter((t: string) => t !== '');
+          }
+
           setFormData({
             username: profile.username || '',
             codename: profile.codename || '',
-            password: profile.password || '',
             phone: profile.phone || '',
             birth_date: profile.birth_date || '',
-            favorite_game: profile.favorite_game || '',
-            bio: profile.bio || '',
+            gender: profile.gender || '',
+            favorite_cardgame_id: profile.favorite_cardgame_id || '',
             avatar: profile.avatar || profile.photoURL || PREDEFINED_AVATARS[0],
-            cover_url: profile.cover_url || PREDEFINED_COVERS[0],
-            fighter_tags: Array.isArray(profile.fighter_tags) ? profile.fighter_tags : []
+            banner_url: profile.banner_url || profile.cover_url || PREDEFINED_COVERS[0],
+            fighter_tags: tags
           });
         }
         setLoading(false);
@@ -69,8 +84,8 @@ export const EditProfile: React.FC = () => {
     setFormData(prev => ({ ...prev, avatar }));
   };
 
-  const handleCoverSelect = (cover_url: string) => {
-    setFormData(prev => ({ ...prev, cover_url }));
+  const handleCoverSelect = (banner_url: string) => {
+    setFormData(prev => ({ ...prev, banner_url }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -159,10 +174,10 @@ export const EditProfile: React.FC = () => {
                 key={i}
                 type="button"
                 onClick={() => handleCoverSelect(cover)}
-                className={`relative h-24 md:h-32 rounded-2xl overflow-hidden border-4 transition-all ${formData.cover_url === cover ? 'border-purple-500 scale-105 shadow-lg shadow-purple-500/20' : 'border-slate-800 hover:border-slate-700'}`}
+                className={`relative h-24 md:h-32 rounded-2xl overflow-hidden border-4 transition-all ${formData.banner_url === cover ? 'border-purple-500 scale-105 shadow-lg shadow-purple-500/20' : 'border-slate-800 hover:border-slate-700'}`}
               >
                 <img src={cover} alt={`Capa ${i}`} className="w-full h-full object-cover" />
-                {formData.cover_url === cover && (
+                {formData.banner_url === cover && (
                   <div className="absolute inset-0 bg-purple-500/20 flex items-center justify-center">
                     <i className="fas fa-check text-white shadow-sm"></i>
                   </div>
@@ -230,44 +245,37 @@ export const EditProfile: React.FC = () => {
               />
             </div>
 
-            <div className="space-y-2 md:col-span-1">
-              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Senha</label>
-              <input 
-                type="password" 
-                name="password"
-                value={formData.password}
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Gênero</label>
+              <select 
+                name="gender"
+                value={formData.gender}
                 onChange={handleChange}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:border-purple-500 transition-colors"
-                placeholder="••••••••"
-              />
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:border-purple-500 transition-colors appearance-none"
+              >
+                <option value="">Selecione</option>
+                <option value="Masculino">Masculino</option>
+                <option value="Feminino">Feminino</option>
+                <option value="Não-binário">Não-binário</option>
+                <option value="Outro">Outro</option>
+                <option value="Prefiro não dizer">Prefiro não dizer</option>
+              </select>
             </div>
 
             <div className="space-y-2 md:col-span-1">
               <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Jogo Favorito</label>
               <select 
-                name="favorite_game"
-                value={formData.favorite_game}
+                name="favorite_cardgame_id"
+                value={formData.favorite_cardgame_id}
                 onChange={handleChange}
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:border-purple-500 transition-colors appearance-none"
               >
                 <option value="">Selecione um jogo</option>
-                {TCG_GAMES.map(game => (
-                  <option key={game} value={game}>{game}</option>
+                {dbGames.map(game => (
+                  <option key={game.id} value={game.id}>{game.name}</option>
                 ))}
               </select>
             </div>
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Bio (Descrição)</label>
-            <textarea 
-              name="bio"
-              value={formData.bio}
-              onChange={handleChange}
-              rows={4}
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:border-purple-500 transition-colors resize-none"
-              placeholder="Conte um pouco sobre você e sua coleção..."
-            ></textarea>
           </div>
         </section>
 

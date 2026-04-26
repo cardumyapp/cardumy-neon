@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../src/components/AuthProvider';
 import { getBinders, createBinder } from '../src/services/supabaseService';
 import { GAMES } from '../constants';
+import { useNavigate } from 'react-router-dom';
 import { OfflineWarning } from '../src/components/OfflineWarning';
 import { supabase } from '../src/lib/supabase';
 
@@ -19,6 +20,7 @@ interface Folder {
 
 export const FoldersPage: React.FC = () => {
   const { user, isOffline } = useAuth();
+  const navigate = useNavigate();
   const [folders, setFolders] = useState<Folder[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
@@ -90,7 +92,7 @@ export const FoldersPage: React.FC = () => {
         <h3 className="text-xs font-black text-slate-500 uppercase tracking-[0.2em] px-2">Pastas do Sistema</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {folders.filter(f => f.isSystem).map(folder => (
-            <FolderCard key={folder.id} folder={folder} />
+            <FolderCard key={folder.id} folder={folder} onClick={() => navigate(`/pastas/${folder.id}`)} />
           ))}
         </div>
       </section>
@@ -99,7 +101,7 @@ export const FoldersPage: React.FC = () => {
         <h3 className="text-xs font-black text-slate-500 uppercase tracking-[0.2em] px-2">Pastas Personalizadas</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {folders.filter(f => !f.isSystem).map(folder => (
-            <FolderCard key={folder.id} folder={folder} />
+            <FolderCard key={folder.id} folder={folder} onClick={() => navigate(`/pastas/${folder.id}`)} />
           ))}
           <button 
             onClick={() => setIsModalOpen(true)}
@@ -163,8 +165,11 @@ export const FoldersPage: React.FC = () => {
   );
 };
 
-const FolderCard: React.FC<{ folder: Folder }> = ({ folder }) => (
-  <div className="group bg-slate-900/40 border border-slate-800 rounded-[32px] p-6 hover:border-purple-500/50 transition-all duration-300 cursor-pointer shadow-xl relative overflow-hidden">
+const FolderCard: React.FC<{ folder: Folder; onClick?: () => void }> = ({ folder, onClick }) => (
+  <div 
+    onClick={onClick}
+    className="group bg-slate-900/40 border border-slate-800 rounded-[32px] p-6 hover:border-purple-500/50 transition-all duration-300 cursor-pointer shadow-xl relative overflow-hidden"
+  >
     <div className={`absolute top-0 right-0 w-32 h-32 ${folder.color} opacity-[0.03] rounded-full blur-3xl -mr-10 -mt-10`}></div>
     
     <div className="flex items-center space-x-5 mb-8">

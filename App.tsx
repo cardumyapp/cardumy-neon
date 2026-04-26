@@ -13,6 +13,7 @@ import { StoreProfile } from './pages/StoreProfile';
 import { EventDetails } from './pages/EventDetails';
 import { CartPage } from './pages/Cart';
 import { FoldersPage } from './pages/Folders';
+import { FolderDetails } from './pages/FolderDetails';
 import { SupportPage } from './pages/Support';
 import { Notifications } from './pages/Notifications';
 import { Trades } from './pages/Trades';
@@ -24,6 +25,8 @@ import { Product, CartItem, GameType } from './types';
 import { GAMES } from './constants';
 import { AuthProvider, useAuth } from './src/components/AuthProvider';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
+
+import { getCardgames } from './src/services/supabaseService';
 
 const SidebarItem: React.FC<{ to: string; icon: string; label: string; active: boolean; collapsed: boolean; badge?: number; onClick?: () => void }> = ({ to, icon, label, active, collapsed, badge, onClick }) => (
   <Link 
@@ -53,6 +56,15 @@ const AppContent: React.FC = () => {
   const [isGamePickerOpen, setIsGamePickerOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [dbGames, setDbGames] = useState<{id: any, name: string, slug?: string}[]>([]);
+
+  useEffect(() => {
+    const fetchGames = async () => {
+      const g = await getCardgames();
+      setDbGames(g);
+    };
+    fetchGames();
+  }, []);
 
   useEffect(() => {
     setIsMobileMenuOpen(false);
@@ -84,8 +96,13 @@ const AppContent: React.FC = () => {
 
   const currentGameInfo = useMemo(() => {
     if (activeGame === 'All') return { label: 'Todos os Jogos', color: 'text-slate-400' };
+    
+    // Try to find the name from dbGames if the slug matches
+    const dbGame = dbGames.find(g => g.slug === activeGame || g.name === activeGame);
+    if (dbGame) return { label: dbGame.name, color: 'text-purple-400' };
+    
     return { label: activeGame, color: 'text-purple-400' };
-  }, [activeGame]);
+  }, [activeGame, dbGames]);
 
   const addToCart = (product: Product) => {
     setCart(prev => {
@@ -170,7 +187,17 @@ const AppContent: React.FC = () => {
                   >
                     <span>Ver Tudo</span>
                   </button>
-                  {GAMES.map(game => (
+                  {dbGames.map(game => (
+                    <button 
+                      key={game.id}
+                      onClick={() => { setActiveGame((game.slug || game.name) as GameType); setIsGamePickerOpen(false); }}
+                      className={`w-full text-left px-3 py-2.5 rounded-lg text-xs font-bold transition-colors mb-1 flex items-center space-x-3 ${activeGame === (game.slug || game.name) ? 'bg-purple-600 text-white' : 'text-slate-400 hover:bg-slate-700 hover:text-white'}`}
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full bg-slate-600"></span>
+                      <span>{game.name}</span>
+                    </button>
+                  ))}
+                  {dbGames.length === 0 && GAMES.map(game => (
                     <button 
                       key={game.type}
                       onClick={() => { setActiveGame(game.type); setIsGamePickerOpen(false); }}
@@ -205,9 +232,15 @@ const AppContent: React.FC = () => {
         {/* Social Links Sidebar - Only shown when NOT collapsed and NOT on small height */}
         {!isSidebarCollapsed && (
           <div className="px-4 py-4 border-t border-slate-800/50 flex items-center justify-around transition-all animate-in fade-in duration-300">
-             <a href="#" className="text-slate-500 hover:text-pink-500 transition-colors p-1.5"><i className="fab fa-instagram"></i></a>
-             <a href="#" className="text-slate-500 hover:text-blue-400 transition-colors p-1.5"><i className="fab fa-twitter"></i></a>
-             <a href="#" className="text-slate-500 hover:text-indigo-400 transition-colors p-1.5"><i className="fab fa-discord"></i></a>
+             <a href="https://www.instagram.com/cardumy/" target="_blank" rel="noopener noreferrer" className="text-slate-500 hover:text-pink-500 transition-colors p-1.5" title="Instagram">
+               <i className="fab fa-instagram"></i>
+             </a>
+             <a href="https://chat.whatsapp.com/CdX5OCXmlojHTutlbjEqId" target="_blank" rel="noopener noreferrer" className="text-slate-500 hover:text-emerald-500 transition-colors p-1.5" title="WhatsApp">
+               <i className="fab fa-whatsapp"></i>
+             </a>
+             <a href="https://discord.gg/hNWvmdz6ja" target="_blank" rel="noopener noreferrer" className="text-slate-500 hover:text-indigo-400 transition-colors p-1.5" title="Discord">
+               <i className="fab fa-discord"></i>
+             </a>
           </div>
         )}
 
@@ -290,6 +323,7 @@ const AppContent: React.FC = () => {
             <Route path="/" element={<Dashboard activeGame={activeGame} />} />
             <Route path="/busca" element={<Search activeGame={activeGame} />} />
             <Route path="/pastas" element={<FoldersPage />} />
+            <Route path="/pastas/:folderId" element={<FolderDetails />} />
             <Route path="/produtos" element={<Products onAddToCart={addToCart} activeGame={activeGame} />} />
             <Route path="/deckbuilder" element={<DeckBuilderPage activeGame={activeGame} />} />
             <Route path="/lojas" element={<Stores />} />

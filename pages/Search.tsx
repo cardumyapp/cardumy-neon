@@ -3,7 +3,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { GameType, Card } from '../types';
 import { useAuth } from '../src/components/AuthProvider';
-import { addCardToList, searchExternalCards } from '../src/services/supabaseService';
+import { addCardToList, searchExternalCards, getBinders, addCardToBinder } from '../src/services/supabaseService';
 
 interface Folder {
   id: string;
@@ -49,6 +49,7 @@ export const Search: React.FC<SearchProps> = ({ activeGame }) => {
   const [totalPages, setTotalPages] = useState(0);
   const [totalResults, setTotalResults] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
+  const [userBinders, setUserBinders] = useState<any[]>([]);
   const itemsPerPage = 20;
 
   const fetchCards = useCallback(async (game: string, query: string, page: number) => {
@@ -60,6 +61,14 @@ export const Search: React.FC<SearchProps> = ({ activeGame }) => {
     setTotalResults(response.total);
     setLoading(false);
   }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    const unsubscribe = getBinders(user.id, (binders) => {
+      setUserBinders(binders);
+    });
+    return () => unsubscribe();
+  }, [user]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -74,19 +83,23 @@ export const Search: React.FC<SearchProps> = ({ activeGame }) => {
     setCurrentPage(1);
   }, [searchQuery, activeGame]);
 
-  const folders: Folder[] = [
-    { id: 'f1', name: 'Minha Coleção', color: 'bg-purple-500', listType: 'cards' },
-    { id: 'f2', name: 'Para Troca', color: 'bg-blue-500', listType: 'offerlist' },
-    { id: 'f3', name: 'Wishlist', color: 'bg-pink-500', listType: 'wishlist' },
+  const systemFolders: Folder[] = [
+    { id: 'colecao', name: 'Minha Coleção', color: 'bg-purple-500', listType: 'cards' },
+    { id: 'offerlist', name: 'Para Troca', color: 'bg-blue-500', listType: 'offerlist' },
+    { id: 'wishlist', name: 'Wishlist', color: 'bg-pink-500', listType: 'wishlist' },
   ];
 
   const [lastAdded, setLastAdded] = useState<{cardId: string, folderName: string} | null>(null);
 
-  const handleAddToFolder = async (card: any, folder: Folder) => {
+  const handleAddToFolder = async (card: any, folder: any, isCustom: boolean = false) => {
     if (!user) return;
     setAddingToFolder(null);
     try {
-      await addCardToList(user.id, folder.listType, card);
+      if (isCustom) {
+        await addCardToBinder(user.id, folder.id, card);
+      } else {
+        await addCardToList(user.id, folder.listType, card);
+      }
       setLastAdded({ cardId: card.id, folderName: folder.name });
       setTimeout(() => setLastAdded(null), 3000);
     } catch (err) {
@@ -265,8 +278,8 @@ export const Search: React.FC<SearchProps> = ({ activeGame }) => {
                   {addingToFolder === card.id ? (
                     <div className="absolute bottom-0 left-0 right-0 bg-slate-800 rounded-2xl p-2 border border-purple-500 shadow-2xl z-20 animate-in zoom-in-95 duration-200">
                       <p className="text-[9px] font-black uppercase text-slate-400 mb-2 px-2">Escolha a pasta</p>
-                      <div className="space-y-1">
-                        {folders.map(folder => (
+                      <div className="max-h-48 overflow-y-auto scrollbar-hide space-y-1">
+                        {systemFolders.map(folder => (
                           <button 
                             key={folder.id}
                             onClick={() => handleAddToFolder(card, folder)}
@@ -276,13 +289,24 @@ export const Search: React.FC<SearchProps> = ({ activeGame }) => {
                             <span>{folder.name}</span>
                           </button>
                         ))}
-                        <button 
-                          onClick={() => setAddingToFolder(null)}
-                          className="w-full text-center py-2 text-[10px] text-slate-500 hover:text-white"
-                        >
-                          Cancelar
-                        </button>
+                        {userBinders.length > 0 && <div className="h-px bg-slate-700 my-2 mx-2"></div>}
+                        {userBinders.map(binder => (
+                          <button 
+                            key={binder.id}
+                            onClick={() => handleAddToFolder(card, binder, true)}
+                            className="w-full text-left px-3 py-2 rounded-xl text-xs hover:bg-slate-700 transition-colors flex items-center space-x-2"
+                          >
+                            <span className="w-2 h-2 rounded-full bg-slate-600"></span>
+                            <span className="truncate">{binder.name}</span>
+                          </button>
+                        ))}
                       </div>
+                      <button 
+                        onClick={() => setAddingToFolder(null)}
+                        className="w-full text-center py-2 text-[10px] text-slate-500 hover:text-white"
+                      >
+                        Cancelar
+                      </button>
                     </div>
                   ) : lastAdded?.cardId === card.id ? (
                     <button className="w-full bg-emerald-600/20 border border-emerald-500/30 text-emerald-400 py-3 rounded-2xl text-xs font-bold flex items-center justify-center space-x-2 animate-in fade-in">
@@ -418,7 +442,7 @@ export const Search: React.FC<SearchProps> = ({ activeGame }) => {
                     </button>
                     <button 
                       onClick={() => {
-                        handleAddToFolder(expandedCard, folders[0]);
+                        handleAddToFolder(expandedCard, systemFolders[0]);
                         setExpandedCard(null);
                       }}
                       className="w-full bg-slate-800 hover:bg-purple-600 text-white font-black uppercase text-[9px] tracking-widest py-2.5 rounded-lg transition-all"
