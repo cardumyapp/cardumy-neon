@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../src/components/AuthProvider';
 import { 
   getBinderWithCards, 
@@ -20,7 +20,9 @@ interface BinderCard extends Card {
 
 export const FolderDetails: React.FC = () => {
   const { folderId } = useParams<{ folderId: string }>();
-  const { user } = useAuth();
+  const [searchParams] = useSearchParams();
+  const ownerId = searchParams.get('user');
+  const { user: currentUser } = useAuth();
   const navigate = useNavigate();
   const [folder, setFolder] = useState<any>(null);
   const [cards, setCards] = useState<BinderCard[]>([]);
@@ -28,29 +30,31 @@ export const FolderDetails: React.FC = () => {
   const [isDeletingBinder, setIsDeletingBinder] = useState(false);
 
   const isSystem = folderId === 'colecao' || folderId === 'wishlist' || folderId === 'offerlist';
+  const effectiveUserId = ownerId || currentUser?.id;
+  const canEdit = !ownerId || ownerId === currentUser?.id?.toString();
 
   useEffect(() => {
-    if (!user || !folderId) return;
+    if (!effectiveUserId || !folderId) return;
 
     const fetchData = async () => {
       setLoading(true);
       try {
         if (isSystem) {
           const listType = folderId === 'colecao' ? 'cards' : folderId as any;
-          const titles: any = { colecao: 'Minha Coleção', wishlist: 'Wishlist', offerlist: 'Offerlist (Trocas)' };
+          const titles: any = { colecao: 'Coleção', wishlist: 'Wishlist', offerlist: 'Offerlist (Trocas)' };
           const icons: any = { colecao: 'fa-box-archive', wishlist: 'fa-heart', offerlist: 'fa-right-left' };
           const colors: any = { colecao: 'bg-purple-600', wishlist: 'bg-pink-600', offerlist: 'bg-emerald-600' };
 
           setFolder({
             id: folderId,
-            name: titles[folderId],
+            name: ownerId ? `${titles[folderId]}` : `Minha ${titles[folderId]}`,
             icon: icons[folderId],
             color: colors[folderId],
             isSystem: true
           });
 
           // Hack to use real-time or just initial fetch
-          getListCards(user.id, listType, (data) => {
+          getListCards(effectiveUserId, listType, (data) => {
              const mappedCards: BinderCard[] = data.map(c => ({
                 id: c.card_id, // Important: use card_id for management
                 dbId: c.id,    // Database row ID
@@ -66,7 +70,7 @@ export const FolderDetails: React.FC = () => {
              setLoading(false);
           });
         } else {
-          const data = await getBinderWithCards(user.id, folderId);
+          const data = await getBinderWithCards(effectiveUserId, folderId);
           if (data) {
             setFolder({
               ...data,
@@ -97,14 +101,14 @@ export const FolderDetails: React.FC = () => {
     };
 
     fetchData();
-  }, [user, folderId, navigate, isSystem]);
+  }, [effectiveUserId, folderId, navigate, isSystem]);
 
   const handleRemoveCard = async (card: any) => {
-    if (!user || !folderId) return;
+    if (!currentUser || !folderId) return;
     try {
       if (isSystem) {
         const listType = folderId === 'colecao' ? 'cards' : folderId as any;
-        await removeCardFromList(user.id, listType, card.id);
+        await removeCardFromList(currentUser.id, listType, card.id);
       } else {
         await removeCardFromBinder(folderId, card.dbId);
       }
@@ -115,12 +119,12 @@ export const FolderDetails: React.FC = () => {
   };
 
   const handleDeleteBinder = async () => {
-    if (!user || !folderId || isSystem) return;
+    if (!currentUser || !folderId || isSystem) return;
     if (!window.confirm('Tem certeza que deseja excluir esta pasta?')) return;
 
     setIsDeletingBinder(true);
     try {
-      await deleteBinder(user.id, folderId);
+      await deleteBinder(currentUser.id, folderId);
       navigate('/pastas');
     } catch (error) {
       alert('Erro ao excluir pasta.');
@@ -158,7 +162,7 @@ export const FolderDetails: React.FC = () => {
           </div>
         </div>
 
-        {!isSystem && (
+        {!isSystem && canEdit && (
           <button 
             onClick={handleDeleteBinder}
             disabled={isDeletingBinder}
@@ -187,14 +191,16 @@ export const FolderDetails: React.FC = () => {
                   <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-md text-[10px] font-black px-2 py-1 rounded-lg text-white">
                     x{card.quantity || 1}
                   </div>
-                  <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center p-4">
-                    <button 
-                      onClick={() => handleRemoveCard(card)}
-                      className="bg-red-600 hover:bg-red-700 text-white w-10 h-10 rounded-full flex items-center justify-center transition-transform hover:scale-110"
-                    >
-                      <i className="fas fa-trash-can"></i>
-                    </button>
-                  </div>
+                  {canEdit && (
+                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center p-4">
+                      <button 
+                        onClick={() => handleRemoveCard(card)}
+                        className="bg-red-600 hover:bg-red-700 text-white w-10 h-10 rounded-full flex items-center justify-center transition-transform hover:scale-110"
+                      >
+                        <i className="fas fa-trash-can"></i>
+                      </button>
+                    </div>
+                  )}
                 </div>
                 <div className="px-1">
                   <h4 className="text-xs font-bold text-white truncate leading-tight mb-1">{card.name}</h4>

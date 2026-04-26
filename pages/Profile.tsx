@@ -103,10 +103,9 @@ export const Profile: React.FC = () => {
   const isOwnProfile = currentUser?.id === profileUser.id || currentUser?.email === profileUser.email;
 
   const displayStats = [
-    { label: 'Coleção', value: stats.collection_size, icon: 'fa-box-archive', color: 'text-purple-400', bg: 'bg-purple-500/10' },
-    { label: 'Wishlist', value: stats.wishlist_size, icon: 'fa-heart', color: 'text-pink-400', bg: 'bg-pink-500/10' },
-    { label: 'Seguidores', value: stats.followers, icon: 'fa-users', color: 'text-blue-400', bg: 'bg-blue-500/10' },
-    { label: 'Seguindo', value: stats.following, icon: 'fa-user-plus', color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
+    { id: 'colecao', label: 'Coleção', value: stats.collection_size, icon: 'fa-box-archive', color: 'text-purple-400', bg: 'bg-purple-500/10' },
+    { id: 'wishlist', label: 'Wishlist', value: stats.wishlist_size, icon: 'fa-heart', color: 'text-pink-400', bg: 'bg-pink-500/10' },
+    { id: 'offerlist', label: 'Offerlist', value: stats.offers_size, icon: 'fa-right-left', color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
   ];
 
   const badges = [
@@ -143,7 +142,19 @@ export const Profile: React.FC = () => {
               <h1 className="text-2xl md:text-4xl font-black tracking-tight text-white leading-tight truncate">{profileUser.codename || profileUser.displayName}</h1>
               <i className="fas fa-circle-check text-blue-400 text-sm md:text-xl" title="Verificada"></i>
             </div>
-            <p className="text-slate-400 text-xs md:text-sm font-medium mb-3">@{profileUser.username} • {profileUser.role === 'admin' ? 'Administrador' : (profileUser.cardgames?.name || profileUser.favorite_game || 'Colecionador Lendário')}</p>
+            <p className="text-slate-400 text-xs md:text-sm font-medium mb-2">@{profileUser.username} • {profileUser.role === 'admin' ? 'Administrador' : (profileUser.cardgames?.name || profileUser.favorite_game || 'Colecionador Lendário')}</p>
+            
+            <div className="flex items-center space-x-4 mb-3">
+              <button className="flex items-center space-x-1 group">
+                <span className="text-white text-sm font-bold">{stats.following || 0}</span>
+                <span className="text-slate-500 text-sm group-hover:underline">Seguindo</span>
+              </button>
+              <button className="flex items-center space-x-1 group">
+                <span className="text-white text-sm font-bold">{stats.followers || 0}</span>
+                <span className="text-slate-500 text-sm group-hover:underline">Seguidores</span>
+              </button>
+            </div>
+
             <div className="flex flex-wrap justify-center md:justify-start gap-1.5 md:gap-2">
               {(() => {
                 let tags: string[] = [];
@@ -194,15 +205,24 @@ export const Profile: React.FC = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 md:gap-8 px-4 md:px-0">
         <div className="lg:col-span-8 space-y-6 md:space-y-8">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+          <div className="grid grid-cols-3 gap-3 md:gap-4">
             {displayStats.map(stat => (
-              <div key={stat.label} className="bg-slate-900/50 backdrop-blur-sm p-4 md:p-6 rounded-2xl border border-slate-800 hover:border-slate-700 transition-all group cursor-default">
+              <button 
+                key={stat.label} 
+                onClick={() => {
+                  if (['colecao', 'wishlist', 'offerlist'].includes(stat.id)) {
+                    navigate(`/pastas/${stat.id}${!isOwnProfile ? `?user=${profileUser.id}` : ''}`);
+                  }
+                }}
+                disabled={!['colecao', 'wishlist', 'offerlist'].includes(stat.id)}
+                className={`bg-slate-900/50 backdrop-blur-sm p-4 md:p-6 rounded-2xl border border-slate-800 hover:border-slate-700 transition-all group ${['colecao', 'wishlist', 'offerlist'].includes(stat.id) ? 'cursor-pointer' : 'cursor-default'}`}
+              >
                 <div className={`${stat.bg} ${stat.color} w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl flex items-center justify-center mb-3 md:mb-4 text-sm md:text-lg group-hover:scale-110 transition-transform`}>
                   <i className={`fas ${stat.icon}`}></i>
                 </div>
                 <p className="text-lg md:text-2xl font-black text-white">{stat.value}</p>
-                <p className="text-slate-500 text-[8px] md:text-[10px] font-bold uppercase tracking-widest">{stat.label}</p>
-              </div>
+                <p className="text-slate-500 text-[8px] md:text-[10px] font-bold uppercase tracking-widest text-left">{stat.label}</p>
+              </button>
             ))}
           </div>
 
