@@ -4,8 +4,11 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { createClient } from "@supabase/supabase-js";
 import dotenv from "dotenv";
+import NodeCache from "node-cache";
 
 dotenv.config();
+
+const cache = new NodeCache({ stdTTL: 60, checkperiod: 120 }); // Cache for 60 seconds by default
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -172,9 +175,13 @@ async function startServer() {
 
   // Store Routes - Replicating Python logic
   app.get("/api/rankings/colecao", async (req: express.Request, res: express.Response) => {
-    console.log("[DEBUG] API: /api/rankings/colecao hitting");
     if (!supabaseAdmin) return res.status(500).json({ error: "Supabase not configured" });
     const limit = parseInt(req.query.limit as string) || 5;
+    
+    const cacheKey = `ranking_colecao_${limit}`;
+    const cachedData = cache.get(cacheKey);
+    if (cachedData) return res.json(cachedData);
+
     try {
       // Fallback to JS aggregation as the primary logic since RPC is missing
       const { data: users, error: uError } = await supabaseAdmin.from('users').select('id, username, codename, avatar');
@@ -186,18 +193,21 @@ async function startServer() {
       }));
       
       const result = ranking.sort((a, b) => b.total_cards - a.total_cards).slice(0, limit);
-      console.log(`[DEBUG] Collection ranking returned ${result.length} items`);
+      cache.set(cacheKey, result, 300); // 5 minutes cache for rankings
       res.json(result);
     } catch (error: any) {
-      console.error('[DEBUG] Error in /api/rankings/colecao:', error);
       res.status(500).json({ error: error.message });
     }
   });
 
   app.get("/api/rankings/ofertas", async (req: express.Request, res: express.Response) => {
-    console.log("[DEBUG] API: /api/rankings/ofertas hitting");
     if (!supabaseAdmin) return res.status(500).json({ error: "Supabase not configured" });
     const limit = parseInt(req.query.limit as string) || 5;
+
+    const cacheKey = `ranking_ofertas_${limit}`;
+    const cachedData = cache.get(cacheKey);
+    if (cachedData) return res.json(cachedData);
+
     try {
       // Grouping in Supabase/PostgREST is often handled via RPC for complex aggregations
       const { data: users, error: uError } = await supabaseAdmin.from('users').select('id, username, codename, avatar');
@@ -210,10 +220,9 @@ async function startServer() {
       }));
       
       const result = ranking.sort((a, b) => b.offers_count - a.offers_count).slice(0, limit);
-      console.log(`[DEBUG] Offers ranking returned ${result.length} items`);
+      cache.set(cacheKey, result, 300); // 5 minutes cache for rankings
       res.json(result);
     } catch (error: any) {
-      console.error('[DEBUG] Error in /api/rankings/ofertas:', error);
       res.status(500).json({ error: error.message });
     }
   });
@@ -222,11 +231,22 @@ async function startServer() {
     if (!supabaseAdmin) return res.status(500).json({ error: "Supabase not configured" });
     const { username } = req.params;
     const { follower_id } = req.query;
+
+    const cacheKey = `profile_${username}_${follower_id || 'none'}`;
+    const cachedData = cache.get(cacheKey);
+    if (cachedData) return res.json(cachedData);
+
     try {
-      // 1. Get user by username or ID
+      // 1. Get user by username, ID or Email
       let query = supabaseAdmin.from('users').select('*, cardgames(id, name)');
-      if (!isNaN(Number(username))) {
+      
+      const isNumeric = !isNaN(Number(username)) && !username.includes('@');
+      const isEmail = username.includes('@');
+
+      if (isNumeric) {
         query = query.eq('id', username);
+      } else if (isEmail) {
+        query = query.eq('email', username);
       } else {
         query = query.eq('username', username);
       }
@@ -259,10 +279,16 @@ async function startServer() {
       // 4. Reviews
       const { data: reviews, error: reviewError } = await supabaseAdmin
         .from('user_reviews')
-        .select('*, reviewer:users(codename, avatar)')
+        .select(`
+          id,
+          comment,
+          is_positive,
+          created_at,
+          reviewer:users!reviewer_id(codename, avatar)
+        `)
         .eq('reviewed_id', user.id)
         .order('created_at', { ascending: false })
-        .limit(5);
+        .limit(20);
 
       const { data: counters } = await supabaseAdmin
         .from('user_reviews')
@@ -274,7 +300,7 @@ async function startServer() {
       const totalReviews = likes + dislikes;
       const approvalRate = totalReviews > 0 ? Math.round((likes / totalReviews) * 100) : null;
 
-      res.json({
+      const profileData = {
         user,
         is_following: isFollowing,
         stats: {
@@ -289,7 +315,10 @@ async function startServer() {
           approval_rate: approvalRate
         },
         reviews: reviews || []
-      });
+      };
+
+      cache.set(cacheKey, profileData, 60); // Cache profile for 1 minute
+      res.json(profileData);
     } catch (error: any) {
       console.error('Error fetching full user profile:', error);
       res.status(500).json({ error: error.message });
@@ -311,6 +340,11 @@ async function startServer() {
         .upsert({ follower_id, followed_id: targetUser.id }, { onConflict: 'follower_id,followed_id' });
       
       if (error) throw error;
+      
+      // Invalidate cache
+      const keys = cache.keys();
+      keys.filter(k => k.startsWith(`profile_${username}`)).forEach(k => cache.del(k));
+      
       res.json({ message: "Seguindo com sucesso" });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -332,6 +366,11 @@ async function startServer() {
         .eq('followed_id', targetUser.id);
       
       if (error) throw error;
+
+      // Invalidate cache
+      const keys = cache.keys();
+      keys.filter(k => k.startsWith(`profile_${username}`)).forEach(k => cache.del(k));
+
       res.json({ message: "Deixou de seguir" });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -357,6 +396,11 @@ async function startServer() {
         }, { onConflict: 'reviewer_id,reviewed_id' });
       
       if (error) throw error;
+
+      // Invalidate cache
+      const keys = cache.keys();
+      keys.filter(k => k.startsWith(`profile_${username}`)).forEach(k => cache.del(k));
+
       res.json({ message: "Avaliação registrada" });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -364,9 +408,13 @@ async function startServer() {
   });
 
   app.get("/api/atividades", async (req: express.Request, res: express.Response) => {
-    console.log("[DEBUG] API: /api/atividades hitting");
     if (!supabaseAdmin) return res.status(500).json({ error: "Supabase not configured" });
     const limit = parseInt(req.query.limit as string) || 10;
+    
+    const cacheKey = `atividades_${limit}`;
+    const cachedData = cache.get(cacheKey);
+    if (cachedData) return res.json(cachedData);
+
     try {
       // First try action_logs as it was confirmed to exist in codebase
       const { data, error } = await supabaseAdmin
@@ -379,7 +427,6 @@ async function startServer() {
         .limit(limit);
 
       if (error) {
-        console.warn('[DEBUG] Error fetching from action_logs with joins, trying without joins:', error.message);
         const { data: dataLog, error: errorLog } = await supabaseAdmin
           .from('action_logs')
           .select('*')
@@ -397,11 +444,9 @@ async function startServer() {
              timestamp: new Date(item.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
              date: new Date(item.created_at).toLocaleDateString('pt-BR')
            }));
-           console.log(`[DEBUG] Activities (action_logs simple) returned ${formatted.length} items`);
            return res.json(formatted);
         }
 
-        console.warn('[DEBUG] Error fetching from action_logs completely, trying social_feeds as fallback:', errorLog.message);
         // Fallback or just throw
         const { data: data2, error: error2 } = await supabaseAdmin
           .from('social_feeds')
@@ -413,7 +458,6 @@ async function startServer() {
           .limit(limit);
         
         if (error2) {
-          console.error('[DEBUG] Both action_logs and social_feeds failed');
           throw error2;
         }
 
@@ -427,7 +471,6 @@ async function startServer() {
           timestamp: new Date(item.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
           date: new Date(item.created_at).toLocaleDateString('pt-BR')
         }));
-        console.log(`[DEBUG] Activities (social_feeds) returned ${formatted.length} items`);
         return res.json(formatted);
       }
 
@@ -445,10 +488,9 @@ async function startServer() {
         };
       });
 
-      console.log(`[DEBUG] Activities (action_logs joined) returned ${formatted.length} items`);
+      cache.set(cacheKey, formatted, 30); // Activities change often, but a 30s cache helps a lot with load
       res.json(formatted);
     } catch (error: any) {
-      console.error('[DEBUG] Error in /api/atividades:', error);
       res.status(500).json({ error: error.message });
     }
   });

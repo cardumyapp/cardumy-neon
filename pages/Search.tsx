@@ -243,9 +243,6 @@ export const Search: React.FC<SearchProps> = ({ activeGame }) => {
                     >
                       <i className="fas fa-expand"></i>
                     </button>
-                    <button className="bg-white/10 backdrop-blur-md hover:bg-pink-600 p-3 rounded-xl text-white transition-all">
-                      <i className="fas fa-heart"></i>
-                    </button>
                   </div>
                 </div>
                 <div className="absolute top-4 left-4 bg-slate-950/80 backdrop-blur-md px-3 py-1 rounded-lg border border-white/10 shadow-lg">

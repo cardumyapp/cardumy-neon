@@ -57,12 +57,44 @@ export const StoreProfile: React.FC<StoreProfileProps> = ({ onAddToCart }) => {
       }
 
       if (storeData) {
-        // Map database fields to the Store interface if they differ slightly
+        // Try to parse JSON fields if they are strings
+        const tryParse = (val: any) => {
+          if (typeof val === 'string') {
+            try { return JSON.parse(val); } catch (e) { return val; }
+          }
+          return val;
+        };
+
+        const contato = tryParse(storeData.contato);
+        const redesSociais = tryParse(storeData.redes_sociais);
+
+        const getFromList = (list: any, key: string) => {
+          if (Array.isArray(list)) {
+            const found = list.find(item => (item && typeof item === 'object' && item[key]));
+            return found ? found[key] : null;
+          }
+          if (list && typeof list === 'object') return list[key];
+          return null;
+        };
+
+        // Combine address fields for a full location string
+        const fullLocation = storeData.endereco 
+          ? `${storeData.endereco}${storeData.bairro ? `, ${storeData.bairro}` : ''}${storeData.cidade ? ` - ${storeData.cidade}, ${storeData.estado || ''}` : ''}`
+          : storeData.location || "Localização não informada";
+
+        // Map database fields to the Store interface
         const mappedStore: Store = {
           ...storeData,
           id: String(storeData.id),
-          isPartner: !!storeData.is_partner || !!storeData.isPartner || storeData.id === 's1' || storeData.id === 's2' || storeData.id === 's3',
-          whatsapp: storeData.whatsapp || storeData.phone,
+          name: storeData.name,
+          logo: storeData.logo,
+          location: fullLocation,
+          isPartner: !!storeData.parceiro || !!storeData.is_partner || !!storeData.isPartner || storeData.id === 's1' || storeData.id === 's2' || storeData.id === 's3',
+          whatsapp: getFromList(contato, 'whatsapp') || storeData.whatsapp || storeData.phone,
+          instagram: getFromList(redesSociais, 'instagram') || storeData.instagram,
+          discord: getFromList(redesSociais, 'discord') || storeData.discord,
+          email: getFromList(contato, 'email') || storeData.email,
+          site: storeData.site,
           opening_hours: storeData.opening_hours || storeData.horarios,
           about: storeData.about || storeData.sobre,
           schedule: storeData.schedule || []

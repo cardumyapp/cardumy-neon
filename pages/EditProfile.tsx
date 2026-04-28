@@ -2,8 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../src/components/AuthProvider';
-import { getUserProfile, updateUserProfile } from '../src/services/supabaseService';
-import { FIGHTER_TAGS, PREDEFINED_AVATARS, PREDEFINED_COVERS, TCG_GAMES, UserProfile } from '../types';
+import { getUserProfile, updateUserProfile, getFighterTags } from '../src/services/supabaseService';
+import { PREDEFINED_AVATARS, PREDEFINED_COVERS, TCG_GAMES, UserProfile } from '../types';
 import { motion } from 'motion/react';
 
 export const EditProfile: React.FC = () => {
@@ -14,6 +14,7 @@ export const EditProfile: React.FC = () => {
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
   const [dbGames, setDbGames] = useState<{id: any, name: string}[]>([]);
+  const [allFighterTags, setAllFighterTags] = useState<{id: any, name: string}[]>([]);
   const [formData, setFormData] = useState({
     username: '',
     codename: '',
@@ -27,12 +28,16 @@ export const EditProfile: React.FC = () => {
   });
 
   useEffect(() => {
-    const fetchGames = async () => {
+    const fetchInitialData = async () => {
       const { getCardgames } = await import('../src/services/supabaseService');
-      const games = await getCardgames();
+      const [games, tags] = await Promise.all([
+        getCardgames(),
+        getFighterTags()
+      ]);
       setDbGames(games);
+      setAllFighterTags(tags);
     };
-    fetchGames();
+    fetchInitialData();
   }, []);
 
   useEffect(() => {
@@ -99,7 +104,6 @@ export const EditProfile: React.FC = () => {
 
     if (result) {
       setMessage({ type: 'success', text: 'Perfil atualizado com sucesso!' });
-      setTimeout(() => navigate('/profile'), 1500);
     } else {
       setMessage({ type: 'error', text: 'Falha ao atualizar perfil. Tente novamente.' });
     }
@@ -289,16 +293,19 @@ export const EditProfile: React.FC = () => {
             <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">{formData.fighter_tags.length} selecionadas</span>
           </div>
           <div className="flex flex-wrap gap-2">
-            {FIGHTER_TAGS.map(tag => (
+            {allFighterTags.map(tag => (
               <button
-                key={tag}
+                key={tag.id}
                 type="button"
-                onClick={() => handleTagToggle(tag)}
-                className={`px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-wider border transition-all ${formData.fighter_tags.includes(tag) ? 'bg-purple-600 border-purple-500 text-white shadow-lg shadow-purple-600/20' : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'}`}
+                onClick={() => handleTagToggle(tag.name)}
+                className={`px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-wider border transition-all ${formData.fighter_tags.includes(tag.name) ? 'bg-purple-600 border-purple-500 text-white shadow-lg shadow-purple-600/20' : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'}`}
               >
-                {tag}
+                {tag.name}
               </button>
             ))}
+            {allFighterTags.length === 0 && (
+              <p className="text-[10px] text-slate-600 italic">Carregando tags...</p>
+            )}
           </div>
         </section>
 

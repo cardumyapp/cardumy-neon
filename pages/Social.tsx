@@ -14,14 +14,12 @@ export const Social: React.FC = () => {
 
   useEffect(() => {
     const fetchActivities = async () => {
-      console.log('[DEBUG] Social component: fetchActivities starting');
       setActivitiesLoading(true);
       try {
         const data = await getActivities(5);
-        console.log(`[DEBUG] Social component: fetchActivities received ${data?.length || 0} items`);
         setActivities(data);
       } catch (err) {
-        console.error('[DEBUG] Social component: fetchActivities error:', err);
+        // Error handling remained
       } finally {
         setActivitiesLoading(false);
       }
@@ -49,18 +47,16 @@ export const Social: React.FC = () => {
 
   useEffect(() => {
     const fetchAllRankings = async () => {
-      console.log('[DEBUG] Social component: fetchAllRankings starting');
       setRankLoading(true);
       try {
         const [collData, offData] = await Promise.all([
           getCollectionRanking(5),
           getOffersRanking(5)
         ]);
-        console.log(`[DEBUG] Social component: rankings received. Collection: ${collData?.length || 0}, Offers: ${offData?.length || 0}`);
         setCollectionRankings(collData);
         setOffersRankings(offData);
       } catch (err) {
-        console.error('[DEBUG] Social component: fetchAllRankings error:', err);
+        // Error handling remained
       } finally {
         setRankLoading(false);
       }

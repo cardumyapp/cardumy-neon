@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../src/components/AuthProvider';
-import { getBinders, createBinder } from '../src/services/supabaseService';
+import { getBinders, createBinder, getFoldersStats } from '../src/services/supabaseService';
 import { GAMES } from '../constants';
 import { useNavigate } from 'react-router-dom';
 import { OfflineWarning } from '../src/components/OfflineWarning';
@@ -26,6 +26,7 @@ export const FoldersPage: React.FC = () => {
   const [newFolderName, setNewFolderName] = useState('');
   const [dbGames, setDbGames] = useState<any[]>([]);
   const [selectedGameId, setSelectedGameId] = useState<string>('');
+  const [stats, setStats] = useState<{system: any, binders: any}>({ system: {}, binders: {} });
 
   useEffect(() => {
     const fetchGames = async () => {
@@ -41,19 +42,27 @@ export const FoldersPage: React.FC = () => {
   useEffect(() => {
     if (!user) return;
 
+    const fetchStats = async () => {
+      const s = await getFoldersStats(user.id);
+      setStats(s);
+    };
+
     const systemFolders: Folder[] = [
-      { id: 'colecao', name: 'Minha Coleção', icon: 'fa-box-archive', color: 'bg-purple-600', cardCount: 0, estimatedValue: 0, isSystem: true },
-      { id: 'wishlist', name: 'Wishlist', icon: 'fa-heart', color: 'bg-pink-600', cardCount: 0, estimatedValue: 0, isSystem: true },
-      { id: 'offerlist', name: 'Offerlist (Trocas)', icon: 'fa-right-left', color: 'bg-emerald-600', cardCount: 0, estimatedValue: 0, isSystem: true },
+      { id: 'colecao', name: 'Minha Coleção', icon: 'fa-box-archive', color: 'bg-purple-600', cardCount: stats.system.colecao || 0, estimatedValue: 0, isSystem: true },
+      { id: 'wishlist', name: 'Wishlist', icon: 'fa-heart', color: 'bg-pink-600', cardCount: stats.system.wishlist || 0, estimatedValue: 0, isSystem: true },
+      { id: 'offerlist', name: 'Offerlist (Trocas)', icon: 'fa-right-left', color: 'bg-emerald-600', cardCount: stats.system.offerlist || 0, estimatedValue: 0, isSystem: true },
     ];
 
     const unsubscribe = getBinders(user.id, (dbBinders) => {
+      // Trigger stats refresh
+      fetchStats();
+      
       const customFolders: Folder[] = dbBinders.map(b => ({
         id: b.id,
         name: b.name,
         icon: 'fa-folder',
         color: 'bg-slate-800',
-        cardCount: 0,
+        cardCount: stats.binders[b.id] || 0,
         estimatedValue: 0,
         gameName: dbGames.find(g => g.id.toString() === b.game_id.toString())?.name || 'Personalizada'
       }));
@@ -61,7 +70,7 @@ export const FoldersPage: React.FC = () => {
     });
 
     return () => unsubscribe();
-  }, [user, dbGames]);
+  }, [user, dbGames, stats]);
 
   const handleCreateBinder = async () => {
     if (!user || !newFolderName.trim() || !selectedGameId) return;

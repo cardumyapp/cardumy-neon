@@ -242,6 +242,36 @@ export const addCardToBinder = async (userId: any, binderId: any, card: any) => 
   }
 };
 
+export const updateCardQuantityInList = async (userId: string | number, listType: 'cards' | 'wishlist' | 'offerlist', cardId: string, quantity: number) => {
+  const table = listType === 'cards' ? 'user_cards' : listType;
+  try {
+    const { error } = await supabase
+      .from(table)
+      .update({ quantidade: quantity })
+      .eq('user_id', userId)
+      .eq('card_id', cardId);
+    
+    if (error) throw error;
+  } catch (error) {
+    console.error(`Error updating card quantity in ${listType}:`, error);
+    throw error;
+  }
+};
+
+export const updateCardQuantityInBinder = async (dbId: any, quantity: number) => {
+  try {
+    const { error } = await supabase
+      .from('user_cards')
+      .update({ quantidade: quantity })
+      .eq('id', dbId);
+    
+    if (error) throw error;
+  } catch (error) {
+    console.error('Error updating card quantity in binder:', error);
+    throw error;
+  }
+};
+
 export const removeCardFromList = async (userId: string | number, listType: 'cards' | 'wishlist' | 'offerlist', cardId: string) => {
   const table = listType === 'cards' ? 'user_cards' : listType;
   try {
@@ -604,17 +634,14 @@ export const getStoreEvents = async (storeId: string) => {
 };
 
 export const getActivities = async (limit: number = 10) => {
-  console.log(`[DEBUG] Fetching activities with limit: ${limit}`);
   try {
     const response = await fetch(`/api/atividades?limit=${limit}`);
-    console.log(`[DEBUG] Activities response status: ${response.status}`);
     if (!response.ok) {
       const errorText = await response.text();
       console.error('Activities fetch error response:', errorText);
       throw new Error(`Failed to fetch activities: ${response.status}`);
     }
     const data = await response.json();
-    console.log(`[DEBUG] Activities fetched successfully, count: ${data?.length || 0}`);
     return data;
   } catch (error: any) {
     console.error('Error fetching activities:', error?.message || error);
@@ -822,13 +849,10 @@ export const submitUserReview = async (username: string, reviewerId: string, isP
 };
 
 export const getCollectionRanking = async (limit: number = 5) => {
-  console.log(`[DEBUG] Fetching collection ranking with limit: ${limit}`);
   try {
     const response = await fetch(`/api/rankings/colecao?limit=${limit}`);
-    console.log(`[DEBUG] Collection ranking response status: ${response.status}`);
     if (!response.ok) throw new Error('Failed to fetch ranking');
     const data = await response.json();
-    console.log(`[DEBUG] Collection ranking fetched, count: ${data?.length || 0}`);
     return data;
   } catch (error) {
     console.error('Error fetching collection ranking:', error);
@@ -837,13 +861,10 @@ export const getCollectionRanking = async (limit: number = 5) => {
 };
 
 export const getOffersRanking = async (limit: number = 5) => {
-  console.log(`[DEBUG] Fetching offers ranking with limit: ${limit}`);
   try {
     const response = await fetch(`/api/rankings/ofertas?limit=${limit}`);
-    console.log(`[DEBUG] Offers ranking response status: ${response.status}`);
     if (!response.ok) throw new Error('Failed to fetch ranking');
     const data = await response.json();
-    console.log(`[DEBUG] Offers ranking fetched, count: ${data?.length || 0}`);
     return data;
   } catch (error) {
     console.error('Error fetching offers ranking:', error);
@@ -863,6 +884,107 @@ export const searchUsers = async (searchTerm: string) => {
     return data || [];
   } catch (error) {
     console.error('Error searching users:', error);
+    return [];
+  }
+};
+
+export const getFoldersStats = async (userId: string | number) => {
+  try {
+    const stats: Record<string, number> = {
+      colecao: 0,
+      wishlist: 0,
+      offerlist: 0
+    };
+
+    // System counts (sum of quantidade)
+    const { data: collecaoData } = await supabase.from('user_cards').select('quantidade').eq('user_id', userId);
+    stats.colecao = collecaoData?.reduce((acc, curr) => acc + (curr.quantidade || 0), 0) || 0;
+
+    const { data: wishlistData } = await supabase.from('wishlist').select('quantidade').eq('user_id', userId);
+    stats.wishlist = wishlistData?.reduce((acc, curr) => acc + (curr.quantidade || 0), 0) || 0;
+
+    const { data: offerlistData } = await supabase.from('offerlist').select('quantidade').eq('user_id', userId);
+    stats.offerlist = offerlistData?.reduce((acc, curr) => acc + (curr.quantidade || 0), 0) || 0;
+
+    // Binder counts
+    const { data: binders } = await supabase.from('user_binders').select('id').eq('user_id', userId);
+    
+    if (binders && binders.length > 0) {
+      const binderIds = binders.map(b => b.id);
+      const { data: binderCards } = await supabase
+        .from('binder_cards')
+        .select('binder_id, card:user_cards(quantidade)')
+        .in('binder_id', binderIds);
+      
+      const binderStats: Record<string, number> = {};
+      binderIds.forEach(id => binderStats[id] = 0);
+
+      binderCards?.forEach((bc: any) => {
+        if (bc.binder_id && bc.card) {
+          binderStats[bc.binder_id] += (bc.card.quantidade || 0);
+        }
+      });
+
+      return { system: stats, binders: binderStats };
+    }
+
+    return { system: stats, binders: {} };
+  } catch (error) {
+    console.error('Error fetching folder stats:', error);
+    return { system: { colecao: 0, wishlist: 0, offerlist: 0 }, binders: {} };
+  }
+};
+
+export const getFighterTags = async () => {
+  try {
+    const { data, error } = await supabase.from('fighter_tags').select('*').order('name', { ascending: true });
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching fighter tags:', error);
+    return [];
+  }
+};
+
+export const getReviewPhrases = async (type?: 'positive' | 'negative') => {
+  try {
+    let query = supabase.from('review_phrases').select('*');
+    if (type) query = query.eq('type', type);
+    
+    const { data, error } = await query.order('text', { ascending: true });
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching review phrases:', error);
+    return [];
+  }
+};
+
+export const getProductTypes = async (gameId?: string | number) => {
+  try {
+    let query = supabase.from('product_types').select('*');
+    if (gameId && gameId !== 'all') query = query.eq('game_id', gameId);
+    
+    const { data, error } = await query.order('name', { ascending: true });
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching product types:', error);
+    return [];
+  }
+};
+
+export const getProductsByFilters = async (filters: { game_id?: string | number, product_type_id?: string | number }) => {
+  try {
+    let query = supabase.from('products').select('*');
+    if (filters.game_id && filters.game_id !== 'all') query = query.eq('game_id', filters.game_id);
+    if (filters.product_type_id && filters.product_type_id !== 'all') query = query.eq('product_type_id', filters.product_type_id);
+    
+    const { data, error } = await query.order('created_at', { ascending: false });
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching filtered products:', error);
     return [];
   }
 };

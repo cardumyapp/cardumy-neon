@@ -8,7 +8,9 @@ import {
   removeCardFromList, 
   removeCardFromBinder,
   deleteBinder,
-  moveCardBetweenLists
+  moveCardBetweenLists,
+  updateCardQuantityInList,
+  updateCardQuantityInBinder
 } from '../src/services/supabaseService';
 import { motion, AnimatePresence } from 'motion/react';
 import { Card, GameType } from '../types';
@@ -118,6 +120,34 @@ export const FolderDetails: React.FC = () => {
     }
   };
 
+  const handleUpdateQuantity = async (card: BinderCard, delta: number) => {
+    if (!currentUser || !folderId || !canEdit) return;
+    
+    const currentQuantity = card.quantity || 1;
+    const newQuantity = currentQuantity + delta;
+    
+    if (newQuantity < 1) {
+      handleRemoveCard(card);
+      return;
+    }
+
+    try {
+      if (isSystem) {
+        const listType = folderId === 'colecao' ? 'cards' : folderId as any;
+        await updateCardQuantityInList(currentUser.id, listType, card.id, newQuantity);
+      } else {
+        await updateCardQuantityInBinder(card.dbId, newQuantity);
+      }
+      
+      setCards(prev => prev.map(c => 
+        c.dbId === card.dbId ? { ...c, quantity: newQuantity } : c
+      ));
+    } catch (error) {
+      console.error('Error updating quantity:', error);
+      alert('Erro ao atualizar quantidade.');
+    }
+  };
+
   const handleDeleteBinder = async () => {
     if (!currentUser || !folderId || isSystem) return;
     if (!window.confirm('Tem certeza que deseja excluir esta pasta?')) return;
@@ -188,9 +218,35 @@ export const FolderDetails: React.FC = () => {
               >
                 <div className="aspect-[3/4.2] rounded-xl overflow-hidden mb-3 bg-slate-950 relative">
                   <img src={card.imageUrl} alt={card.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
-                  <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-md text-[10px] font-black px-2 py-1 rounded-lg text-white">
-                    x{card.quantity || 1}
+                  
+                  <div className="absolute top-2 right-2 bg-black/80 backdrop-blur-md text-[10px] font-black px-1.5 py-1 rounded-lg text-white flex items-center space-x-1.5 border border-white/5 z-20">
+                    {canEdit && (
+                      <button 
+                        onClick={(e) => { 
+                          e.preventDefault(); 
+                          e.stopPropagation();
+                          handleUpdateQuantity(card, -1); 
+                        }}
+                        className="w-5 h-5 hover:text-red-400 transition-colors flex items-center justify-center bg-white/5 hover:bg-white/10 rounded flex-shrink-0"
+                      >
+                        <i className="fas fa-minus text-[7px]"></i>
+                      </button>
+                    )}
+                    <span className="min-w-[12px] text-center">x{card.quantity || 1}</span>
+                    {canEdit && (
+                      <button 
+                        onClick={(e) => { 
+                          e.preventDefault(); 
+                          e.stopPropagation();
+                          handleUpdateQuantity(card, 1); 
+                        }}
+                        className="w-5 h-5 hover:text-emerald-400 transition-colors flex items-center justify-center bg-white/5 hover:bg-white/10 rounded flex-shrink-0"
+                      >
+                        <i className="fas fa-plus text-[7px]"></i>
+                      </button>
+                    )}
                   </div>
+
                   {canEdit && (
                     <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center p-4">
                       <button 
@@ -204,7 +260,13 @@ export const FolderDetails: React.FC = () => {
                 </div>
                 <div className="px-1">
                   <h4 className="text-xs font-bold text-white truncate leading-tight mb-1">{card.name}</h4>
-                  <p className="text-[9px] text-slate-500 uppercase font-black tracking-widest">{card.rarity || 'Common'}</p>
+                  <div className="flex items-center justify-between">
+                    <p className="text-[9px] text-slate-500 uppercase font-black tracking-widest">{card.rarity || 'Common'}</p>
+                    <p className="text-[9px] text-purple-400 font-mono font-bold">#{card.id || card.code || 'ID'}</p>
+                  </div>
+                  <div className="mt-1">
+                    <p className="text-[8px] text-slate-600 uppercase font-black truncate">{card.set || card.game || ''}</p>
+                  </div>
                 </div>
               </motion.div>
             ))

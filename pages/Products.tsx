@@ -1,9 +1,9 @@
-
 import React, { useState, useMemo, useEffect } from 'react';
-import { getProducts } from '../src/services/supabaseService';
+import { getProducts, getCardgames, getProductTypes } from '../src/services/supabaseService';
 import { ProductType, Product, GameType } from '../types';
 import { useAuth } from '../src/components/AuthProvider';
 import { OfflineWarning } from '../src/components/OfflineWarning';
+import { motion, AnimatePresence } from 'motion/react';
 
 interface ProductsProps {
   onAddToCart: (product: Product) => void;
@@ -15,25 +15,54 @@ type SortOption = 'newest' | 'price_asc' | 'price_desc' | 'relevance';
 export const Products: React.FC<ProductsProps> = ({ onAddToCart, activeGame }) => {
   const { isOffline } = useAuth();
   const [selectedSlug, setSelectedSlug] = useState<string | null>(null);
-  const [itemFilter, setItemFilter] = useState<string>('Todos');
-  const [gameFilter, setGameFilter] = useState<string>('Todos');
+  const [dbGames, setDbGames] = useState<any[]>([]);
+  const [dbProductTypes, setDbProductTypes] = useState<any[]>([]);
+  const [gameFilterId, setGameFilterId] = useState<string | number>('all');
+  const [typeFilterId, setTypeFilterId] = useState<string | number>('all');
   const [sortBy, setSortBy] = useState<SortOption>('relevance');
   const [searchQuery, setSearchQuery] = useState('');
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
   const itemsPerPage = 12;
+
+  // Filter product types based on the selected game
+  const visibleProductTypes = useMemo(() => {
+    if (gameFilterId === 'all') {
+      return dbProductTypes.filter(type => !type.game_id);
+    }
+    return dbProductTypes.filter(type => !type.game_id || type.game_id?.toString() === gameFilterId.toString());
+  }, [dbProductTypes, gameFilterId]);
 
   useEffect(() => {
     const unsub = getProducts((data) => {
       setProducts(data);
       setLoading(false);
     });
+    
+    const fetchMetadata = async () => {
+      const [games, types] = await Promise.all([
+        getCardgames(),
+        getProductTypes()
+      ]);
+      setDbGames(games);
+      setDbProductTypes(types);
+    };
+    
+    fetchMetadata();
     return () => unsub();
   }, []);
 
-  const itemCategories = ['Todos', 'Produto Selado', 'Acessório', 'Premium Bandai', 'Carta Avulsa'];
-  const gameCategories = ['Todos', 'One Piece', 'Magic', 'Pokémon', 'Yu-Gi-Oh!', 'Disney Lorcana', 'Digimon'];
+  // Sync game filter with activeGame prop
+  useEffect(() => {
+    if (activeGame !== 'All' && dbGames.length > 0) {
+      const game = dbGames.find(g => g.name === activeGame);
+      if (game) setGameFilterId(game.id);
+    } else if (activeGame === 'All') {
+      setGameFilterId('all');
+    }
+  }, [activeGame, dbGames]);
 
   const mappedProducts = useMemo(() => {
     return products.map(p => ({
@@ -45,37 +74,33 @@ export const Products: React.FC<ProductsProps> = ({ onAddToCart, activeGame }) =
     }));
   }, [products]);
 
-  const scopedProducts = useMemo(() => {
+  const filteredProducts = useMemo(() => {
     let list = [...mappedProducts];
     
-    // Respeita o foco global se definido, caso contrário usa o filtro local
-    const targetGame = activeGame !== 'All' ? activeGame : (gameFilter !== 'Todos' ? gameFilter : null);
+    // Filter by Game
+    if (gameFilterId !== 'all') {
+      list = list.filter(p => p.game_id?.toString() === gameFilterId.toString() || p.cardgames?.id?.toString() === gameFilterId.toString());
+    }
     
-    if (targetGame) {
-      list = list.filter(p => !p.game || p.game === targetGame || p.cardgames?.name === targetGame);
+    // Filter by Type
+    if (typeFilterId !== 'all') {
+      list = list.filter(p => p.product_type_id?.toString() === typeFilterId.toString());
     }
 
     if (searchQuery) {
       list = list.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()));
     }
-    return list;
-  }, [activeGame, gameFilter, searchQuery, mappedProducts]);
-
-  const tickets = useMemo(() => scopedProducts.filter(p => p.type === 'Ingresso'), [scopedProducts]);
-  
-  const normalItems = useMemo(() => {
-    let list = scopedProducts.filter(p => p.type !== 'Ingresso');
-    
-    if (itemFilter !== 'Todos') {
-      list = list.filter(p => p.type === itemFilter || (itemFilter === 'Produto Selado' && p.type === 'Booster Box'));
-    }
 
     return list.sort((a, b) => {
       if (sortBy === 'price_asc') return a.price - b.price;
       if (sortBy === 'price_desc') return b.price - a.price;
+      if (sortBy === 'newest') return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
       return 0;
     });
-  }, [scopedProducts, itemFilter, sortBy]);
+  }, [mappedProducts, gameFilterId, typeFilterId, searchQuery, sortBy]);
+
+  const tickets = useMemo(() => filteredProducts.filter(p => p.type === 'Ingresso'), [filteredProducts]);
+  const normalItems = useMemo(() => filteredProducts.filter(p => p.type !== 'Ingresso'), [filteredProducts]);
 
   const totalPages = Math.ceil(normalItems.length / itemsPerPage);
   
@@ -86,7 +111,17 @@ export const Products: React.FC<ProductsProps> = ({ onAddToCart, activeGame }) =
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [itemFilter, gameFilter, searchQuery, sortBy, activeGame]);
+  }, [gameFilterId, typeFilterId, searchQuery, sortBy, activeGame]);
+
+  // Reset type filter if it becomes invalid for the current game
+  useEffect(() => {
+    if (typeFilterId !== 'all' && visibleProductTypes.length > 0) {
+      const isStillVisible = visibleProductTypes.some(t => t.id.toString() === typeFilterId.toString());
+      if (!isStillVisible) {
+        setTypeFilterId('all');
+      }
+    }
+  }, [visibleProductTypes, typeFilterId]);
 
   const productOffers = useMemo(() => {
     if (!selectedSlug) return [];
@@ -95,139 +130,213 @@ export const Products: React.FC<ProductsProps> = ({ onAddToCart, activeGame }) =
 
   const selectedBaseProduct = useMemo(() => productOffers[0] || null, [productOffers]);
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-500"></div>
-      </div>
-    );
-  }
-
   if (selectedSlug && selectedBaseProduct) {
     return (
-      <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in duration-500">
-        <button onClick={() => setSelectedSlug(null)} className="text-slate-500 hover:text-white flex items-center space-x-2 text-xs font-black uppercase tracking-widest">
-          <i className="fas fa-arrow-left"></i>
-          <span>Voltar</span>
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="max-w-4xl mx-auto space-y-8 pb-20 px-4"
+      >
+        <button onClick={() => setSelectedSlug(null)} className="group text-slate-500 hover:text-white flex items-center space-x-2 text-xs font-black uppercase tracking-widest transition-colors">
+          <i className="fas fa-arrow-left transition-transform group-hover:-translate-x-1"></i>
+          <span>Voltar para Loja</span>
         </button>
-        <div className="bg-slate-900/60 border border-slate-800 rounded-[32px] p-12 text-center space-y-6 shadow-2xl">
-          <div className="w-48 h-64 mx-auto">
-             <img src={selectedBaseProduct.imageUrl} className="w-full h-full object-contain rounded-2xl" alt={selectedBaseProduct.name} />
+        
+        <div className="bg-slate-900/60 border border-slate-800 rounded-[32px] overflow-hidden shadow-2xl relative">
+          <div className="absolute inset-0 bg-gradient-to-br from-purple-600/10 to-transparent pointer-events-none"></div>
+          <div className="p-8 md:p-12 flex flex-col md:flex-row items-center gap-12 relative z-10">
+            <div className="w-full md:w-64 aspect-[3/4] flex-shrink-0">
+               <motion.img 
+                layoutId={`img-${selectedBaseProduct.slug}`}
+                src={selectedBaseProduct.imageUrl} 
+                className="w-full h-full object-contain rounded-2xl drop-shadow-[0_20px_50px_rgba(139,92,246,0.3)]" 
+                alt={selectedBaseProduct.name} 
+               />
+            </div>
+            <div className="flex-1 text-center md:text-left space-y-4">
+              <span className="inline-block px-3 py-1 bg-purple-500/10 border border-purple-500/20 rounded-full text-[10px] font-black text-purple-400 uppercase tracking-widest">
+                {selectedBaseProduct.game || 'TCG'}
+              </span>
+              <h2 className="text-3xl md:text-4xl font-black text-white uppercase leading-tight">{selectedBaseProduct.name}</h2>
+              <div className="flex flex-wrap gap-2 justify-center md:justify-start">
+                <span className="px-3 py-1 bg-slate-800 rounded-lg text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                  {selectedBaseProduct.type}
+                </span>
+              </div>
+            </div>
           </div>
-          <h2 className="text-3xl font-black text-white uppercase">{selectedBaseProduct.name}</h2>
         </div>
+
         <div className="space-y-4">
-          <h3 className="text-sm font-black text-slate-500 uppercase tracking-widest px-2">Ofertas Disponíveis</h3>
-          {productOffers.map((offer) => (
-            <OfferRow key={offer.id} offer={offer} onAddToCart={onAddToCart} />
-          ))}
+          <div className="flex items-center justify-between px-2">
+            <h3 className="text-sm font-black text-slate-500 uppercase tracking-widest">Ofertas Disponíveis</h3>
+            <span className="text-[10px] font-bold text-slate-600 uppercase">{productOffers.length} {productOffers.length === 1 ? 'vendedor' : 'vendedores'}</span>
+          </div>
+          <div className="space-y-3">
+            {productOffers.map((offer) => (
+              <OfferRow key={offer.id} offer={offer} onAddToCart={onAddToCart} />
+            ))}
+          </div>
         </div>
-      </div>
+      </motion.div>
     );
   }
 
   return (
-    <div className="max-w-7xl mx-auto space-y-12 pb-20 animate-in fade-in duration-500">
+    <div className="max-w-7xl mx-auto space-y-12 pb-20 px-4 sm:px-6">
       {isOffline && <OfflineWarning />}
       
       {/* SEÇÃO DESTAQUE: INGRESSOS */}
       <section className="space-y-6">
-        <div className="flex items-center space-x-3 px-2">
-           <div className="w-10 h-10 bg-indigo-600/20 rounded-xl flex items-center justify-center text-indigo-400 border border-indigo-500/20">
-             <i className="fas fa-ticket-simple"></i>
-           </div>
-           <div>
-             <h2 className="text-2xl font-black text-white uppercase tracking-tight">Arena Cardumy</h2>
-             <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Ingressos para Torneios de {activeGame === 'All' ? 'TCG' : activeGame}</p>
-           </div>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <div className="w-12 h-12 bg-indigo-600/20 rounded-2xl flex items-center justify-center text-indigo-400 border border-indigo-500/20 shadow-inner">
+              <i className="fas fa-ticket-simple text-xl"></i>
+            </div>
+            <div>
+              <h2 className="text-2xl font-black text-white uppercase tracking-tight">Arena Cardumy</h2>
+              <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Ingressos para Torneios e Eventos</p>
+            </div>
+          </div>
+          <div className="hidden sm:block">
+            <div className="px-4 py-1.5 bg-indigo-500/10 border border-indigo-500/20 rounded-full text-[10px] font-black text-indigo-400 uppercase tracking-widest">
+              AO VIVO
+            </div>
+          </div>
         </div>
 
-        {tickets.length > 0 ? (
+        {loading ? (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {[1, 2, 3].map(i => <div key={i} className="h-48 rounded-[32px] bg-slate-900/40 border border-slate-800 animate-pulse"></div>)}
+          </div>
+        ) : tickets.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {tickets.map(ticket => (
-              <div key={ticket.id} onClick={() => setSelectedSlug(ticket.slug)} className="group bg-indigo-950/20 border border-indigo-500/20 rounded-[32px] p-6 hover:border-indigo-400 transition-all cursor-pointer shadow-xl overflow-hidden relative">
-                <div className="flex justify-between items-start mb-4">
-                   <h3 className="text-lg font-black text-white leading-tight uppercase line-clamp-2">{ticket.name}</h3>
-                   <div className="bg-slate-950/80 px-2 py-2 rounded-xl border border-white/5 flex flex-col items-center">
-                      <span className="text-[10px] font-black text-white">{ticket.stock || 0}</span>
-                      <span className="text-[8px] font-black text-slate-500 uppercase">VAGAS</span>
-                   </div>
+              <motion.div 
+                whileHover={{ scale: 1.02 }}
+                key={ticket.id} 
+                onClick={() => setSelectedSlug(ticket.slug)} 
+                className="group bg-indigo-950/20 border border-indigo-500/20 rounded-[32px] p-8 hover:border-indigo-400 transition-all cursor-pointer shadow-xl overflow-hidden relative"
+              >
+                <div className="absolute top-0 right-0 p-8">
+                  <div className="bg-slate-950/80 px-3 py-2 rounded-2xl border border-white/5 flex flex-col items-center">
+                    <span className="text-xs font-black text-white">{ticket.stock || 0}</span>
+                    <span className="text-[8px] font-black text-slate-500 uppercase">VAGAS</span>
+                  </div>
                 </div>
-                <div className="flex items-center justify-between mt-auto">
-                   <span className="text-xl font-black text-white">R$ {(ticket.price || 0).toFixed(2)}</span>
-                   <div className="w-10 h-10 bg-indigo-600 text-white rounded-xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
-                     <i className="fas fa-arrow-right text-xs"></i>
-                   </div>
+                <div className="space-y-4 pt-1">
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">{ticket.game || 'Especial'}</span>
+                    <h3 className="text-xl font-black text-white leading-tight uppercase line-clamp-2 pr-12">{ticket.name}</h3>
+                  </div>
+                  <div className="flex items-center justify-between pt-4">
+                    <span className="text-2xl font-black text-white">R$ {(ticket.price || 0).toFixed(2)}</span>
+                    <div className="w-12 h-12 bg-indigo-600 text-white rounded-2xl flex items-center justify-center shadow-lg group-hover:bg-indigo-500 transition-colors">
+                      <i className="fas fa-arrow-right"></i>
+                    </div>
+                  </div>
                 </div>
-              </div>
+              </motion.div>
             ))}
           </div>
-        ) : (
-          <div className="py-12 text-center bg-slate-900/20 rounded-[40px] border border-dashed border-slate-800 mx-2">
-             <p className="text-slate-600 font-bold uppercase text-xs">Sem eventos para o foco selecionado</p>
+        ) : !loading && (
+          <div className="py-16 text-center bg-slate-900/10 rounded-[40px] border border-dashed border-slate-800/50">
+             <i className="fas fa-calendar-alt text-slate-800 text-3xl mb-4"></i>
+             <p className="text-slate-600 font-bold uppercase text-[10px] tracking-widest">Nenhum evento agendado para este filtro</p>
           </div>
         )}
       </section>
 
       {/* MARKETPLACE LAYOUT */}
-      <div className="flex flex-col lg:flex-row gap-8">
+      <div className="flex flex-col lg:flex-row gap-10">
         
-        {/* Sidebar de Filtros (Desktop) */}
-        <aside className="lg:w-64 space-y-6 flex-shrink-0">
-          <div className="bg-slate-900/40 border border-slate-800 rounded-[32px] p-6 space-y-8 shadow-xl">
+        {/* Mobile Filter Toggle */}
+        <div className="lg:hidden flex items-center justify-between bg-slate-900/60 p-4 rounded-2xl border border-slate-800">
+           <div className="flex flex-col">
+             <span className="text-[10px] font-black text-slate-500 uppercase">Filtros Ativos</span>
+             <span className="text-xs font-bold text-white uppercase">{normalItems.length} Produtos</span>
+           </div>
+           <button 
+             onClick={() => setIsFilterOpen(!isFilterOpen)}
+             className="px-6 py-2.5 bg-purple-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center space-x-2"
+           >
+             <i className={`fas ${isFilterOpen ? 'fa-times' : 'fa-sliders-h'}`}></i>
+             <span>{isFilterOpen ? 'Fechar' : 'Filtrar'}</span>
+           </button>
+        </div>
+
+        {/* Sidebar de Filtros (Desktop + Mobile Toggle) */}
+        <aside className={`lg:w-64 flex-shrink-0 transition-all ${isFilterOpen ? 'block' : 'hidden lg:block'}`}>
+          <div className="sticky top-6 bg-slate-900/40 border border-slate-800 rounded-[32px] p-6 space-y-10 shadow-xl">
             
-            {/* FILTRO 1: CATEGORIA (Vem primeiro agora) */}
+            {/* FILTRO: GÊNERO */}
             <div className="space-y-4">
-              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Categoria</label>
-              <div className="space-y-2">
-                {itemCategories.map(cat => (
-                  <button 
-                    key={cat}
-                    onClick={() => setItemFilter(cat)}
-                    className={`w-full text-left px-4 py-3 rounded-xl text-[11px] font-bold transition-all border ${
-                      itemFilter === cat ? 'bg-purple-600 border-purple-500 text-white shadow-lg' : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
-                    }`}
-                  >
-                    {cat}
-                  </button>
+              <div className="flex items-center space-x-2 px-1">
+                <i className="fas fa-shapes text-purple-500 text-[10px]"></i>
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Gênero</label>
+              </div>
+              <div className="space-y-1.5 max-h-[300px] overflow-y-auto pr-1">
+                <FilterButton 
+                  isActive={typeFilterId === 'all'} 
+                  onClick={() => setTypeFilterId('all')} 
+                  label="Todos" 
+                />
+                {visibleProductTypes.map(type => (
+                  <FilterButton 
+                    key={type.id}
+                    isActive={typeFilterId === type.id}
+                    onClick={() => setTypeFilterId(type.id)}
+                    label={type.name}
+                  />
                 ))}
               </div>
             </div>
 
-            {/* FILTRO 2: FRANQUIA (Apenas se o foco global for 'All') */}
+            {/* FILTRO: FRANQUIA */}
             {activeGame === 'All' && (
               <div className="space-y-4">
-                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Franquia</label>
-                <div className="space-y-2">
-                  {gameCategories.map(game => (
-                    <button 
-                      key={game}
-                      onClick={() => setGameFilter(game)}
-                      className={`w-full text-left px-4 py-3 rounded-xl text-[11px] font-bold transition-all border ${
-                        gameFilter === game ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg' : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
-                      }`}
-                    >
-                      {game}
-                    </button>
+                <div className="flex items-center space-x-2 px-1">
+                  <i className="fas fa-gamepad text-indigo-500 text-[10px]"></i>
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Franquia</label>
+                </div>
+                <div className="space-y-1.5 max-h-[300px] overflow-y-auto pr-1">
+                  <FilterButton 
+                    isActive={gameFilterId === 'all'} 
+                    onClick={() => setGameFilterId('all')} 
+                    label="Todas as Ligas" 
+                    colorClass="bg-indigo-600 border-indigo-500"
+                  />
+                  {dbGames.map(game => (
+                    <FilterButton 
+                      key={game.id}
+                      isActive={gameFilterId.toString() === game.id.toString()}
+                      onClick={() => setGameFilterId(game.id)}
+                      label={game.name}
+                      colorClass="bg-indigo-600 border-indigo-500"
+                    />
                   ))}
                 </div>
               </div>
             )}
 
-            {/* FILTRO 3: ORDENAÇÃO */}
+            {/* FILTRO: ORDENAÇÃO */}
             <div className="space-y-4">
-              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Ordenar Por</label>
-              <div className="space-y-2">
+              <div className="flex items-center space-x-2 px-1">
+                <i className="fas fa-sort-amount-down text-emerald-500 text-[10px]"></i>
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Classificar</label>
+              </div>
+              <div className="grid grid-cols-1 gap-1.5">
                 {[
-                  { id: 'relevance', label: 'Relevância' },
-                  { id: 'price_asc', label: 'Menor Preço' },
-                  { id: 'price_desc', label: 'Maior Preço' }
+                  { id: 'relevance', label: 'Em Destaque' },
+                  { id: 'newest', label: 'Novos Lotes' },
+                  { id: 'price_asc', label: 'Preço: Menor' },
+                  { id: 'price_desc', label: 'Preço: Maior' }
                 ].map(opt => (
                   <button 
                     key={opt.id}
                     onClick={() => setSortBy(opt.id as SortOption)}
-                    className={`w-full text-left px-4 py-3 rounded-xl text-[11px] font-bold transition-all border ${
-                      sortBy === opt.id ? 'bg-slate-800 border-purple-500 text-purple-400' : 'bg-slate-950 border-slate-800 text-slate-500 hover:border-slate-700'
+                    className={`text-left px-4 py-3 rounded-xl text-[11px] font-bold transition-all border ${
+                      sortBy === opt.id ? 'bg-slate-800 border-emerald-500/50 text-emerald-400' : 'bg-slate-950/40 border-slate-800 text-slate-500 hover:border-slate-700'
                     }`}
                   >
                     {opt.label}
@@ -239,61 +348,115 @@ export const Products: React.FC<ProductsProps> = ({ onAddToCart, activeGame }) =
         </aside>
 
         {/* Grid de Itens */}
-        <div className="flex-1 space-y-6">
-           <div className="relative">
-              <i className="fas fa-search absolute left-5 top-1/2 -translate-y-1/2 text-slate-500"></i>
-              <input 
-                type="text" 
-                placeholder="Pesquisar produtos..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-800 rounded-2xl pl-12 pr-4 py-4 text-sm focus:outline-none focus:border-purple-500 transition-all shadow-xl"
-              />
+        <div className="flex-1 space-y-8">
+           <div className="flex flex-col sm:flex-row gap-4">
+              <div className="relative flex-1 group">
+                 <i className="fas fa-search absolute left-5 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within:text-purple-500 transition-colors"></i>
+                 <input 
+                   type="text" 
+                   placeholder="Procure por box, boosters, kits..."
+                   value={searchQuery}
+                   onChange={(e) => setSearchQuery(e.target.value)}
+                   className="w-full bg-slate-900 border border-slate-800 rounded-2xl pl-12 pr-4 py-4 text-sm font-medium focus:outline-none focus:border-purple-500 transition-all shadow-xl placeholder:text-slate-600"
+                 />
+              </div>
+              <div className="hidden sm:flex items-center px-6 bg-slate-900/40 border border-slate-800 rounded-2xl shadow-xl">
+                 <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest leading-none">
+                   {normalItems.length} <span className="text-slate-700">resultados</span>
+                 </span>
+              </div>
            </div>
 
-           <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-6">
-              {paginatedItems.map(product => (
-                <div key={product.id} onClick={() => setSelectedSlug(product.slug)} className="group bg-slate-900/40 border border-slate-800 rounded-3xl overflow-hidden transition-all duration-300 hover:border-purple-500/50 hover:-translate-y-1 cursor-pointer flex flex-col shadow-lg">
-                  <div className="aspect-[3/4] p-4 bg-slate-950/20 relative flex items-center justify-center">
-                    <img src={product.imageUrl} className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-700" alt={product.name} />
-                  </div>
-                  <div className="p-4 flex-1 flex flex-col justify-between">
-                    <div>
-                      <p className="text-[8px] font-black text-slate-600 uppercase mb-1">{product.game || 'TCG'}</p>
-                      <h4 className="text-[10px] font-bold text-white uppercase line-clamp-2 h-7 group-hover:text-purple-400 transition-colors">{product.name}</h4>
-                    </div>
-                    <div className="flex items-center justify-between pt-3">
-                      <span className="text-sm font-black text-emerald-400">R$ {(product.price || 0).toFixed(2)}</span>
-                      <div className="w-7 h-7 rounded-lg bg-slate-800 flex items-center justify-center text-slate-500 group-hover:bg-purple-600 group-hover:text-white transition-all">
-                        <i className="fas fa-plus text-[10px]"></i>
+           <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-6">
+              {loading ? (
+                Array.from({ length: 8 }).map((_, i) => (
+                  <div key={i} className="aspect-[3/4] bg-slate-900/40 border border-slate-800 rounded-[32px] animate-pulse"></div>
+                ))
+              ) : (
+                <AnimatePresence mode="popLayout">
+                  {paginatedItems.map(product => (
+                    <motion.div 
+                      layout
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.9 }}
+                      key={product.id} 
+                      onClick={() => setSelectedSlug(product.slug)} 
+                      className="group bg-slate-900/40 border border-slate-800 rounded-[32px] overflow-hidden transition-all duration-500 hover:border-purple-500/50 hover:-translate-y-2 cursor-pointer flex flex-col shadow-lg"
+                    >
+                      <div className="aspect-square p-6 bg-slate-950/20 relative flex items-center justify-center overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-t from-slate-950/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                        <img 
+                          src={product.imageUrl} 
+                          className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-700 ease-out" 
+                          alt={product.name} 
+                        />
+                        {product.stock <= 5 && product.stock > 0 && (
+                          <div className="absolute top-4 left-4">
+                            <span className="px-2 py-0.5 bg-orange-500 text-white text-[8px] font-black uppercase rounded-lg shadow-lg">Últimas Unid.</span>
+                          </div>
+                        )}
+                        {product.stock === 0 && (
+                          <div className="absolute inset-0 bg-slate-950/80 flex items-center justify-center">
+                            <span className="text-[10px] font-black text-white uppercase tracking-[0.2em] -rotate-12 border-2 border-white px-3 py-1">Esgotado</span>
+                          </div>
+                        )}
                       </div>
-                    </div>
+                      <div className="p-5 flex-1 flex flex-col justify-between space-y-4">
+                        <div className="space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">{product.game || 'TCG'}</span>
+                            <span className="text-[8px] font-bold text-slate-700 uppercase">{product.type}</span>
+                          </div>
+                          <h4 className="text-[11px] font-black text-white uppercase line-clamp-2 h-9 group-hover:text-purple-400 transition-colors leading-relaxed">{product.name}</h4>
+                        </div>
+                        <div className="flex items-center justify-between pt-2 border-t border-slate-800/50">
+                          <div className="flex flex-col">
+                            <span className="text-[8px] font-bold text-slate-600 uppercase">A partir de</span>
+                            <span className="text-sm font-black text-emerald-400">R$ {(product.price || 0).toFixed(2)}</span>
+                          </div>
+                          <div className="w-9 h-9 rounded-xl bg-slate-800 flex items-center justify-center text-slate-500 group-hover:bg-purple-600 group-hover:text-white transition-all shadow-inner group-hover:rotate-90">
+                            <i className="fas fa-plus text-[10px]"></i>
+                          </div>
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+              )}
+              {!loading && paginatedItems.length === 0 && (
+                <div className="col-span-full py-32 text-center space-y-6">
+                  <div className="w-20 h-20 bg-slate-900 border border-slate-800 rounded-full flex items-center justify-center mx-auto text-slate-700">
+                    <i className="fas fa-box-open text-3xl"></i>
                   </div>
-                </div>
-              ))}
-              {paginatedItems.length === 0 && (
-                <div className="col-span-full py-24 text-center space-y-4 opacity-30">
-                  <i className="fas fa-box-open text-4xl"></i>
-                  <p className="text-xs font-black uppercase tracking-widest">Nenhum produto encontrado</p>
+                  <div className="space-y-1">
+                    <p className="text-sm font-black text-white uppercase tracking-[0.1em]">Nenhum tesouro encontrado</p>
+                    <p className="text-[10px] text-slate-500 font-bold">Tente ajustar seus filtros para descobrir novos produtos.</p>
+                  </div>
+                  <button 
+                    onClick={() => { setTypeFilterId('all'); setGameFilterId('all'); setSearchQuery(''); }}
+                    className="px-6 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-[10px] font-black uppercase transition-colors"
+                  >
+                    Resetar Filtros
+                  </button>
                 </div>
               )}
            </div>
 
            {/* Paginação */}
            {totalPages > 1 && (
-             <div className="flex items-center justify-center space-x-2 pt-8">
+             <div className="flex items-center justify-center space-x-2 pt-12">
                <button
                  disabled={currentPage === 1}
-                 onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                 className="w-10 h-10 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-400 hover:border-purple-500 hover:text-white transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                 onClick={() => { setCurrentPage(prev => Math.max(1, prev - 1)); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                 className="w-11 h-11 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-400 hover:border-purple-500 hover:text-white transition-all disabled:opacity-20 disabled:cursor-not-allowed shadow-lg"
                >
                  <i className="fas fa-chevron-left text-xs"></i>
                </button>
                
-               <div className="flex items-center space-x-1">
+               <div className="flex items-center space-x-1.5 px-3">
                  {Array.from({ length: totalPages }, (_, i) => i + 1)
                    .filter(page => {
-                     // Mostrar primeira, última e algumas ao redor da atual
                      return page === 1 || page === totalPages || Math.abs(page - currentPage) <= 1;
                    })
                    .map((page, index, array) => {
@@ -303,13 +466,13 @@ export const Products: React.FC<ProductsProps> = ({ onAddToCart, activeGame }) =
 
                      return (
                        <React.Fragment key={page}>
-                         {showEllipsis && <span className="text-slate-600 px-1">...</span>}
+                         {showEllipsis && <span className="text-slate-600 font-black px-1 pb-1">...</span>}
                          <button
-                           onClick={() => setCurrentPage(page)}
-                           className={`w-10 h-10 rounded-xl border font-bold text-xs transition-all ${
+                           onClick={() => { setCurrentPage(page); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                           className={`w-11 h-11 rounded-2xl border font-black text-xs transition-all shadow-md ${
                              currentPage === page 
-                               ? 'bg-purple-600 border-purple-500 text-white shadow-lg' 
-                               : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'
+                               ? 'bg-purple-600 border-purple-500 text-white shadow-[0_10px_20px_-5px_rgba(139,92,246,0.3)] scale-110 z-10' 
+                               : 'bg-slate-900 border-slate-800 text-slate-500 hover:border-slate-700'
                            }`}
                          >
                            {page}
@@ -321,8 +484,8 @@ export const Products: React.FC<ProductsProps> = ({ onAddToCart, activeGame }) =
 
                <button
                  disabled={currentPage === totalPages}
-                 onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                 className="w-10 h-10 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-400 hover:border-purple-500 hover:text-white transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                 onClick={() => { setCurrentPage(prev => Math.min(totalPages, prev + 1)); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                 className="w-11 h-11 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-400 hover:border-purple-500 hover:text-white transition-all disabled:opacity-20 disabled:cursor-not-allowed shadow-lg"
                >
                  <i className="fas fa-chevron-right text-xs"></i>
                </button>
@@ -334,28 +497,56 @@ export const Products: React.FC<ProductsProps> = ({ onAddToCart, activeGame }) =
   );
 };
 
+const FilterButton: React.FC<{ isActive: boolean; onClick: () => void; label: string; colorClass?: string }> = ({ isActive, onClick, label, colorClass = 'bg-purple-600 border-purple-500' }) => (
+  <button 
+    onClick={onClick}
+    className={`w-full text-left px-4 py-3.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border ${
+      isActive ? `${colorClass} text-white shadow-lg scale-[1.02]` : 'bg-slate-950/40 border-slate-800/80 text-slate-500 hover:border-slate-700 hover:text-slate-300'
+    }`}
+  >
+    {label}
+  </button>
+);
+
 const OfferRow: React.FC<{ offer: Product; onAddToCart: (p: Product) => void }> = ({ offer, onAddToCart }) => {
-  const [qty, setQty] = useState(1);
   return (
-    <div className="bg-slate-900/40 border border-slate-800 p-6 rounded-3xl flex flex-col md:flex-row items-center justify-between gap-6 group">
-      <div className="flex items-center space-x-4">
-        <div className="w-12 h-12 rounded-xl overflow-hidden border border-slate-700 bg-slate-950">
-           <img src={offer.storeLogo || `https://ui-avatars.com/api/?name=${offer.storeName}`} className="w-full h-full object-cover" alt={offer.storeName} />
+    <motion.div 
+      initial={{ opacity: 0, x: -10 }}
+      animate={{ opacity: 1, x: 0 }}
+      className="bg-slate-900/40 border border-slate-800 p-6 rounded-[32px] flex flex-col md:flex-row items-center justify-between gap-6 group hover:border-slate-700 transition-colors shadow-xl"
+    >
+      <div className="flex items-center space-x-5">
+        <div className="w-14 h-14 rounded-2xl overflow-hidden border border-slate-700 bg-slate-950 shadow-inner p-1">
+           <img src={offer.storeLogo || `https://ui-avatars.com/api/?name=${offer.storeName || 'Store'}`} className="w-full h-full object-cover rounded-xl" alt={offer.storeName} />
         </div>
-        <div>
-          <h4 className="font-black text-white text-sm group-hover:text-purple-400">{offer.storeName}</h4>
-          <p className="text-[9px] font-bold text-slate-500 uppercase mt-1">Lojista Parceiro</p>
+        <div className="space-y-0.5">
+          <div className="flex items-center space-x-2">
+            <h4 className="font-black text-white text-base group-hover:text-purple-400 transition-colors uppercase tracking-tight">{offer.storeName || 'Lojista Cardumy'}</h4>
+          </div>
+          <div className="flex items-center space-x-2">
+            <span className="text-[9px] font-black text-emerald-500 uppercase tracking-widest">{offer.stock || 0} em estoque</span>
+            <span className="text-slate-800 text-[10px]">|</span>
+            <p className="text-[9px] font-bold text-slate-500 uppercase">Envio para todo Brasil</p>
+          </div>
         </div>
       </div>
-      <div className="flex items-center space-x-6 w-full md:w-auto justify-between md:justify-end">
-        <span className="text-xl font-black text-emerald-400">R$ {(offer.price || 0).toFixed(2)}</span>
+      <div className="flex items-center space-x-8 w-full md:w-auto justify-between md:justify-end border-t md:border-t-0 border-slate-800/50 pt-4 md:pt-0">
+        <div className="flex flex-col items-end">
+          <span className="text-[10px] font-bold text-slate-500 uppercase leading-none mb-1">Preço Unitário</span>
+          <span className="text-2xl font-black text-emerald-400">R$ {(offer.price || 0).toFixed(2)}</span>
+        </div>
         <button 
-          onClick={() => onAddToCart({ ...offer, quantity: qty } as any)}
-          className="bg-purple-600 hover:bg-purple-700 text-white font-black text-[10px] uppercase px-8 py-3.5 rounded-xl transition-all shadow-lg active:scale-95"
+          onClick={() => onAddToCart({ ...offer, quantity: 1 } as any)}
+          disabled={offer.stock === 0}
+          className={`px-10 py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest transition-all shadow-xl active:scale-95 ${
+            offer.stock === 0 
+            ? 'bg-slate-800 text-slate-500 cursor-not-allowed' 
+            : 'bg-purple-600 hover:bg-purple-500 text-white shadow-[0_10px_25px_-5px_rgba(139,92,246,0.3)]'
+          }`}
         >
-          {offer.type === ProductType.TICKET ? 'Garantir Vaga' : 'Comprar'}
+          {offer.stock === 0 ? 'Esgotado' : (offer.type === 'Ingresso' ? 'Garantir Vaga' : 'Adicionar')}
         </button>
       </div>
-    </div>
+    </motion.div>
   );
 };

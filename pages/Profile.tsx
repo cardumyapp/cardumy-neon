@@ -6,7 +6,8 @@ import {
   getFullUserProfile, 
   followUser, 
   unfollowUser, 
-  submitUserReview 
+  submitUserReview,
+  getReviewPhrases
 } from '../src/services/supabaseService';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -21,6 +22,22 @@ export const Profile: React.FC = () => {
   const [reviewComment, setReviewComment] = useState('');
   const [reviewLoading, setReviewLoading] = useState(false);
   const [showReviewForm, setShowReviewForm] = useState(false);
+  const [reviewPhrases, setReviewPhrases] = useState<any[]>([]);
+  const [reviewType, setReviewType] = useState<'positive' | 'negative'>('positive');
+
+  const fetchPhrases = async (type: 'positive' | 'negative') => {
+    const data = await getReviewPhrases(type);
+    setReviewPhrases(data);
+    if (data.length > 0) {
+      setReviewComment(data[0].text);
+    }
+  };
+
+  useEffect(() => {
+    if (showReviewForm) {
+      fetchPhrases(reviewType);
+    }
+  }, [showReviewForm, reviewType]);
 
   const fetchProfile = async () => {
     setLoading(true);
@@ -263,34 +280,59 @@ export const Profile: React.FC = () => {
             <AnimatePresence>
               {showReviewForm && (
                 <motion.div 
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: 'auto', opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  className="overflow-hidden"
+                   initial={{ height: 0, opacity: 0 }}
+                   animate={{ height: 'auto', opacity: 1 }}
+                   exit={{ height: 0, opacity: 0 }}
+                   className="overflow-hidden"
                 >
                   <div className="bg-slate-950 border border-slate-800 p-4 rounded-2xl space-y-4 mb-6">
-                    <textarea 
-                      value={reviewComment}
-                      onChange={(e) => setReviewComment(e.target.value)}
-                      placeholder="Conte sua experiência com este usuário..."
-                      className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-xs md:text-sm text-white focus:outline-none focus:border-purple-500/50 resize-none h-24"
-                    />
-                    <div className="flex items-center justify-end space-x-3">
+                    <div className="flex items-center space-x-2 mb-2">
+                       <button 
+                         onClick={() => setReviewType('positive')}
+                         className={`flex-1 flex items-center justify-center space-x-2 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${reviewType === 'positive' ? 'bg-green-500/20 text-green-500 border border-green-500/30 shadow-[0_0_15px_rgba(34,197,94,0.1)]' : 'bg-slate-900 text-slate-500 grayscale'}`}
+                       >
+                         <i className="fas fa-thumbs-up"></i>
+                         <span>Positiva</span>
+                       </button>
+                       <button 
+                         onClick={() => setReviewType('negative')}
+                         className={`flex-1 flex items-center justify-center space-x-2 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${reviewType === 'negative' ? 'bg-red-500/20 text-red-500 border border-red-500/30' : 'bg-slate-900 text-slate-500 grayscale'}`}
+                       >
+                         <i className="fas fa-thumbs-down"></i>
+                         <span>Negativa</span>
+                       </button>
+                    </div>
+
+                    <div className="space-y-2 max-h-48 overflow-y-auto pr-1 custom-scrollbar">
+                      {reviewPhrases.length > 0 ? (
+                        reviewPhrases.map((phrase) => (
+                          <button
+                            key={phrase.id}
+                            onClick={() => setReviewComment(phrase.text)}
+                            className={`w-full text-left px-4 py-3 rounded-xl text-xs transition-all border ${reviewComment === phrase.text ? 'bg-purple-600/20 border-purple-500 text-white font-bold' : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'}`}
+                          >
+                            {phrase.text}
+                          </button>
+                        ))
+                      ) : (
+                        <div className="text-center py-4 text-slate-600 text-[10px] italic">
+                          Carregando opções...
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex items-center justify-end pt-2">
                       <button 
-                        onClick={() => handleReviewSubmit(false)}
-                        disabled={reviewLoading}
-                        className="flex items-center space-x-2 bg-red-500/10 border border-red-500/20 px-4 py-2 rounded-xl text-[10px] font-bold uppercase text-red-500 hover:bg-red-500/20 transition-all disabled:opacity-50"
+                        onClick={() => handleReviewSubmit(reviewType === 'positive')}
+                        disabled={reviewLoading || !reviewComment}
+                        className={`w-full flex items-center justify-center space-x-2 px-4 py-3 rounded-xl text-xs font-black uppercase transition-all shadow-lg active:scale-95 disabled:opacity-50 ${reviewType === 'positive' ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-red-600 hover:bg-red-700 text-white'}`}
                       >
-                        <i className="fas fa-thumbs-down"></i>
-                        <span>Negativa</span>
-                      </button>
-                      <button 
-                        onClick={() => handleReviewSubmit(true)}
-                        disabled={reviewLoading}
-                        className="flex items-center space-x-2 bg-green-500/10 border border-green-500/20 px-4 py-2 rounded-xl text-[10px] font-bold uppercase text-green-500 hover:bg-green-500/20 transition-all disabled:opacity-50"
-                      >
-                        <i className="fas fa-thumbs-up"></i>
-                        <span>Positiva</span>
+                        {reviewLoading ? (
+                          <i className="fas fa-circle-notch animate-spin"></i>
+                        ) : (
+                          <i className={`fas ${reviewType === 'positive' ? 'fa-check' : 'fa-triangle-exclamation'}`}></i>
+                        )}
+                        <span>Confirmar Avaliação {reviewType === 'positive' ? 'Positiva' : 'Negativa'}</span>
                       </button>
                     </div>
                   </div>
@@ -300,28 +342,31 @@ export const Profile: React.FC = () => {
 
             <div className="space-y-4">
               {reviews && reviews.length > 0 ? (
-                reviews.map((review: any, i: number) => (
-                  <div key={i} className="flex items-start space-x-4 py-4 border-b border-slate-800/50 last:border-none">
-                    <img 
-                      src={review.reviewer?.avatar || `https://ui-avatars.com/api/?name=${review.reviewer?.codename}&background=8b5cf6&color=fff`} 
-                      className="w-10 h-10 rounded-full border border-slate-800"
-                      alt=""
-                    />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs font-bold text-white">{review.reviewer?.codename}</span>
-                        <div className={`flex items-center space-x-1.5 px-2 py-0.5 rounded-full text-[8px] font-black uppercase ${review.is_positive ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
-                          <i className={`fas ${review.is_positive ? 'fa-thumbs-up' : 'fa-thumbs-down'}`}></i>
-                          <span>{review.is_positive ? 'Positiva' : 'Negativa'}</span>
+                reviews.map((review: any, i: number) => {
+                  const reviewer = Array.isArray(review.reviewer) ? review.reviewer[0] : review.reviewer;
+                  return (
+                    <div key={i} className="flex items-start space-x-4 py-4 border-b border-slate-800/50 last:border-none">
+                      <img 
+                        src={reviewer?.avatar || `https://ui-avatars.com/api/?name=${reviewer?.codename || 'User'}&background=8b5cf6&color=fff`} 
+                        className="w-10 h-10 rounded-full border border-slate-800 object-cover"
+                        alt=""
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs font-bold text-white">{reviewer?.codename || 'Usuário'}</span>
+                          <div className={`flex items-center space-x-1.5 px-2 py-0.5 rounded-full text-[8px] font-black uppercase ${review.is_positive ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
+                            <i className={`fas ${review.is_positive ? 'fa-thumbs-up' : 'fa-thumbs-down'}`}></i>
+                            <span>{review.is_positive ? 'Positiva' : 'Negativa'}</span>
+                          </div>
                         </div>
+                        <p className="text-xs text-slate-400 italic">"{review.comment}"</p>
+                        <span className="text-[9px] text-slate-600 mt-2 block font-mono">
+                          {new Date(review.created_at).toLocaleDateString('pt-BR')}
+                        </span>
                       </div>
-                      <p className="text-xs text-slate-400 italic">"{review.comment}"</p>
-                      <span className="text-[9px] text-slate-600 mt-2 block font-mono">
-                        {new Date(review.created_at).toLocaleDateString('pt-BR')}
-                      </span>
                     </div>
-                  </div>
-                ))
+                  );
+                })
               ) : (
                 <div className="text-center py-6 text-slate-500 text-xs italic">
                   Nenhuma avaliação recebida ainda.
