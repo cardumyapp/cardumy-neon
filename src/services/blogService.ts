@@ -22,9 +22,9 @@ export interface BlogPost {
 
 export const fetchLatestPosts = async (perPage: number = 3): Promise<BlogPost[]> => {
   try {
-    const response = await fetch(`https://cardumy.blog/wp-json/wp/v2/posts?per_page=${perPage}&_embed`);
+    const response = await fetch(`/api/blog-posts?per_page=${perPage}`);
     if (!response.ok) {
-      throw new Error('Failed to fetch posts');
+      throw new Error('Failed to fetch posts via proxy');
     }
     return await response.json();
   } catch (error) {

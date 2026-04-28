@@ -15,8 +15,14 @@ O projeto foi construído utilizando as seguintes ferramentas fundamentais:
 
 ### Backend & Persistência
 - **Supabase (@supabase/supabase-js)**: Integração crucial para Autenticação, Banco de Dados (PostgreSQL) e Real-time.
-- **Express (Node.js)**: Servidor back-end que sustenta a aplicação em modo full-stack.
+- **Express (Node.js)**: Servidor back-end que sustenta a aplicação em modo full-stack, gerenciando proxies de API e segurança.
 - **tsx**: Execução do servidor TypeScript diretamente em tempo de desenvolvimento.
+
+## 🏗️ Arquitetura Full-Stack
+
+A aplicação utiliza uma arquitetura unificada:
+- **Client Side**: React montado via Vite para uma experiência de SPA rápida e responsiva.
+- **Server Side**: Express servindo como gateway para APIs protegidas, cache e proxy para serviços externos (Supabase Admin, Homura API).
 
 ### Iconografia
 - **Font Awesome & Lucide React**: Biblioteca de ícones consistente para toda a interface.
@@ -37,8 +43,10 @@ O projeto foi construído utilizando as seguintes ferramentas fundamentais:
 
 - `/src/components`: Componentes reutilizáveis de UI.
 - `/src/services`: Lógica de integração com Supabase e APIs externas.
-- `/pages`: Visualizações principais da aplicação.
-- `server.ts`: Ponto de entrada do servidor Node.js/Express.
+- `/src/pages`: Visualizações principais da aplicação.
+- `/src/lib`: Utilitários e instâncias de clientes (Supabase).
+- `/src/types.ts` & `/src/constants.tsx`: Definições globais de tipos e constantes.
+- `server.ts`: Ponto de entrada do servidor Node.js/Express (Full-stack).
 
 ---
 Desenvolvido com ❤️ para a comunidade TCG.

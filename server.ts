@@ -20,10 +20,21 @@ async function startServer() {
 
   // Request logger - FIRST
   app.use((req, res, next) => {
+    // Skip logging for static assets to reduce noise
+    const isStatic = req.url.startsWith('/src/') || 
+                    req.url.startsWith('/@vite') || 
+                    req.url.startsWith('/node_modules/') ||
+                    req.url.endsWith('.tsx') ||
+                    req.url.endsWith('.ts') ||
+                    req.url.endsWith('.css') ||
+                    req.url.endsWith('.js');
+
     const start = Date.now();
     res.on('finish', () => {
       const duration = Date.now() - start;
-      console.log(`${new Date().toISOString()} - [SERVER] ${req.method} ${req.url} - ${res.statusCode} (${duration}ms)`);
+      if (!isStatic || res.statusCode >= 400) {
+        console.log(`${new Date().toISOString()} - [SERVER] ${req.method} ${req.url} - ${res.statusCode} (${duration}ms)`);
+      }
     });
     next();
   });
@@ -41,6 +52,14 @@ async function startServer() {
     next();
   });
 
+  // Supabase Admin Client (Service Role)
+  const supabaseUrl = process.env.VITE_SUPABASE_URL;
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  
+  const supabaseAdmin = (supabaseUrl && supabaseServiceKey) 
+    ? createClient(supabaseUrl, supabaseServiceKey)
+    : null;
+
   // Diagnosis Route
   app.get("/api/health", (req, res) => {
     res.json({ 
@@ -50,14 +69,6 @@ async function startServer() {
       supabase: !!supabaseAdmin
     });
   });
-
-  // Supabase Admin Client (Service Role)
-  const supabaseUrl = process.env.VITE_SUPABASE_URL;
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  
-  const supabaseAdmin = (supabaseUrl && supabaseServiceKey) 
-    ? createClient(supabaseUrl, supabaseServiceKey)
-    : null;
 
   // API Routes
   app.get("/api/cards", async (req: express.Request, res: express.Response) => {
@@ -161,23 +172,22 @@ async function startServer() {
       console.log('Updating user profile for ID:', userId);
       console.log('Filtered updates:', filteredUpdates);
 
-      // Recursive lookup function to find user by ID or Email
-      const findUser = async (id: string) => {
-        // Try direct ID only if numeric
-        const isNumeric = !isNaN(Number(id)) && !String(id).includes('@') && !String(id).includes('-');
-        if (isNumeric) {
-          const { data: byId } = await supabaseAdmin.from('users').select('id').eq('id', id).maybeSingle();
-          if (byId) return byId;
-        }
+      // Lookup function to find user by ID, Email or Username
+      const findUser = async (id: string | number) => {
+        const idStr = String(id);
+        
+        // Try ID first (numeric or UUID)
+        const { data: byId } = await supabaseAdmin.from('users').select('id').eq('id', id).maybeSingle();
+        if (byId) return byId;
 
         // Try Email
-        if (String(id).includes('@')) {
-          const { data: byEmail } = await supabaseAdmin.from('users').select('id').eq('email', id).maybeSingle();
+        if (idStr.includes('@')) {
+          const { data: byEmail } = await supabaseAdmin.from('users').select('id').eq('email', idStr).maybeSingle();
           if (byEmail) return byEmail;
         }
 
-        // Try Username as fallback
-        const { data: byUsername } = await supabaseAdmin.from('users').select('id').eq('username', id).maybeSingle();
+        // Try Username
+        const { data: byUsername } = await supabaseAdmin.from('users').select('id').eq('username', idStr).maybeSingle();
         return byUsername;
       };
 
@@ -967,6 +977,19 @@ async function startServer() {
     }
   });
 
+  app.get("/api/blog-posts", async (req, res) => {
+    const perPage = req.query.per_page || 3;
+    try {
+      const response = await fetch(`https://cardumy.blog/wp-json/wp/v2/posts?per_page=${perPage}&_embed`);
+      if (!response.ok) throw new Error('Failed to fetch from Cardumy Blog');
+      const data = await response.json();
+      res.json(data);
+    } catch (error: any) {
+      console.error('Blog proxy error:', error);
+      res.status(500).json({ error: 'Failed to fetch blog posts', detail: error.message });
+    }
+  });
+
   // 404 for API routes
   app.use('/api', (req, res) => {
     console.warn(`404 API Route not found: ${req.method} ${req.url}`);
@@ -999,7 +1022,7 @@ async function startServer() {
   }
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+    console.log(`${new Date().toISOString()} - [SERVER] Started listening on 0.0.0.0:${PORT}`);
     console.log(`Supabase Admin configured: ${!!supabaseAdmin}`);
   });
   } catch (error) {
