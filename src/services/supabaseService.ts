@@ -1,5 +1,7 @@
 import { supabase } from '../lib/supabase';
 
+const API_BASE = typeof window !== 'undefined' ? window.location.origin : '';
+
 export const getProducts = (callback: (products: any[]) => void) => {
   const fetchProducts = async () => {
     const { data, error } = await supabase
@@ -515,17 +517,30 @@ export const getUserProfile = async (userId: string | number) => {
 
 export const syncUser = async (userData: any) => {
   try {
-    const response = await fetch('/api/sync-user', {
+    console.log('API Call: syncUser', userData.email);
+    const response = await fetch(`${API_BASE}/api/sync-user`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({ userData })
+    }).catch(err => {
+      console.error('Fetch error in syncUser:', err);
+      throw err;
     });
     
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to sync user');
+      const contentType = response.headers.get('content-type');
+      let errorMsg = 'Failed to sync user';
+      if (contentType && contentType.includes('application/json')) {
+        const errorData = await response.json();
+        errorMsg = errorData.error || errorMsg;
+      } else {
+        const text = await response.text();
+        console.error('Server returned non-JSON error for sync-user:', text);
+        errorMsg = `Server error (${response.status})`;
+      }
+      throw new Error(errorMsg);
     }
     
     return await response.json();
@@ -537,7 +552,7 @@ export const syncUser = async (userData: any) => {
 
 export const updateUserProfile = async (userId: string | number, updates: any) => {
   try {
-    const response = await fetch('/api/update-profile', {
+    const response = await fetch(`${API_BASE}/api/update-profile`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -580,29 +595,37 @@ export const getStoreBySlug = async (slug: string) => {
 
 export const getStoreProfileInfo = async (username: string) => {
   try {
-    const response = await fetch(`/api/lojas/${username}`);
-    if (!response.ok) throw new Error('Failed to fetch store profile info');
+    console.log('API Call: getStoreProfileInfo', username);
+    const response = await fetch(`${API_BASE}/api/lojas/${encodeURIComponent(username)}`);
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to fetch store profile info: ${response.status} ${errorText}`);
+    }
     return await response.json();
   } catch (error) {
-    console.error('Error fetching store profile info:', error);
+    console.error('Error fetching store profile info (Failed to fetch usually means server is unreachable):', error);
     return null;
   }
 };
 
 export const getStoreSchedule = async (storeId: string) => {
   try {
-    const response = await fetch(`/api/lojas/${storeId}/semanais`);
-    if (!response.ok) throw new Error('Failed to fetch store schedule');
+    console.log('API Call: getStoreSchedule', storeId);
+    const response = await fetch(`${API_BASE}/api/lojas/${encodeURIComponent(storeId)}/semanais`);
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to fetch store schedule: ${response.status} ${errorText}`);
+    }
     return await response.json();
   } catch (error) {
-    console.error('Error fetching store schedule:', error);
+    console.error('Error fetching store schedule (Failed to fetch usually means server is unreachable):', error);
     return [];
   }
 };
 
 export const updateStoreStock = async (store_id: string, product_id: number | string, quantity: number) => {
   try {
-    const response = await fetch('/api/lojas/estoque/update', {
+    const response = await fetch(`${API_BASE}/api/lojas/estoque/update`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ store_id, product_id, quantity })
@@ -635,31 +658,47 @@ export const getStoreEvents = async (storeId: string) => {
 
 export const getActivities = async (limit: number = 10) => {
   try {
-    const response = await fetch(`/api/atividades?limit=${limit}`);
+    console.log('API Call: getActivities', limit);
+    const response = await fetch(`${API_BASE}/api/atividades?limit=${limit}`);
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Activities fetch error response:', errorText);
-      throw new Error(`Failed to fetch activities: ${response.status}`);
+      const contentType = response.headers.get('content-type');
+      let errorMsg = `Failed to fetch activities: ${response.status}`;
+      if (contentType && contentType.includes('application/json')) {
+        const errorData = await response.json();
+        errorMsg = errorData.error || errorMsg;
+      } else {
+        const text = await response.text();
+        console.error('Activities fetch non-JSON error:', text);
+      }
+      throw new Error(errorMsg);
     }
     const data = await response.json();
     return data;
   } catch (error: any) {
-    console.error('Error fetching activities:', error?.message || error);
+    console.error('Error fetching activities (Failed to fetch usually means server is unreachable):', error?.message || error);
     return [];
   }
 };
 
 export const getAllTournaments = async () => {
   try {
-    const response = await fetch('/api/torneios');
+    console.log('API Call: getAllTournaments');
+    const response = await fetch(`${API_BASE}/api/torneios`);
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Tournaments fetch error response:', errorText);
-      throw new Error(`Failed to fetch tournaments: ${response.status}`);
+      const contentType = response.headers.get('content-type');
+      let errorMsg = `Failed to fetch tournaments: ${response.status}`;
+      if (contentType && contentType.includes('application/json')) {
+        const errorData = await response.json();
+        errorMsg = errorData.error || errorMsg;
+      } else {
+        const text = await response.text();
+        console.error('Tournaments fetch non-JSON error:', text);
+      }
+      throw new Error(errorMsg);
     }
     return await response.json();
   } catch (error: any) {
-    console.error('Error fetching tournaments:', error?.message || error);
+    console.error('Error fetching tournaments (Failed to fetch usually means server is unreachable):', error?.message || error);
     return [];
   }
 };
@@ -719,9 +758,7 @@ export const searchExternalCards = async (game: string, query: string, page: num
     };
 
     const gameId = gameMap[game] || game.toLowerCase().replace(/\s+/g, '');
-    const url = `/api/cards?game=${encodeURIComponent(gameId)}&q=${encodeURIComponent(query)}&page=${page}&limit=${limit}`;
-    
-    const response = await fetch(url);
+    const response = await fetch(`${API_BASE}/api/cards?game=${encodeURIComponent(gameId)}&q=${encodeURIComponent(query)}&page=${page}&limit=${limit}`);
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       console.error('Failed to fetch external cards. Status:', response.status, 'Body:', errorData);
@@ -778,7 +815,7 @@ export const searchExternalCards = async (game: string, query: string, page: num
 
 export const getStoreTournaments = async (username: string) => {
   try {
-    const response = await fetch(`/api/lojas/${username}/torneios`);
+    const response = await fetch(`${API_BASE}/api/lojas/${username}/torneios`);
     if (!response.ok) {
       const errorText = await response.text();
       console.error('Store tournaments fetch error response:', errorText);
@@ -793,8 +830,7 @@ export const getStoreTournaments = async (username: string) => {
 
 export const getFullUserProfile = async (username: string, followerId?: string) => {
   try {
-    const url = `/api/users/${username}/profile${followerId ? `?follower_id=${followerId}` : ''}`;
-    const response = await fetch(url);
+    const response = await fetch(`${API_BASE}/api/users/${username}/profile${followerId ? `?follower_id=${followerId}` : ''}`);
     if (!response.ok) throw new Error('Failed to fetch full user profile');
     return await response.json();
   } catch (error) {
@@ -805,7 +841,7 @@ export const getFullUserProfile = async (username: string, followerId?: string) 
 
 export const followUser = async (username: string, followerId: string) => {
   try {
-    const response = await fetch(`/api/users/${username}/follow`, {
+    const response = await fetch(`${API_BASE}/api/users/${username}/follow`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ follower_id: followerId })
@@ -820,7 +856,7 @@ export const followUser = async (username: string, followerId: string) => {
 
 export const unfollowUser = async (username: string, followerId: string) => {
   try {
-    const response = await fetch(`/api/users/${username}/unfollow`, {
+    const response = await fetch(`${API_BASE}/api/users/${username}/unfollow`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ follower_id: followerId })
@@ -835,7 +871,7 @@ export const unfollowUser = async (username: string, followerId: string) => {
 
 export const submitUserReview = async (username: string, reviewerId: string, isPositive: boolean, comment: string) => {
   try {
-    const response = await fetch(`/api/users/${username}/review`, {
+    const response = await fetch(`${API_BASE}/api/users/${username}/review`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ reviewer_id: reviewerId, is_positive: isPositive, comment })
@@ -850,7 +886,7 @@ export const submitUserReview = async (username: string, reviewerId: string, isP
 
 export const getCollectionRanking = async (limit: number = 5) => {
   try {
-    const response = await fetch(`/api/rankings/colecao?limit=${limit}`);
+    const response = await fetch(`${API_BASE}/api/rankings/colecao?limit=${limit}`);
     if (!response.ok) throw new Error('Failed to fetch ranking');
     const data = await response.json();
     return data;
@@ -862,7 +898,7 @@ export const getCollectionRanking = async (limit: number = 5) => {
 
 export const getOffersRanking = async (limit: number = 5) => {
   try {
-    const response = await fetch(`/api/rankings/ofertas?limit=${limit}`);
+    const response = await fetch(`${API_BASE}/api/rankings/ofertas?limit=${limit}`);
     if (!response.ok) throw new Error('Failed to fetch ranking');
     const data = await response.json();
     return data;

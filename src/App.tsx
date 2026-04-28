@@ -23,10 +23,10 @@ import { AdminStats } from './pages/AdminStats';
 import { EditProfile } from './pages/EditProfile';
 import { Product, CartItem, GameType } from './types';
 import { GAMES } from './constants';
-import { AuthProvider, useAuth } from './src/components/AuthProvider';
-import { ErrorBoundary } from './src/components/ErrorBoundary';
+import { AuthProvider, useAuth } from './components/AuthProvider';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
-import { getCardgames } from './src/services/supabaseService';
+import { getCardgames } from './services/supabaseService';
 
 const SidebarItem: React.FC<{ to: string; icon: string; label: string; active: boolean; collapsed: boolean; badge?: number; onClick?: () => void }> = ({ to, icon, label, active, collapsed, badge, onClick }) => (
   <Link 

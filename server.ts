@@ -14,10 +14,42 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 async function startServer() {
-  const app = express();
-  const PORT = 3000;
+  try {
+    const app = express();
+    const PORT = 3000;
+
+  // Request logger - FIRST
+  app.use((req, res, next) => {
+    const start = Date.now();
+    res.on('finish', () => {
+      const duration = Date.now() - start;
+      console.log(`${new Date().toISOString()} - [SERVER] ${req.method} ${req.url} - ${res.statusCode} (${duration}ms)`);
+    });
+    next();
+  });
 
   app.use(express.json());
+
+  // CORS middleware for iframe environment
+  app.use((req, res, next) => {
+    res.header("Access-Control-Allow-Origin", "*");
+    res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+    res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    if (req.method === "OPTIONS") {
+      return res.sendStatus(200);
+    }
+    next();
+  });
+
+  // Diagnosis Route
+  app.get("/api/health", (req, res) => {
+    res.json({ 
+      status: "ok", 
+      time: new Date().toISOString(),
+      env: process.env.NODE_ENV || 'development',
+      supabase: !!supabaseAdmin
+    });
+  });
 
   // Supabase Admin Client (Service Role)
   const supabaseUrl = process.env.VITE_SUPABASE_URL;
@@ -92,7 +124,8 @@ async function startServer() {
         'gender', 
         'birth_date', 
         'phone', 
-        'fighter_tags'
+        'fighter_tags',
+        'bio'
       ];
 
       // Filter updates to restricted basic info list
@@ -496,7 +529,11 @@ async function startServer() {
   });
 
   app.get("/api/torneios", async (req: express.Request, res: express.Response) => {
-    if (!supabaseAdmin) return res.status(500).json({ error: "Supabase not configured" });
+    console.log("Processing request: GET /api/torneios");
+    if (!supabaseAdmin) {
+      console.error("Supabase Admin NOT configured for /api/torneios");
+      return res.status(500).json({ error: "Supabase not configured" });
+    }
     try {
       // First attempt with joins
       const { data, error } = await supabaseAdmin
@@ -914,6 +951,38 @@ async function startServer() {
     }
   });
 
+  app.get("/api/search-users", async (req: express.Request, res: express.Response) => {
+    if (!supabaseAdmin) return res.status(500).json({ error: "Supabase not configured" });
+    const { q } = req.query;
+    try {
+      const { data, error } = await supabaseAdmin
+        .from('users')
+        .select('id, username, codename, avatar, role_id')
+        .or(`username.ilike.%${q}%,codename.ilike.%${q}%`)
+        .limit(10);
+      if (error) throw error;
+      res.json(data);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // 404 for API routes
+  app.use('/api', (req, res) => {
+    console.warn(`404 API Route not found: ${req.method} ${req.url}`);
+    res.status(404).json({ error: `The requested API route ${req.method} ${req.url} was not found on this server.` });
+  });
+
+  // Global Error Handler
+  app.use((err: any, req: any, res: any, next: any) => {
+    console.error('Unhandled Server Error:', err);
+    res.status(err.status || 500).json({
+      error: 'Internal Server Error',
+      message: err.message,
+      stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+    });
+  });
+
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
@@ -931,7 +1000,11 @@ async function startServer() {
 
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on http://localhost:${PORT}`);
+    console.log(`Supabase Admin configured: ${!!supabaseAdmin}`);
   });
+  } catch (error) {
+    console.error("CRITICAL: Server failed to start:", error);
+  }
 }
 
 startServer();

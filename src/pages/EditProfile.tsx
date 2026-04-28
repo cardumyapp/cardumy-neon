@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../src/components/AuthProvider';
-import { getUserProfile, updateUserProfile, getFighterTags } from '../src/services/supabaseService';
+import { useAuth } from '../components/AuthProvider';
+import { getUserProfile, updateUserProfile, getFighterTags } from '../services/supabaseService';
 import { PREDEFINED_AVATARS, PREDEFINED_COVERS, TCG_GAMES, UserProfile } from '../types';
 import { motion } from 'motion/react';
 
@@ -30,7 +30,7 @@ export const EditProfile: React.FC = () => {
 
   useEffect(() => {
     const fetchInitialData = async () => {
-      const { getCardgames } = await import('../src/services/supabaseService');
+      const { getCardgames } = await import('../services/supabaseService');
       const [games, tags] = await Promise.all([
         getCardgames(),
         getFighterTags()
@@ -107,21 +107,17 @@ export const EditProfile: React.FC = () => {
     setSaving(true);
     setMessage(null);
 
-    const response = await fetch('/api/update-profile', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ userId: currentUser.id || currentUser.email, updates: formData })
-    });
-
-    if (response.ok) {
-      setMessage({ type: 'success', text: 'Perfil atualizado com sucesso!' });
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    } else {
-      const errorData = await response.json().catch(() => ({}));
-      const errorMsg = errorData.error || 'Falha ao atualizar perfil. Tente novamente.';
-      setMessage({ type: 'error', text: errorMsg });
+    try {
+      const result = await updateUserProfile(currentUser.id || currentUser.email, formData);
+      if (result) {
+        setMessage({ type: 'success', text: 'Perfil atualizado com sucesso!' });
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } else {
+        setMessage({ type: 'error', text: 'Falha ao atualizar perfil. Tente novamente.' });
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    } catch (error) {
+      setMessage({ type: 'error', text: 'Erro ao conectar ao servidor.' });
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
     setSaving(false);

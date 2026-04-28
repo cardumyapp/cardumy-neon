@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
-import { useAuth } from '../src/components/AuthProvider';
+import { useAuth } from '../components/AuthProvider';
 import { 
   getBinderWithCards, 
   getListCards, 
@@ -12,7 +12,7 @@ import {
   updateCardQuantityInList,
   updateCardQuantityInBinder,
   getCardgames
-} from '../src/services/supabaseService';
+} from '../services/supabaseService';
 import { motion, AnimatePresence } from 'motion/react';
 import { Card, GameType } from '../types';
 
