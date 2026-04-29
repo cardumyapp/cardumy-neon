@@ -136,6 +136,13 @@ export interface Store {
     time: string;
     fee?: string;
   }>;
+  businessHours?: Array<{
+    day_of_week: number;
+    open_time: string;
+    close_time: string;
+    is_closed: boolean;
+  }>;
+  isOpen?: boolean;
   events?: StoreEvent[];
   instagram?: string;
   discord?: string;

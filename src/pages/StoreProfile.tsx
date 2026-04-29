@@ -6,7 +6,8 @@ import {
   getProducts, 
   getStoreTournaments, 
   getStoreProfileInfo, 
-  getStoreSchedule 
+  getStoreSchedule,
+  getStoreHours
 } from '../services/supabaseService';
 import { ProductType, Product, StoreEvent, Store, GameType } from '../types';
 import { useAuth } from '../components/AuthProvider';
@@ -27,7 +28,7 @@ export const StoreProfile: React.FC<StoreProfileProps> = ({ onAddToCart }) => {
   const [store, setStore] = useState<Store | null>(null);
   const [storeEvents, setStoreEvents] = useState<StoreEvent[]>([]);
   const [allProducts, setAllProducts] = useState<any[]>([]);
-  const [stats, setStats] = useState<{ wishlist_size: number, stock_size: number, offers_size: number } | null>(null);
+  const [stats, setStats] = useState<{ wishlist_size: number, stock_size: number, offers_size: number, is_open?: boolean } | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabType>('home');
   const [currentPage, setCurrentPage] = useState(1);
@@ -51,7 +52,8 @@ export const StoreProfile: React.FC<StoreProfileProps> = ({ onAddToCart }) => {
           setStats({
             wishlist_size: profileStats.wishlist_size,
             stock_size: profileStats.stock_size,
-            offers_size: profileStats.offers_size
+            offers_size: profileStats.offers_size,
+            is_open: profileStats.is_open
           });
         }
       }
@@ -109,6 +111,12 @@ export const StoreProfile: React.FC<StoreProfileProps> = ({ onAddToCart }) => {
             time: s.horario,
             fee: s.valor_insc ? `R$ ${s.valor_insc}` : 'Gratuito'
           }));
+        }
+
+        // Fetch real hours from backend
+        const realHours = await getStoreHours(mappedStore.id);
+        if (realHours && realHours.length > 0) {
+          mappedStore.businessHours = realHours;
         }
 
         setStore(mappedStore);
@@ -371,10 +379,23 @@ export const StoreProfile: React.FC<StoreProfileProps> = ({ onAddToCart }) => {
              </div>
              
              <div className="space-y-3 md:space-y-4">
-               <div className="flex items-center space-x-2 text-white/90 text-xs md:text-sm font-bold">
-                  <i className="fas fa-location-dot text-purple-400"></i>
-                  <span>{store.location}</span>
-               </div>
+              <div className="flex flex-wrap items-center gap-3 md:gap-4">
+                <div className="flex items-center space-x-2 text-white/90 text-xs md:text-sm font-bold">
+                   <i className="fas fa-location-dot text-purple-400"></i>
+                   <span>{store.location}</span>
+                </div>
+                
+                {stats && stats.is_open !== undefined && (
+                  <div className={`flex items-center space-x-2 px-3 py-1 rounded-full border text-[10px] md:text-xs font-black uppercase tracking-widest ${
+                    stats.is_open 
+                      ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400' 
+                      : 'bg-rose-500/20 border-rose-500/30 text-rose-400'
+                  }`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${stats.is_open ? 'bg-emerald-400 animate-pulse' : 'bg-rose-400'}`}></span>
+                    <span>{stats.is_open ? 'Aberto Agora' : 'Fechado'}</span>
+                  </div>
+                )}
+              </div>
 
                <div className="flex flex-wrap gap-2 md:gap-3">
                   {stats && (
@@ -481,36 +502,80 @@ export const StoreProfile: React.FC<StoreProfileProps> = ({ onAddToCart }) => {
           )}
 
           {activeTab === 'agenda' && (
-            <div className="space-y-6 md:space-y-8 animate-in fade-in duration-500">
-               <h3 className="text-lg md:text-xl font-black text-white flex items-center">
-                  <span className="w-1 h-5 md:w-1.5 md:h-6 bg-purple-600 rounded-full mr-3"></span>
-                  Agenda Semanal
-               </h3>
-               
-               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {sortedSchedule.length > 0 ? sortedSchedule.map((t, i) => (
-                    <div key={i} className="bg-slate-900/50 border border-slate-800 p-6 rounded-2xl flex items-center justify-between group hover:border-purple-500/30 transition-all">
-                       <div className="flex items-center space-x-4">
-                          <div className={`w-12 h-12 rounded-xl flex items-center justify-center font-black text-[10px] uppercase tracking-tighter ${
-                            t.day === 'Domingo' ? 'bg-orange-500/20 text-orange-400' : 'bg-slate-800 text-slate-500'
-                          }`}>
-                            {t.day.substring(0, 3)}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 animate-in fade-in duration-500">
+               {/* Business Hours */}
+               <div className="space-y-6">
+                 <h3 className="text-lg md:text-xl font-black text-white flex items-center">
+                    <span className="w-1 h-5 md:w-1.5 md:h-6 bg-emerald-600 rounded-full mr-3"></span>
+                    Horário de Funcionamento
+                 </h3>
+                 <div className="bg-slate-900/40 border border-slate-800 rounded-3xl p-6 md:p-8 space-y-4">
+                    {store.businessHours && store.businessHours.length > 0 ? (
+                      DAY_ORDER.map((day, idx) => {
+                        const hoursForDay = store.businessHours?.filter(h => h.day_of_week === idx);
+                        const isClosed = !hoursForDay || hoursForDay.length === 0 || hoursForDay.every(h => h.is_closed);
+                        
+                        return (
+                          <div key={idx} className="flex items-center justify-between py-1 border-b border-white/5 last:border-0">
+                            <span className={`text-xs md:text-sm font-bold ${idx === new Date().getDay() ? 'text-purple-400' : 'text-slate-400'}`}>
+                              {day}
+                            </span>
+                            <div className="text-right">
+                              {isClosed ? (
+                                <span className="text-xs md:text-sm font-black text-rose-500/80 uppercase">Fechado</span>
+                              ) : (
+                                <div className="space-y-1">
+                                  {hoursForDay?.map((h, hidx) => (
+                                    <p key={hidx} className="text-xs md:text-sm font-black text-white">
+                                      {h.open_time.substring(0, 5)} - {h.close_time.substring(0, 5)}
+                                    </p>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
                           </div>
-                          <div>
-                             <h4 className="text-sm font-bold text-white uppercase">{t.game}</h4>
-                             <p className="text-[10px] text-slate-500 mt-1 flex items-center">
-                                <i className="far fa-clock mr-1.5"></i>
-                                {t.time}
-                             </p>
-                          </div>
-                       </div>
-                       <div className="text-right">
-                          <p className="text-xs font-black text-emerald-400">{t.fee || 'Gratuito'}</p>
-                       </div>
-                    </div>
-                  )) : (
-                    <div className="col-span-full py-12 text-center text-slate-500 text-sm italic">Agenda não disponível.</div>
-                  )}
+                        );
+                      })
+                    ) : (
+                      <p className="text-slate-500 text-sm italic py-4">Horário de funcionamento não informado.</p>
+                    )}
+                 </div>
+               </div>
+
+               {/* Weekly Events */}
+               <div className="space-y-6">
+                 <h3 className="text-lg md:text-xl font-black text-white flex items-center">
+                    <span className="w-1 h-5 md:w-1.5 md:h-6 bg-purple-600 rounded-full mr-3"></span>
+                    Torneios Semanais
+                 </h3>
+                 
+                 <div className="space-y-4">
+                    {sortedSchedule.length > 0 ? sortedSchedule.map((t, i) => (
+                      <div key={i} className="bg-slate-900/50 border border-slate-800 p-5 md:p-6 rounded-2xl flex items-center justify-between group hover:border-purple-500/30 transition-all">
+                         <div className="flex items-center space-x-4">
+                            <div className={`w-12 h-12 rounded-xl flex items-center justify-center font-black text-[10px] uppercase tracking-tighter ${
+                              t.day === 'Domingo' ? 'bg-orange-500/20 text-orange-400' : 'bg-slate-800 text-slate-500'
+                            }`}>
+                              {t.day.substring(0, 3)}
+                            </div>
+                            <div>
+                               <h4 className="text-sm font-bold text-white uppercase">{t.game}</h4>
+                               <p className="text-[10px] text-slate-500 mt-1 flex items-center">
+                                  <i className="far fa-clock mr-1.5"></i>
+                                  {t.time}
+                               </p>
+                            </div>
+                         </div>
+                         <div className="text-right">
+                            <p className="text-xs font-black text-emerald-400">{t.fee || 'Gratuito'}</p>
+                         </div>
+                      </div>
+                    )) : (
+                      <div className="py-12 border border-dashed border-slate-800 rounded-3xl text-center text-slate-500 text-sm italic">
+                        Sem torneios fixos na agenda no momento.
+                      </div>
+                    )}
+                 </div>
                </div>
             </div>
           )}
@@ -634,9 +699,31 @@ export const StoreProfile: React.FC<StoreProfileProps> = ({ onAddToCart }) => {
                   Horários
                 </h3>
                 <div className="bg-slate-950/50 rounded-2xl p-4 border border-slate-800/50">
-                  <p className="text-slate-400 text-sm leading-relaxed whitespace-pre-line">
-                    {store.opening_hours || 'Horário de funcionamento não informado.'}
-                  </p>
+                  {store.businessHours && store.businessHours.length > 0 ? (
+                    <div className="space-y-2">
+                       {DAY_ORDER.map((day, idx) => {
+                         const hoursForDay = store.businessHours?.filter(h => h.day_of_week === idx);
+                         const isClosed = !hoursForDay || hoursForDay.length === 0 || hoursForDay.every(h => h.is_closed);
+                         if (isClosed) return null; // Show only open days in this compact view
+                         return (
+                           <div key={idx} className="flex justify-between items-center text-[11px]">
+                             <span className="text-slate-500 font-bold">{day}</span>
+                             <div className="text-right">
+                               {hoursForDay?.map((h, hidx) => (
+                                 <p key={hidx} className="text-white font-black">
+                                   {h.open_time.substring(0, 5)} - {h.close_time.substring(0, 5)}
+                                 </p>
+                               ))}
+                             </div>
+                           </div>
+                         );
+                       })}
+                    </div>
+                  ) : (
+                    <p className="text-slate-400 text-sm leading-relaxed whitespace-pre-line">
+                      {store.opening_hours || 'Horário de funcionamento não informado.'}
+                    </p>
+                  )}
                 </div>
               </div>
 

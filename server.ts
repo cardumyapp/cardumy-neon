@@ -830,10 +830,29 @@ async function startServer() {
         store,
         wishlist_size: wishlistCount || 0,
         stock_size: stockCount,
-        offers_size: 10 // Mocked as in python
+        offers_size: 10, // Mocked as in python
+        is_open: store ? (await supabaseAdmin.rpc('is_store_open', { p_store_id: store.id })).data : false
       });
     } catch (error: any) {
       console.error('Error fetching store profile info:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/lojas/:storeId/hours", async (req: express.Request, res: express.Response) => {
+    if (!supabaseAdmin) return res.status(500).json({ error: "Supabase not configured" });
+    const { storeId } = req.params;
+    try {
+      const { data, error } = await supabaseAdmin
+        .from('store_hours')
+        .select('*')
+        .eq('store_id', storeId)
+        .order('day_of_week', { ascending: true })
+        .order('open_time', { ascending: true });
+      
+      if (error) throw error;
+      res.json(data || []);
+    } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
   });

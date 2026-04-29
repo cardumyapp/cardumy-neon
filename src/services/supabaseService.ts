@@ -699,7 +699,7 @@ export const getStoreProfileInfo = async (username: string) => {
 
 export const getStoreSchedule = async (storeId: string) => {
   try {
-    console.log('API Call: getStoreSchedule', storeId);
+    console.log('API Call: getStoreSchedule (Events)', storeId);
     const response = await fetch(`/api/lojas/${encodeURIComponent(storeId)}/semanais`);
     if (!response.ok) {
       const errorText = await response.text();
@@ -707,7 +707,22 @@ export const getStoreSchedule = async (storeId: string) => {
     }
     return await response.json();
   } catch (error) {
-    console.error('Error fetching store schedule (Failed to fetch usually means server is unreachable):', error);
+    console.error('Error fetching store schedule:', error);
+    return [];
+  }
+};
+
+export const getStoreHours = async (storeId: string) => {
+  try {
+    console.log('API Call: getStoreHours', storeId);
+    const response = await fetch(`/api/lojas/${encodeURIComponent(storeId)}/hours`);
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to fetch store hours: ${response.status} ${errorText}`);
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching store hours:', error);
     return [];
   }
 };
