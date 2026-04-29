@@ -9,7 +9,7 @@ export const getProducts = (callback: (products: any[]) => void) => {
 
   const fetchProducts = async () => {
     const { data, error } = await supabase
-      .from('cards')
+      .from('products')
       .select('*')
       .order('created_at', { ascending: false });
     
@@ -23,10 +23,10 @@ export const getProducts = (callback: (products: any[]) => void) => {
   fetchProducts();
 
   // Set up real-time subscription with a unique channel name to avoid conflicts
-  const channelName = `public:cards:${Math.random().toString(36).substring(2)}`;
+  const channelName = `public:products:${Math.random().toString(36).substring(2)}`;
   const subscription = supabase
     .channel(channelName)
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'cards' }, fetchProducts)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, fetchProducts)
     .subscribe();
 
   return () => {
@@ -1109,7 +1109,7 @@ export const getProductTypes = async (gameId?: string | number) => {
 
 export const getProductsByFilters = async (filters: { game_id?: string | number, product_type_id?: string | number }) => {
   try {
-    let query = supabase.from('cards').select('*');
+    let query = supabase.from('products').select('*');
     if (filters.game_id && filters.game_id !== 'all') query = query.eq('game_id', filters.game_id);
     if (filters.product_type_id && filters.product_type_id !== 'all') query = query.eq('product_type_id', filters.product_type_id);
     

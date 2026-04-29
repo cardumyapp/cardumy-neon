@@ -36,7 +36,7 @@ export const Orders: React.FC = () => {
               <div className="flex items-center space-x-8">
                 <div className="text-right">
                   <p className="text-xs text-slate-500 uppercase font-black mb-1">Valor Total</p>
-                  <p className="text-lg font-black text-white">R$ {order.total.toFixed(2)}</p>
+                  <p className="text-lg font-black text-white">R$ {(order.total || 0).toFixed(2)}</p>
                 </div>
                 <div className="text-right">
                   <p className="text-xs text-slate-500 uppercase font-black mb-1">Status</p>

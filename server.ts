@@ -270,6 +270,7 @@ async function startServer() {
     res.json({ message: "Seeding disabled" });
   });
 
+  // API Call: updateProfile
   app.post("/api/update-profile", async (req: express.Request, res: express.Response) => {
     if (!supabaseAdmin) {
       return res.status(500).json({ error: "Supabase Admin client not configured" });
@@ -277,7 +278,8 @@ async function startServer() {
 
     try {
       const { userId, updates } = req.body;
-      console.log(`[API] POST /api/update-profile - User: ${userId}, Updates:`, JSON.stringify(updates));
+      console.log(`[API] POST /api/update-profile - User: ${userId}`);
+      
       if (!userId) {
         return res.status(400).json({ error: "User ID is required" });
       }
@@ -293,10 +295,11 @@ async function startServer() {
         'birth_date', 
         'phone', 
         'fighter_tags',
-        'bio'
+        'bio',
+        'updated_at'
       ];
 
-      // Filter updates to restricted basic info list
+      // Filter and clean updates
       const filteredUpdates: any = {};
       Object.keys(updates).forEach(key => {
         let targetKey = key;
@@ -309,10 +312,13 @@ async function startServer() {
         if (allowedFields.includes(targetKey)) {
           let val = updates[key];
           
-          // Data normalization
-          if (targetKey === 'birth_date' && val === "") val = null;
-          if (targetKey === 'favorite_cardgame_id' && (val === "" || val === null)) val = null;
-          if (targetKey === 'favorite_cardgame_id' && val !== null) val = Number(val);
+          // Data normalization for bigints and dates
+          if ((targetKey === 'birth_date' || targetKey === 'favorite_cardgame_id') && val === "") {
+            val = null;
+          } else if (targetKey === 'favorite_cardgame_id' && val !== null && val !== undefined) {
+            const num = Number(val);
+            val = !isNaN(num) ? num : null;
+          }
           
           if (targetKey === 'fighter_tags' && Array.isArray(val)) {
             val = val.join(', '); // Convert array to comma-separated string for text field
@@ -323,36 +329,26 @@ async function startServer() {
       });
 
       if (Object.keys(filteredUpdates).length === 0) {
-        return res.status(400).json({ error: "No valid basic information provided for update" });
+        return res.status(400).json({ error: "No valid information provided for update" });
       }
 
       // Always set updated_at
       filteredUpdates.updated_at = new Date().toISOString();
 
-      console.log('Updating user profile for ID:', userId);
-      console.log('Filtered updates:', filteredUpdates);
-
-      // Lookup function to find user by ID, Email or Username
+      // Lookup function to find user
       const findUser = async (id: string | number) => {
         const idStr = String(id);
-        
-        // Try ID first (numeric or UUID)
         const { data: byId } = await supabaseAdmin.from('users').select('id').eq('id', id).maybeSingle();
         if (byId) return byId;
-
-        // Try Email
         if (idStr.includes('@')) {
           const { data: byEmail } = await supabaseAdmin.from('users').select('id').eq('email', idStr).maybeSingle();
           if (byEmail) return byEmail;
         }
-
-        // Try Username
         const { data: byUsername } = await supabaseAdmin.from('users').select('id').eq('username', idStr).maybeSingle();
         return byUsername;
       };
 
       const targetUser = await findUser(userId);
-
       if (!targetUser) {
         return res.status(404).json({ error: "User not found" });
       }
@@ -365,12 +361,18 @@ async function startServer() {
         .maybeSingle();
 
       if (updateError) {
-        console.error(`[DB ERROR] update-profile failure: ${updateError.code} - ${updateError.message}`, updateError.details);
-        return res.status(errorToStatus(updateError)).json({ 
+        console.error(`[DB ERROR] update-profile failure: ${updateError.code} - ${updateError.message} (Payload: ${JSON.stringify(filteredUpdates)})`);
+        return res.status(500).json({ 
           error: "Erro ao atualizar perfil no banco de dados", 
           code: updateError.code,
           message: updateError.message 
         });
+      }
+
+      // Invalidate profile cache
+      if (data) {
+        const keys = cache.keys();
+        keys.filter(k => k.startsWith(`profile_${data.username}`) || k.startsWith(`profile_${data.id}`) || k.startsWith(`profile_${data.email}`)).forEach(k => cache.del(k));
       }
       
       return res.json(data);
@@ -399,7 +401,11 @@ async function startServer() {
 
     try {
       // Fallback to JS aggregation as the primary logic since RPC is missing
-      const { data: users, error: uError } = await supabaseAdmin.from('users').select('id, username, codename, avatar');
+      // EXCLUDE Lojistas (role_id 6)
+      const { data: users, error: uError } = await supabaseAdmin
+        .from('users')
+        .select('id, username, codename, avatar')
+        .neq('role_id', 6);
       if (uError) throw uError;
       
       const ranking = await Promise.all(users.map(async (u) => {
@@ -425,7 +431,11 @@ async function startServer() {
 
     try {
       // Grouping in Supabase/PostgREST is often handled via RPC for complex aggregations
-      const { data: users, error: uError } = await supabaseAdmin.from('users').select('id, username, codename, avatar');
+      // EXCLUDE Lojistas (role_id 6)
+      const { data: users, error: uError } = await supabaseAdmin
+        .from('users')
+        .select('id, username, codename, avatar')
+        .neq('role_id', 6);
       if (uError) throw uError;
       
       const ranking = await Promise.all(users.map(async (u) => {
@@ -647,49 +657,66 @@ async function startServer() {
 
     try {
       // First try action_logs
+      // EXCLUDE Lojistas (role_id 6) by filtering via join if possible, or just fetch and filter
       const { data, error } = await supabaseAdmin
         .from('action_logs')
-        .select('*')
+        .select(`
+          *,
+          users:user_id!inner ( username, codename, avatar, role_id )
+        `)
+        .neq('users.role_id', 6)
         .order('created_at', { ascending: false })
         .limit(limit);
 
-      if (error) {
-        console.warn(`[ATIVIDADES] Table action_logs failed: ${error.message}`);
+      if (error || !data || data.length === 0) {
+        if (error) console.warn(`[ATIVIDADES] Table action_logs error: ${error.message}`);
         // Try social_feeds
         const { data: sData, error: sError } = await supabaseAdmin
           .from('social_feeds')
-          .select('*')
+          .select(`
+            *,
+            users:user_id!inner ( username, codename, avatar, role_id )
+          `)
+          .neq('users.role_id', 6)
           .order('created_at', { ascending: false })
           .limit(limit);
         
-        if (sError) {
-          console.warn(`[ATIVIDADES] Table social_feeds failed: ${sError.message}`);
+        if (sError || !sData || sData.length === 0) {
+          if (sError) console.warn(`[ATIVIDADES] Table social_feeds error: ${sError.message}`);
           return res.json([]);
         }
 
-        const formatted = (sData || []).map(item => ({
-          id: item.id,
-          user: item.username || 'Usuário',
-          userId: item.user_id,
-          avatar: item.avatar_url || item.avatar,
-          action: item.activity_type || 'fez uma ação',
-          target: item.content || 'algo',
-          timestamp: new Date(item.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-          date: new Date(item.created_at).toLocaleDateString('pt-BR')
-        }));
+        const formatted = (sData || []).map(item => {
+          const user = (item as any).users;
+          const userDisplayName = user?.username || user?.codename || item.username;
+          return {
+            id: item.id,
+            user: userDisplayName || (item.user_id ? `Peixe ${item.user_id}` : 'Usuário'),
+            userId: item.user_id,
+            avatar: user?.avatar || item.avatar_url || item.avatar,
+            action: item.activity_type || 'fez uma ação',
+            target: item.content || 'algo',
+            timestamp: new Date(item.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+            date: new Date(item.created_at).toLocaleDateString('pt-BR')
+          };
+        });
         return res.json(formatted);
       }
 
-      const formatted = (data || []).map(item => ({
-        id: item.id,
-        user: item.username || 'Usuário',
-        userId: item.user_id,
-        avatar: item.avatar,
-        action: item.action || 'fez uma ação',
-        target: `${item.entity || ''} ${item.details?.name || ''}`,
-        timestamp: new Date(item.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-        date: new Date(item.created_at).toLocaleDateString('pt-BR')
-      }));
+      const formatted = (data || []).map(item => {
+        const user = (item as any).users;
+        const userDisplayName = user?.username || user?.codename || item.username;
+        return {
+          id: item.id,
+          user: userDisplayName || (item.user_id ? `Peixe ${item.user_id}` : 'Usuário'),
+          userId: item.user_id,
+          avatar: user?.avatar || item.avatar,
+          action: item.action || 'fez uma ação',
+          target: `${item.entity || ''} ${item.details?.name || ''}`,
+          timestamp: new Date(item.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+          date: new Date(item.created_at).toLocaleDateString('pt-BR')
+        };
+      });
 
       cache.set(cacheKey, formatted, 30);
       res.json(formatted);
@@ -976,7 +1003,7 @@ async function startServer() {
       const type = req.query.type as string;
       const offset = (page - 1) * limit;
 
-      let query = supabaseAdmin.from('cards').select('*, cardgames(name)', { count: 'exact' });
+      let query = supabaseAdmin.from('products').select('*, cardgames(name)', { count: 'exact' });
       
       if (game) query = query.eq('cardgames.name', game);
       if (type) query = query.eq('product_type', type);
@@ -1002,7 +1029,7 @@ async function startServer() {
     const { id } = req.params;
     try {
       const { data: product, error: pError } = await supabaseAdmin
-        .from('cards')
+        .from('products')
         .select('*, cardgames(name)')
         .eq('id', id)
         .maybeSingle();
@@ -1178,6 +1205,7 @@ async function startServer() {
       const { data, error } = await supabaseAdmin
         .from('users')
         .select('id, username, codename, avatar, role_id')
+        .neq('role_id', 6)
         .or(`username.ilike.%${q}%,codename.ilike.%${q}%`)
         .limit(10);
       if (error) throw error;

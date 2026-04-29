@@ -74,7 +74,7 @@ export const EventDetails: React.FC<EventDetailsProps> = ({ onAddToCart }) => {
              <div>
                <p className="text-xs text-slate-500 uppercase font-black tracking-widest mb-1">Valor da Inscrição</p>
                <div className="flex items-end space-x-2">
-                  <span className="text-4xl font-black text-emerald-400">R$ {event.price.toFixed(2)}</span>
+                  <span className="text-4xl font-black text-emerald-400">R$ {(event.price || 0).toFixed(2)}</span>
                   <span className="text-slate-500 text-xs font-bold mb-1.5">/ ingresso</span>
                </div>
              </div>

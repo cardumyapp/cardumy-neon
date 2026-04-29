@@ -11,7 +11,7 @@ interface CartPageProps {
 }
 
 export const CartPage: React.FC<CartPageProps> = ({ cart, updateQuantity, removeFromCart }) => {
-  const total = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
+  const total = cart.reduce((acc, item) => acc + ((item.price || 0) * (item.quantity || 0)), 0);
 
   return (
     <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in duration-500">
@@ -40,7 +40,7 @@ export const CartPage: React.FC<CartPageProps> = ({ cart, updateQuantity, remove
                 </div>
                 <div className="flex-1 min-w-0">
                   <h3 className="font-bold text-white truncate">{item.name}</h3>
-                  <p className="text-sm text-slate-500 font-medium">R$ {item.price.toFixed(2)} / un</p>
+                  <p className="text-sm text-slate-500 font-medium">R$ {(Number(item.price) || 0).toFixed(2)} / un</p>
                 </div>
                 <div className="flex items-center gap-3">
                   <div className="flex items-center bg-slate-950 rounded-lg border border-slate-800">
@@ -75,7 +75,7 @@ export const CartPage: React.FC<CartPageProps> = ({ cart, updateQuantity, remove
               <div className="space-y-4 pt-4 border-t border-slate-800">
                 <div className="flex justify-between text-slate-400 text-sm">
                   <span>Subtotal</span>
-                  <span>R$ {total.toFixed(2)}</span>
+                  <span>R$ {(total || 0).toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-slate-400 text-sm">
                   <span>Frete</span>
@@ -83,7 +83,7 @@ export const CartPage: React.FC<CartPageProps> = ({ cart, updateQuantity, remove
                 </div>
                 <div className="flex justify-between text-white font-black text-xl pt-4 border-t border-slate-800">
                   <span>Total</span>
-                  <span className="text-purple-400">R$ {total.toFixed(2)}</span>
+                  <span className="text-purple-400">R$ {(total || 0).toFixed(2)}</span>
                 </div>
               </div>
               <button className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-black py-4 rounded-xl shadow-xl shadow-purple-600/20 transition-all active:scale-95 flex items-center justify-center space-x-2">

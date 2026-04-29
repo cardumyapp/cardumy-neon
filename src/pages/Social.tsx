@@ -246,7 +246,7 @@ export const Social: React.FC = () => {
               className="bg-slate-900/40 border border-slate-800 p-5 rounded-[28px] hover:border-slate-700 transition-all group"
             >
               <div className="flex items-start justify-between mb-3">
-                <Link to={`/perfil/${action.user}`} className="flex items-center space-x-3">
+                <Link to={`/perfil/${action.userId || action.user}`} className="flex items-center space-x-3">
                   <img 
                     src={action.avatar || `https://ui-avatars.com/api/?name=${action.user}`} 
                     className="w-8 h-8 rounded-xl object-cover border border-slate-800 group-hover:border-purple-500 transition-all" 

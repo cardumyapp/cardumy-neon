@@ -49,6 +49,20 @@ const SidebarItem: React.FC<{ to: string; icon: string; label: string; active: b
   </Link>
 );
 
+const SidebarGroup: React.FC<{ label: string; collapsed: boolean; children: React.ReactNode }> = ({ label, collapsed, children }) => (
+  <div className="mb-4">
+    {!collapsed && (
+      <p className="px-4 text-[9px] font-black uppercase tracking-widest text-slate-500 mb-2 mt-4 flex items-center">
+        <span className="mr-2">{label}</span>
+        <span className="flex-1 h-[1px] bg-slate-800/50"></span>
+      </p>
+    )}
+    <div className="space-y-1">
+      {children}
+    </div>
+  </div>
+);
+
 const AppContent: React.FC = () => {
   const location = useLocation();
   const { user, login, logout } = useAuth();
@@ -214,20 +228,31 @@ const AppContent: React.FC = () => {
           </div>
         </div>
         
-        <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto scrollbar-hide">
-          <SidebarItem to="/" icon="fa-house" label="Início" active={location.pathname === '/'} collapsed={isSidebarCollapsed} />
-          <SidebarItem to="/perfil" icon="fa-user" label="Perfil" active={location.pathname === '/perfil'} collapsed={isSidebarCollapsed} />
-          {!isLojista && <SidebarItem to="/pastas" icon="fa-folder-open" label="Pastas" active={location.pathname === '/pastas'} collapsed={isSidebarCollapsed} />}
-          <SidebarItem to="/busca" icon="fa-magnifying-glass" label="Cartas" active={location.pathname === '/busca'} collapsed={isSidebarCollapsed} />
-          {!isLojista && <SidebarItem to="/deckbuilder" icon="fa-hammer" label="Deckbuilder" active={location.pathname === '/deckbuilder'} collapsed={isSidebarCollapsed} />}
-          <SidebarItem to="/trocas" icon="fa-right-left" label="Trocas" active={location.pathname === '/trocas'} collapsed={isSidebarCollapsed} />
-          <SidebarItem to="/torneios" icon="fa-trophy" label="Torneios" active={location.pathname === '/torneios'} collapsed={isSidebarCollapsed} />
-          <SidebarItem to="/comunidade" icon="fa-users" label="Comunidade" active={location.pathname === '/comunidade'} collapsed={isSidebarCollapsed} />
-          <SidebarItem to="/lojas" icon="fa-shop" label="Lojas" active={location.pathname === '/lojas' || location.pathname.startsWith('/loja/')} collapsed={isSidebarCollapsed} />
-          <SidebarItem to="/produtos" icon="fa-bag-shopping" label="Produtos" active={location.pathname === '/produtos'} collapsed={isSidebarCollapsed} />
-          {!isLojista && <SidebarItem to="/carrinho" icon="fa-shopping-cart" label="Carrinho" active={location.pathname === '/carrinho'} badge={cartCount} collapsed={isSidebarCollapsed} />}
-          <SidebarItem to="/pedidos" icon="fa-clipboard-list" label="Pedidos" active={location.pathname === '/pedidos' || location.pathname.startsWith('/pedido/')} collapsed={isSidebarCollapsed} />
-          <SidebarItem to="/suporte" icon="fa-circle-question" label="Suporte" active={location.pathname === '/suporte'} collapsed={isSidebarCollapsed} />
+        <nav className="flex-1 px-4 py-4 overflow-y-auto scrollbar-hide">
+          <SidebarGroup label="Geral" collapsed={isSidebarCollapsed}>
+            {!isLojista && <SidebarItem to="/comunidade" icon="fa-users" label="Comunidade" active={location.pathname === '/comunidade'} collapsed={isSidebarCollapsed} />}
+            <SidebarItem to="/" icon="fa-house" label="Início" active={location.pathname === '/'} collapsed={isSidebarCollapsed} />
+            <SidebarItem to="/perfil" icon="fa-user" label="Perfil" active={location.pathname === '/perfil'} collapsed={isSidebarCollapsed} />
+            <SidebarItem to="/suporte" icon="fa-circle-question" label="Suporte" active={location.pathname === '/suporte'} collapsed={isSidebarCollapsed} />
+          </SidebarGroup>
+
+          <SidebarGroup label="Coleção" collapsed={isSidebarCollapsed}>
+            {!isLojista && <SidebarItem to="/busca" icon="fa-magnifying-glass" label="Cartas" active={location.pathname === '/busca'} collapsed={isSidebarCollapsed} />}
+            {!isLojista && <SidebarItem to="/deckbuilder" icon="fa-hammer" label="Deckbuilder" active={location.pathname === '/deckbuilder'} collapsed={isSidebarCollapsed} />}
+            {!isLojista && <SidebarItem to="/pastas" icon="fa-folder-open" label="Pastas" active={location.pathname === '/pastas'} collapsed={isSidebarCollapsed} />}
+            {!isLojista && <SidebarItem to="/trocas" icon="fa-right-left" label="Trocas" active={location.pathname === '/trocas'} collapsed={isSidebarCollapsed} />}
+          </SidebarGroup>
+
+          <SidebarGroup label="Eventos" collapsed={isSidebarCollapsed}>
+            <SidebarItem to="/torneios" icon="fa-trophy" label="Torneios" active={location.pathname === '/torneios'} collapsed={isSidebarCollapsed} />
+          </SidebarGroup>
+
+          <SidebarGroup label="Mercado" collapsed={isSidebarCollapsed}>
+            {!isLojista && <SidebarItem to="/carrinho" icon="fa-shopping-cart" label="Carrinho" active={location.pathname === '/carrinho'} badge={cartCount} collapsed={isSidebarCollapsed} />}
+            <SidebarItem to="/lojas" icon="fa-shop" label="Lojas" active={location.pathname === '/lojas' || location.pathname.startsWith('/loja/')} collapsed={isSidebarCollapsed} />
+            <SidebarItem to="/pedidos" icon="fa-clipboard-list" label="Pedidos" active={location.pathname === '/pedidos' || location.pathname.startsWith('/pedido/')} collapsed={isSidebarCollapsed} />
+            <SidebarItem to="/produtos" icon="fa-bag-shopping" label="Produtos" active={location.pathname === '/produtos'} collapsed={isSidebarCollapsed} />
+          </SidebarGroup>
         </nav>
 
         {/* Social Links Sidebar - Only shown when NOT collapsed and NOT on small height */}
