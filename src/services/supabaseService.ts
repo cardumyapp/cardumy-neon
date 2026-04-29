@@ -1,9 +1,15 @@
 import { supabase } from '../lib/supabase';
 
 export const getProducts = (callback: (products: any[]) => void) => {
+  // Test server connectivity on load
+  fetch('/api/ping')
+    .then(r => r.json())
+    .then(d => console.log('[DEBUG] Server ping success:', d))
+    .catch(e => console.error('[DEBUG] Server ping FAILED. Server might be down or unreachable via relative path:', e));
+
   const fetchProducts = async () => {
     const { data, error } = await supabase
-      .from('products')
+      .from('cards')
       .select('*')
       .order('created_at', { ascending: false });
     
@@ -17,10 +23,10 @@ export const getProducts = (callback: (products: any[]) => void) => {
   fetchProducts();
 
   // Set up real-time subscription with a unique channel name to avoid conflicts
-  const channelName = `public:products:${Math.random().toString(36).substring(2)}`;
+  const channelName = `public:cards:${Math.random().toString(36).substring(2)}`;
   const subscription = supabase
     .channel(channelName)
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, fetchProducts)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'cards' }, fetchProducts)
     .subscribe();
 
   return () => {
@@ -55,18 +61,45 @@ export const getStores = (callback: (stores: any[]) => void) => {
   };
 };
 
+export const syncCard = async (card: any) => {
+  try {
+    const response = await fetch('/api/cards/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ card })
+    });
+    if (!response.ok) throw new Error('Failed to sync card with DB');
+    return await response.json();
+  } catch (error) {
+    console.error('Error syncing card:', error);
+    return null;
+  }
+};
+
 export const addCardToList = async (userId: any, listType: 'cards' | 'wishlist' | 'offerlist', card: any, quantity: number = 1) => {
   const table = listType === 'cards' ? 'user_cards' : listType;
-  const gameSlug = card.game.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
   
   try {
+    // 0. Ensure card exists in our DB and get its BIGINT id and game_id
+    let dbCardId = card.id;
+    let dbGameId = card.game_id;
+    
+    // If it's not a numeric ID, it's definitely an external ID that needs syncing
+    if (isNaN(Number(card.id)) || !dbGameId) {
+       const dbCard = await syncCard(card);
+       if (!dbCard) throw new Error('Could not sync card to database');
+       dbCardId = dbCard.id;
+       dbGameId = dbCard.game_id;
+    }
+
+    if (!dbCardId) throw new Error('Invalid Card ID after sync');
+
     // Check if card already exists in list
     const { data: existing, error: fetchError } = await supabase
       .from(table)
       .select('*')
       .eq('user_id', userId)
-      .eq('card_id', card.id || card.cardId)
-      .eq('game', gameSlug)
+      .eq('card_id', dbCardId)
       .maybeSingle();
 
     if (fetchError && fetchError.code !== 'PGRST116') throw fetchError;
@@ -78,16 +111,21 @@ export const addCardToList = async (userId: any, listType: 'cards' | 'wishlist' 
         .eq('id', existing.id);
       if (updateError) throw updateError;
     } else {
+      const insertPayload: any = {
+        user_id: userId,
+        card_id: dbCardId,
+        quantidade: quantity,
+        game_id: dbGameId
+      };
+      
+      // Some tables might have slightly different structures, user_cards has raridade
+      if (table === 'user_cards' && card.rarity) {
+        insertPayload.raridade = card.rarity;
+      }
+
       const { error: insertError } = await supabase
         .from(table)
-        .insert({
-          user_id: userId,
-          game: gameSlug,
-          card_id: card.id || card.cardId,
-          name: card.name,
-          image_url: card.imageUrl || card.images?.small,
-          quantidade: quantity
-        });
+        .insert(insertPayload);
       if (insertError) throw insertError;
     }
 
@@ -96,8 +134,8 @@ export const addCardToList = async (userId: any, listType: 'cards' | 'wishlist' 
       user_id: userId,
       action: 'adicionou',
       entity: 'a carta',
-      entity_id: card.id || card.cardId,
-      details: { destino: listType, name: card.name, quantidade: quantity, game: gameSlug }
+      entity_id: String(dbCardId),
+      details: { destino: listType, name: card.name, quantidade: quantity }
     });
 
   } catch (error) {
@@ -112,14 +150,32 @@ export const getListCards = (userId: string | number, listType: 'cards' | 'wishl
   const fetchList = async () => {
     const { data, error } = await supabase
       .from(table)
-      .select('*')
+      .select(`
+        *,
+        card:cards (
+          *,
+          cardgame:cardgames (name)
+        )
+      `)
       .eq('user_id', userId);
     
     if (error) {
       console.error(`Error fetching ${listType}:`, error);
       return;
     }
-    callback(data || []);
+
+    // Flatten card data for backwards compatibility in UI
+    const formattedData = (data || []).map(item => {
+      const cardInfo = item.card;
+      return {
+        ...item,
+        name: cardInfo?.name,
+        image_url: cardInfo?.image_url,
+        game: cardInfo?.cardgame?.name || 'Unknown'
+      };
+    });
+
+    callback(formattedData);
   };
 
   fetchList();
@@ -193,20 +249,23 @@ export const getBinders = (userId: string | number, callback: (binders: any[]) =
 };
 
 export const addCardToBinder = async (userId: any, binderId: any, card: any) => {
-  const gameSlug = card.game.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
   try {
-    // First ensure card is in user_cards or just link it?
-    // The schema shows binder_cards links binder and user_cards
-    // But user_cards might not have the card yet if we are adding directly.
-    // Let's assume we need to find or create the card in user_cards first.
-    
+    // Ensure card is in our DB
+    let dbCardId = card.id;
+    let dbGameId = card.game_id;
+    if (isNaN(Number(card.id)) || !dbGameId) {
+      const synced = await syncCard(card);
+      if (!synced) throw new Error('Failed to sync card');
+      dbCardId = synced.id;
+      dbGameId = synced.game_id;
+    }
+
     let cardRecordId;
     const { data: existingCard } = await supabase
       .from('user_cards')
       .select('id')
       .eq('user_id', userId)
-      .eq('card_id', card.cardId || card.id)
-      .eq('game', gameSlug)
+      .eq('card_id', dbCardId)
       .maybeSingle();
     
     if (existingCard) {
@@ -216,11 +275,9 @@ export const addCardToBinder = async (userId: any, binderId: any, card: any) => 
         .from('user_cards')
         .insert({
           user_id: userId,
-          game: gameSlug,
-          card_id: card.cardId || card.id,
-          name: card.name,
-          image_url: card.imageUrl,
-          quantidade: 1
+          card_id: dbCardId,
+          quantidade: 1,
+          game_id: dbGameId
         })
         .select()
         .maybeSingle();
@@ -310,7 +367,6 @@ export const moveCardBetweenLists = async (userId: string | number, fromList: 'c
       .select('*')
       .eq('user_id', userId)
       .eq('card_id', cardId)
-      .eq('game', cardData.game)
       .maybeSingle();
     
     if (checkError && checkError.code !== 'PGRST116') throw checkError;
@@ -325,10 +381,7 @@ export const moveCardBetweenLists = async (userId: string | number, fromList: 'c
         .from(toTable)
         .insert({
           user_id: userId,
-          game: cardData.game,
           card_id: cardId,
-          name: cardData.name,
-          image_url: cardData.image_url,
           quantidade: cardData.quantidade
         });
     }
@@ -388,11 +441,16 @@ export const getBinderWithCards = async (userId: string | number, binderId: stri
     if (!binder) return null;
 
     // Fetch cards linked to this binder
-    // In Python it joins binder_cards with user_cards
     const { data: cards, error: cardsError } = await supabase
       .from('binder_cards')
       .select(`
-        card:user_cards (*)
+        card:user_cards (
+          *,
+          card_info:cards (
+             *,
+             cardgame:cardgames (name)
+          )
+        )
       `)
       .eq('binder_id', binderId);
     
@@ -402,10 +460,21 @@ export const getBinderWithCards = async (userId: string | number, binderId: stri
       ? (binder.cardgames as any)[0]?.name 
       : (binder.cardgames as any)?.name;
 
+    const formattedCards = (cards || []).map(c => {
+      const item = c.card;
+      const info = (item as any)?.card_info;
+      return {
+        ...item,
+        name: info?.beauty_name || info?.name,
+        image_url: info?.image_url,
+        game: info?.cardgame?.name || 'Unknown'
+      };
+    });
+
     return {
       ...binder,
       game_name: gameName,
-      cards: cards?.map(c => c.card) || []
+      cards: formattedCards
     };
   } catch (error) {
     console.error('Error fetching binder with cards:', error);
@@ -448,9 +517,9 @@ export const getGlobalStats = async () => {
   } catch (e) { console.warn('Table stores not found or inaccessible'); }
 
   try {
-    const { count: productsCount } = await supabase.from('products').select('*', { count: 'exact', head: true });
+    const { count: productsCount } = await supabase.from('cards').select('*', { count: 'exact', head: true });
     stats.products = productsCount || 0;
-  } catch (e) { console.warn('Table products not found or inaccessible'); }
+  } catch (e) { console.warn('Table cards not found or inaccessible'); }
 
   try {
     const { count: tournamentsCount } = await supabase.from('tournaments').select('*', { count: 'exact', head: true });
@@ -643,12 +712,12 @@ export const getStoreSchedule = async (storeId: string) => {
   }
 };
 
-export const updateStoreStock = async (store_id: string, product_id: number | string, quantity: number) => {
+export const updateStoreStock = async (store_id: string | number, card_id: number | string, quantity: number) => {
   try {
     const response = await fetch('/api/lojas/estoque/update', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ store_id, product_id, quantity })
+      body: JSON.stringify({ store_id, card_id, quantity })
     });
     if (!response.ok) throw new Error('Failed to update store stock');
     return await response.json();
@@ -980,16 +1049,16 @@ export const getFoldersStats = async (userId: string | number) => {
         .select('binder_id, card:user_cards(quantidade)')
         .in('binder_id', binderIds);
       
-      const binderStats: Record<string, number> = {};
-      binderIds.forEach(id => binderStats[id] = 0);
+      const binderStatsMap: Record<string, number> = {};
+      binderIds.forEach(id => binderStatsMap[id] = 0);
 
       binderCards?.forEach((bc: any) => {
         if (bc.binder_id && bc.card) {
-          binderStats[bc.binder_id] += (bc.card.quantidade || 0);
+          binderStatsMap[bc.binder_id] += (bc.card.quantidade || 0);
         }
       });
 
-      return { system: stats, binders: binderStats };
+      return { system: stats, binders: binderStatsMap };
     }
 
     return { system: stats, binders: {} };
@@ -1040,7 +1109,7 @@ export const getProductTypes = async (gameId?: string | number) => {
 
 export const getProductsByFilters = async (filters: { game_id?: string | number, product_type_id?: string | number }) => {
   try {
-    let query = supabase.from('products').select('*');
+    let query = supabase.from('cards').select('*');
     if (filters.game_id && filters.game_id !== 'all') query = query.eq('game_id', filters.game_id);
     if (filters.product_type_id && filters.product_type_id !== 'all') query = query.eq('product_type_id', filters.product_type_id);
     

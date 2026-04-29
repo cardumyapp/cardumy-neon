@@ -5,6 +5,7 @@ import { fileURLToPath } from "url";
 import { createClient } from "@supabase/supabase-js";
 import dotenv from "dotenv";
 import NodeCache from "node-cache";
+import fetch from "node-fetch";
 
 dotenv.config();
 
@@ -37,6 +38,16 @@ async function startServer() {
       }
     });
     next();
+  });
+
+  // Global Error Handlers
+  process.on('unhandledRejection', (reason, promise) => {
+    console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  });
+
+  process.on('uncaughtException', (err) => {
+    console.error('Uncaught Exception thrown:', err);
+    // In a real prod app, you might want to exit, but here we try to keep going
   });
 
   app.use(express.json());
@@ -77,17 +88,37 @@ async function startServer() {
   // Diagnosis Route
   app.get("/api/health", async (req, res) => {
     let dbStatus = "not_configured";
-    let dbDetails = null;
+    let dbDetails: any = null;
+    let tables: any = {};
 
     if (supabaseAdmin) {
       try {
-        // Test a real query
-        const { error } = await supabaseAdmin.from('users').select('id').limit(1);
-        if (error) {
+        // Test connection
+        const { data: users, error: uError } = await supabaseAdmin.from('users').select('id').limit(1);
+        if (uError) {
           dbStatus = "error";
-          dbDetails = error;
+          dbDetails = uError;
         } else {
           dbStatus = "connected";
+          
+          // Probe some tables
+          const tableToProbe = ['users', 'cards', 'cardgames', 'store_stock', 'stores'];
+          for (const table of tableToProbe) {
+            const { error: probeError } = await supabaseAdmin.from(table).select('*', { count: 'exact', head: true }).limit(1);
+            tables[table] = probeError ? `Error: ${probeError.message}` : "Exists";
+          }
+
+          // Try to get columns for cards table
+          const { data: columns, error: colError } = await supabaseAdmin
+            .from('cards')
+            .select('*')
+            .limit(1);
+          
+          if (!colError && columns && columns.length > 0) {
+            tables.cards_columns = Object.keys(columns[0]);
+          } else if (colError) {
+            tables.cards_columns_error = colError.message;
+          }
         }
       } catch (err: any) {
         dbStatus = "exception";
@@ -101,19 +132,25 @@ async function startServer() {
       env: process.env.NODE_ENV || 'development',
       supabase: !!supabaseAdmin,
       database_connectivity: dbStatus,
-      database_error: dbDetails
+      database_error: dbDetails,
+      tables
     });
   });
 
   // API Routes
+  app.get("/api/ping", (req, res) => {
+    res.json({ status: "pong", time: new Date().toISOString() });
+  });
+
   app.get("/api/cards", async (req: express.Request, res: express.Response) => {
+    console.log(`[API] GET /api/cards - Query:`, req.query);
     const { game, ...rest } = req.query;
     if (!game) {
       return res.status(400).json({ error: "game obrigatório" });
     }
 
     const token = process.env.HOMURA_TOKEN;
-    const baseUrl = process.env.HOMURA_URL || "https://homura-cards.vercel.app";
+    const baseUrl = process.env.VITE_HOMURA_URL || process.env.HOMURA_URL || "https://homura-cards.vercel.app";
 
     try {
       const searchParams = new URLSearchParams();
@@ -145,6 +182,90 @@ async function startServer() {
     }
   });
 
+  app.post("/api/cards/sync", async (req: express.Request, res: express.Response) => {
+    console.log(`[API] POST /api/cards/sync - Body:`, JSON.stringify(req.body));
+    if (!supabaseAdmin) return res.status(500).json({ error: "Supabase not configured on server" });
+    try {
+      const { card } = req.body;
+      if (!card || !card.name || !card.game) {
+        console.warn(`[SYNC-CARD] Missing data: name=${!!card?.name}, game=${!!card?.game}`);
+        return res.status(400).json({ error: "Dados da carta incompletos" });
+      }
+
+      // Cleanup slug logic for game lookup
+      const slugify = (text: string) => text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+      const gameSlug = slugify(card.game);
+      console.log(`[SYNC-CARD] Syncing card: ${card.name} (${gameSlug})`);
+      
+      // 1. Get Game ID
+      const { data: game, error: gameError } = await supabaseAdmin
+        .from('cardgames')
+        .select('id')
+        .eq('slug', gameSlug)
+        .maybeSingle();
+      
+      if (gameError) {
+        console.error(`[SYNC-CARD] Error fetching game: ${JSON.stringify(gameError)}`);
+        throw gameError;
+      }
+      if (!game) {
+        console.warn(`[SYNC-CARD] Game not found: ${gameSlug}`);
+        return res.status(404).json({ error: `Jogo '${card.game}' não encontrado no sistema` });
+      }
+
+      // 2. Try to find card by its external_id
+      // Homura / Scryfall usually provide an ID. Or we use the code.
+      const externalId = String(card.id || card.code || card.number || slugify(card.name));
+      
+      const { data: existing, error: fetchError } = await supabaseAdmin
+        .from('cards')
+        .select('*')
+        .eq('external_id', externalId)
+        .eq('game_id', game.id)
+        .maybeSingle();
+      
+      if (fetchError) {
+        console.error(`[SYNC-CARD] Error fetching existing card: ${JSON.stringify(fetchError)}`);
+        // Fallback search by name if external_id query failed (e.g. column missing, but it's in the schema)
+      }
+
+      if (existing) {
+        console.log(`[SYNC-CARD] Card exists:`, existing.id);
+        return res.json(existing);
+      }
+
+      // 3. Insert new card - ONLY use columns from schema
+      console.log(`[SYNC-CARD] Inserting new card: ${card.name} (ext: ${externalId})`);
+      const insertData = {
+        name: card.name,
+        game_id: game.id,
+        external_id: externalId,
+        image_url: card.imageUrl || card.image || null
+      };
+
+      const { data: newCard, error: insertError } = await supabaseAdmin
+        .from('cards')
+        .insert(insertData)
+        .select()
+        .maybeSingle();
+      
+      if (insertError) {
+        console.error(`[SYNC-CARD] Insert error: ${JSON.stringify(insertError)}`);
+        throw insertError;
+      }
+      
+      console.log(`[SYNC-CARD] Successfully synced card:`, newCard?.id);
+      res.json(newCard);
+    } catch (error: any) {
+      console.error('[SERVER ERROR] sync-card:', JSON.stringify(error));
+      res.status(500).json({ 
+        error: "Erro interno ao sincronizar carta", 
+        message: error.message,
+        details: error.details || error.code || {}
+      });
+    }
+  });
+
   app.post("/api/seed", async (req: express.Request, res: express.Response) => {
     res.json({ message: "Seeding disabled" });
   });
@@ -156,6 +277,7 @@ async function startServer() {
 
     try {
       const { userId, updates } = req.body;
+      console.log(`[API] POST /api/update-profile - User: ${userId}, Updates:`, JSON.stringify(updates));
       if (!userId) {
         return res.status(400).json({ error: "User ID is required" });
       }
@@ -189,6 +311,9 @@ async function startServer() {
           
           // Data normalization
           if (targetKey === 'birth_date' && val === "") val = null;
+          if (targetKey === 'favorite_cardgame_id' && (val === "" || val === null)) val = null;
+          if (targetKey === 'favorite_cardgame_id' && val !== null) val = Number(val);
+          
           if (targetKey === 'fighter_tags' && Array.isArray(val)) {
             val = val.join(', '); // Convert array to comma-separated string for text field
           }
@@ -318,9 +443,11 @@ async function startServer() {
   });
 
   app.get("/api/users/:username/profile", async (req: express.Request, res: express.Response) => {
-    if (!supabaseAdmin) return res.status(500).json({ error: "Supabase not configured" });
     const { username } = req.params;
     const { follower_id } = req.query;
+    console.log(`[API] GET /api/users/${username}/profile - Follower: ${follower_id || 'none'}`);
+    
+    if (!supabaseAdmin) return res.status(500).json({ error: "Supabase not configured on server" });
 
     const cacheKey = `profile_${username}_${follower_id || 'none'}`;
     const cachedData = cache.get(cacheKey);
@@ -418,7 +545,11 @@ async function startServer() {
   app.post("/api/users/:username/follow", async (req: express.Request, res: express.Response) => {
     if (!supabaseAdmin) return res.status(500).json({ error: "Supabase not configured" });
     const { username } = req.params;
-    const { follower_id } = req.body;
+    const { follower_id: raw_follower_id } = req.body;
+    const follower_id = raw_follower_id === "" ? null : raw_follower_id;
+
+    if (!follower_id) return res.status(400).json({ error: "Follower ID is required" });
+
     try {
       const { data: targetUser } = await supabaseAdmin.from('users').select('id').eq('username', username).maybeSingle();
       if (!targetUser) return res.status(404).json({ error: "Usuário não encontrado" });
@@ -444,7 +575,11 @@ async function startServer() {
   app.post("/api/users/:username/unfollow", async (req: express.Request, res: express.Response) => {
     if (!supabaseAdmin) return res.status(500).json({ error: "Supabase not configured" });
     const { username } = req.params;
-    const { follower_id } = req.body;
+    const { follower_id: raw_follower_id } = req.body;
+    const follower_id = raw_follower_id === "" ? null : raw_follower_id;
+
+    if (!follower_id) return res.status(400).json({ error: "Follower ID is required" });
+
     try {
       const { data: targetUser } = await supabaseAdmin.from('users').select('id').eq('username', username).maybeSingle();
       if (!targetUser) return res.status(404).json({ error: "Usuário não encontrado" });
@@ -470,7 +605,11 @@ async function startServer() {
   app.post("/api/users/:username/review", async (req: express.Request, res: express.Response) => {
     if (!supabaseAdmin) return res.status(500).json({ error: "Supabase not configured" });
     const { username } = req.params;
-    const { reviewer_id, is_positive, comment } = req.body;
+    const { reviewer_id: raw_reviewer_id, is_positive, comment } = req.body;
+    const reviewer_id = raw_reviewer_id === "" ? null : raw_reviewer_id;
+
+    if (!reviewer_id) return res.status(400).json({ error: "Reviewer ID is required" });
+
     try {
       const { data: targetUser } = await supabaseAdmin.from('users').select('id').eq('username', username).maybeSingle();
       if (!targetUser) return res.status(404).json({ error: "Usuário não encontrado" });
@@ -498,7 +637,8 @@ async function startServer() {
   });
 
   app.get("/api/atividades", async (req: express.Request, res: express.Response) => {
-    if (!supabaseAdmin) return res.status(500).json({ error: "Supabase not configured" });
+    console.log(`[API] GET /api/atividades - Limit: ${req.query.limit || 10}`);
+    if (!supabaseAdmin) return res.status(500).json({ error: "Supabase not configured on server" });
     const limit = parseInt(req.query.limit as string) || 10;
     
     const cacheKey = `atividades_${limit}`;
@@ -506,56 +646,32 @@ async function startServer() {
     if (cachedData) return res.json(cachedData);
 
     try {
-      // First try action_logs as it was confirmed to exist in codebase
+      // First try action_logs
       const { data, error } = await supabaseAdmin
         .from('action_logs')
-        .select(`
-          id, action, entity, entity_id, details, created_at,
-          users:user_id ( id, username, avatar )
-        `)
+        .select('*')
         .order('created_at', { ascending: false })
         .limit(limit);
 
       if (error) {
-        const { data: dataLog, error: errorLog } = await supabaseAdmin
-          .from('action_logs')
+        console.warn(`[ATIVIDADES] Table action_logs failed: ${error.message}`);
+        // Try social_feeds
+        const { data: sData, error: sError } = await supabaseAdmin
+          .from('social_feeds')
           .select('*')
           .order('created_at', { ascending: false })
           .limit(limit);
         
-        if (!errorLog) {
-           const formatted = (dataLog || []).map(item => ({
-             id: item.id,
-             user: 'Usuário',
-             userId: item.user_id,
-             avatar: null,
-             action: item.action || 'fez uma ação',
-             target: `${item.entity || ''} ${item.details?.name || ''}`,
-             timestamp: new Date(item.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-             date: new Date(item.created_at).toLocaleDateString('pt-BR')
-           }));
-           return res.json(formatted);
+        if (sError) {
+          console.warn(`[ATIVIDADES] Table social_feeds failed: ${sError.message}`);
+          return res.json([]);
         }
 
-        // Fallback or just throw
-        const { data: data2, error: error2 } = await supabaseAdmin
-          .from('social_feeds')
-          .select(`
-            id, activity_type, content, target_id, created_at,
-            users ( id, username, avatar )
-          `)
-          .order('created_at', { ascending: false })
-          .limit(limit);
-        
-        if (error2) {
-          throw error2;
-        }
-
-        const formatted = (data2 || []).map(item => ({
+        const formatted = (sData || []).map(item => ({
           id: item.id,
-          user: (item.users as any)?.username || 'Usuário',
-          userId: (item.users as any)?.id,
-          avatar: (item.users as any)?.avatar,
+          user: item.username || 'Usuário',
+          userId: item.user_id,
+          avatar: item.avatar_url || item.avatar,
           action: item.activity_type || 'fez uma ação',
           target: item.content || 'algo',
           timestamp: new Date(item.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
@@ -564,58 +680,66 @@ async function startServer() {
         return res.json(formatted);
       }
 
-      const formatted = (data || []).map(item => {
-        const user = (item.users as any);
-        return {
-          id: item.id,
-          user: user?.username || 'Usuário',
-          userId: user?.id,
-          avatar: user?.avatar,
-          action: item.action || 'fez uma ação',
-          target: `${item.entity} ${item.details?.name || ''}`,
-          timestamp: new Date(item.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-          date: new Date(item.created_at).toLocaleDateString('pt-BR')
-        };
-      });
+      const formatted = (data || []).map(item => ({
+        id: item.id,
+        user: item.username || 'Usuário',
+        userId: item.user_id,
+        avatar: item.avatar,
+        action: item.action || 'fez uma ação',
+        target: `${item.entity || ''} ${item.details?.name || ''}`,
+        timestamp: new Date(item.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+        date: new Date(item.created_at).toLocaleDateString('pt-BR')
+      }));
 
-      cache.set(cacheKey, formatted, 30); // Activities change often, but a 30s cache helps a lot with load
+      cache.set(cacheKey, formatted, 30);
       res.json(formatted);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      console.error('[SERVER ERROR] GET /api/atividades:', JSON.stringify(error));
+      res.status(500).json({ error: error.message || 'Unknown error in activities' });
     }
   });
 
   app.get("/api/torneios", async (req: express.Request, res: express.Response) => {
-    console.log("Processing request: GET /api/torneios");
+    console.log("[API] GET /api/torneios");
     if (!supabaseAdmin) {
-      console.error("Supabase Admin NOT configured for /api/torneios");
-      return res.status(500).json({ error: "Supabase not configured" });
+      console.error("[TORNEIOS] Supabase Admin NOT configured");
+      return res.status(500).json({ error: "Supabase not configured on server" });
     }
     try {
-      // First attempt with joins
+      // First attempt with joins - using maybe different names for relationships
       const { data, error } = await supabaseAdmin
         .from('tournaments')
         .select(`
-          id, name, max_players, start_date, status,
-          cardgames ( name ),
-          tournament_formats ( name )
+          *,
+          cardgame:cardgames(name),
+          format:tournament_formats(name)
         `)
         .order('start_date', { ascending: true });
       
       if (error) {
-        console.warn('Error fetching tournaments with joins, falling back to simple select:', error.message);
+        console.warn(`[TORNEIOS] Join failed (${error.message}), falling back to simple select`);
         const { data: simpleData, error: simpleError } = await supabaseAdmin
           .from('tournaments')
           .select('*')
           .order('start_date', { ascending: true });
         
         if (simpleError) throw simpleError;
+        
+        // Manual enrichment if possible or just return simple data
         return res.json(simpleData);
       }
-      res.json(data);
+      
+      // Normalize data if joins worked but return format is different
+      const normalized = (data || []).map(t => ({
+        ...t,
+        cardgames: (t as any).cardgame,
+        tournament_formats: (t as any).format
+      }));
+      
+      res.json(normalized);
     } catch (error: any) {
-      console.error('Error fetching tournaments:', error);
-      res.status(500).json({ error: error.message });
+      console.error('[SERVER ERROR] GET /api/torneios:', JSON.stringify(error));
+      res.status(500).json({ error: error.message || 'Unknown error in tournaments' });
     }
   });
 
@@ -646,25 +770,39 @@ async function startServer() {
         .maybeSingle();
       
       if (userError) throw userError;
-      if (!user) return res.status(404).json({ error: "Loja não encontrada" });
+      if (!user) return res.status(404).json({ error: "Usuário não encontrado" });
 
-      // 2. Get Wishlist size
-      const { count: wishlistCount, error: wishError } = await supabaseAdmin
+      // 2. Get store info for this user
+      const { data: store, error: storeError } = await supabaseAdmin
+        .from('stores')
+        .select('id, name, slug')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      
+      if (storeError) throw storeError;
+
+      // 3. Get Wishlist size
+      const { count: wishlistCount } = await supabaseAdmin
         .from('wishlist')
         .select('*', { count: 'exact', head: true })
         .eq('user_id', user.id);
       
-      // 3. Get Store Stock size
-      const { count: stockCount, error: stockError } = await supabaseAdmin
-        .from('store_stock')
-        .select('*', { count: 'exact', head: true })
-        .eq('store_id', user.id)
-        .gt('quantity', 0);
+      let stockCount = 0;
+      if (store) {
+        // 4. Get Store Stock size using stores.id
+        const { count: sCount } = await supabaseAdmin
+          .from('store_stock')
+          .select('*', { count: 'exact', head: true })
+          .eq('store_id', store.id)
+          .gt('quantity', 0);
+        stockCount = sCount || 0;
+      }
 
       res.json({
         user,
+        store,
         wishlist_size: wishlistCount || 0,
-        stock_size: stockCount || 0,
+        stock_size: stockCount,
         offers_size: 10 // Mocked as in python
       });
     } catch (error: any) {
@@ -785,19 +923,22 @@ async function startServer() {
     try {
       // Find store by username (user table)
       const { data: user } = await supabaseAdmin.from('users').select('id').eq('username', username).maybeSingle();
-      if (!user) return res.status(404).json({ error: "Loja não encontrada" });
+      if (!user) return res.status(404).json({ error: "Usuário não encontrado" });
+
+      const { data: store } = await supabaseAdmin.from('stores').select('id').eq('user_id', user.id).maybeSingle();
+      if (!store) return res.status(404).json({ error: "Loja não encontrada" });
 
       const { data, error } = await supabaseAdmin
         .from('store_stock')
         .select(`
-          product_id,
+          card_id,
           quantity,
           store_price,
-          products (
+          cards:card_id (
             id, name, slug, product_type, image_url, beauty_name, mspr, cardgames ( name )
           )
         `)
-        .eq('store_id', user.id);
+        .eq('store_id', store.id);
       
       if (error) throw error;
       res.json(data);
@@ -809,14 +950,14 @@ async function startServer() {
   app.post("/api/lojas/estoque/update", async (req: express.Request, res: express.Response) => {
     if (!supabaseAdmin) return res.status(500).json({ error: "Supabase not configured" });
     try {
-      const { store_id, product_id, quantity } = req.body;
+      const { store_id, card_id, quantity } = req.body;
       const { data, error } = await supabaseAdmin
         .from('store_stock')
         .upsert({
           store_id,
-          product_id,
+          card_id,
           quantity
-        }, { onConflict: 'store_id,product_id' })
+        }, { onConflict: 'store_id,card_id' })
         .select();
       
       if (error) throw error;
@@ -835,13 +976,13 @@ async function startServer() {
       const type = req.query.type as string;
       const offset = (page - 1) * limit;
 
-      let query = supabaseAdmin.from('products').select('*, cardgames(name)', { count: 'exact' });
+      let query = supabaseAdmin.from('cards').select('*, cardgames(name)', { count: 'exact' });
       
       if (game) query = query.eq('cardgames.name', game);
       if (type) query = query.eq('product_type', type);
 
       const { data, count, error } = await query
-        .order('product_type', { ascending: false })
+        .order('id', { ascending: false })
         .range(offset, offset + limit - 1);
       
       if (error) throw error;
@@ -861,18 +1002,31 @@ async function startServer() {
     const { id } = req.params;
     try {
       const { data: product, error: pError } = await supabaseAdmin
-        .from('products')
+        .from('cards')
         .select('*, cardgames(name)')
         .eq('id', id)
         .maybeSingle();
       
       if (pError) throw pError;
-      if (!product) return res.status(404).json({ error: "Produto não encontrado" });
+      if (!product) return res.status(404).json({ error: "Carta não encontrada" });
 
       const { data: stores, error: sError } = await supabaseAdmin
         .from('store_stock')
-        .select('quantity, store_price, users(username, codename, avatar)')
-        .eq('product_id', id)
+        .select(`
+          quantity, 
+          store_price, 
+          stores (
+            id,
+            name,
+            slug,
+            user:users!user_id (
+              username, 
+              codename, 
+              avatar
+            )
+          )
+        `)
+        .eq('card_id', id)
         .gt('quantity', 0)
         .order('store_price', { ascending: true });
       
@@ -1034,6 +1188,7 @@ async function startServer() {
   });
 
   app.get("/api/blog-posts", async (req, res) => {
+    console.log(`[API] GET /api/blog-posts - PerPage: ${req.query.per_page || 3}`);
     const perPage = req.query.per_page || 3;
     try {
       const response = await fetch(`https://cardumy.blog/wp-json/wp/v2/posts?per_page=${perPage}&_embed`);

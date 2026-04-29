@@ -52,6 +52,7 @@ const SidebarItem: React.FC<{ to: string; icon: string; label: string; active: b
 const AppContent: React.FC = () => {
   const location = useLocation();
   const { user, login, logout } = useAuth();
+  const isLojista = useMemo(() => user?.role_id === 6, [user]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [activeGame, setActiveGame] = useState<GameType | 'All'>('All');
   const [isGamePickerOpen, setIsGamePickerOpen] = useState(false);
@@ -216,18 +217,17 @@ const AppContent: React.FC = () => {
         <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto scrollbar-hide">
           <SidebarItem to="/" icon="fa-house" label="Início" active={location.pathname === '/'} collapsed={isSidebarCollapsed} />
           <SidebarItem to="/perfil" icon="fa-user" label="Perfil" active={location.pathname === '/perfil'} collapsed={isSidebarCollapsed} />
-          <SidebarItem to="/pastas" icon="fa-folder-open" label="Pastas" active={location.pathname === '/pastas'} collapsed={isSidebarCollapsed} />
+          {!isLojista && <SidebarItem to="/pastas" icon="fa-folder-open" label="Pastas" active={location.pathname === '/pastas'} collapsed={isSidebarCollapsed} />}
           <SidebarItem to="/busca" icon="fa-magnifying-glass" label="Cartas" active={location.pathname === '/busca'} collapsed={isSidebarCollapsed} />
-          <SidebarItem to="/deckbuilder" icon="fa-hammer" label="Deckbuilder" active={location.pathname === '/deckbuilder'} collapsed={isSidebarCollapsed} />
+          {!isLojista && <SidebarItem to="/deckbuilder" icon="fa-hammer" label="Deckbuilder" active={location.pathname === '/deckbuilder'} collapsed={isSidebarCollapsed} />}
           <SidebarItem to="/trocas" icon="fa-right-left" label="Trocas" active={location.pathname === '/trocas'} collapsed={isSidebarCollapsed} />
           <SidebarItem to="/torneios" icon="fa-trophy" label="Torneios" active={location.pathname === '/torneios'} collapsed={isSidebarCollapsed} />
           <SidebarItem to="/comunidade" icon="fa-users" label="Comunidade" active={location.pathname === '/comunidade'} collapsed={isSidebarCollapsed} />
           <SidebarItem to="/lojas" icon="fa-shop" label="Lojas" active={location.pathname === '/lojas' || location.pathname.startsWith('/loja/')} collapsed={isSidebarCollapsed} />
           <SidebarItem to="/produtos" icon="fa-bag-shopping" label="Produtos" active={location.pathname === '/produtos'} collapsed={isSidebarCollapsed} />
-          <SidebarItem to="/carrinho" icon="fa-shopping-cart" label="Carrinho" active={location.pathname === '/carrinho'} badge={cartCount} collapsed={isSidebarCollapsed} />
+          {!isLojista && <SidebarItem to="/carrinho" icon="fa-shopping-cart" label="Carrinho" active={location.pathname === '/carrinho'} badge={cartCount} collapsed={isSidebarCollapsed} />}
           <SidebarItem to="/pedidos" icon="fa-clipboard-list" label="Pedidos" active={location.pathname === '/pedidos' || location.pathname.startsWith('/pedido/')} collapsed={isSidebarCollapsed} />
           <SidebarItem to="/suporte" icon="fa-circle-question" label="Suporte" active={location.pathname === '/suporte'} collapsed={isSidebarCollapsed} />
-          <SidebarItem to="/admin/stats" icon="fa-chart-pie" label="Admin Stats" active={location.pathname === '/admin/stats'} collapsed={isSidebarCollapsed} />
         </nav>
 
         {/* Social Links Sidebar - Only shown when NOT collapsed and NOT on small height */}
@@ -276,14 +276,16 @@ const AppContent: React.FC = () => {
               <i className="fas fa-bell text-slate-400 group-hover:text-purple-400"></i>
               <span className="absolute top-0 right-0 w-2 h-2 bg-pink-600 rounded-full border border-slate-900"></span>
             </Link>
-            <Link to="/carrinho" className="relative p-2 rounded-xl hover:bg-slate-800 group">
-              <i className="fas fa-shopping-cart text-slate-400 group-hover:text-purple-400"></i>
-              {cartCount > 0 && (
-                <span className="absolute top-0 right-0 w-4 h-4 bg-pink-600 text-white text-[9px] flex items-center justify-center rounded-full border border-slate-900 font-bold">
-                  {cartCount}
-                </span>
-              )}
-            </Link>
+            {!isLojista && (
+              <Link to="/carrinho" className="relative p-2 rounded-xl hover:bg-slate-800 group">
+                <i className="fas fa-shopping-cart text-slate-400 group-hover:text-purple-400"></i>
+                {cartCount > 0 && (
+                  <span className="absolute top-0 right-0 w-4 h-4 bg-pink-600 text-white text-[9px] flex items-center justify-center rounded-full border border-slate-900 font-bold">
+                    {cartCount}
+                  </span>
+                )}
+              </Link>
+            )}
             
             {user ? (
               <div className="flex items-center space-x-2 md:space-x-3 bg-slate-800/50 pr-2 md:pr-4 pl-1 py-1 rounded-full border border-white/5 cursor-pointer group relative">
@@ -295,7 +297,7 @@ const AppContent: React.FC = () => {
                 <div className="hidden sm:flex flex-col">
                    <span className="text-xs font-bold leading-none">{user.username || user.codename || user.displayName || 'Usuário'}</span>
                    <span className="text-[10px] text-slate-500 uppercase font-black">
-                     {user.role_id === 6 ? 'Loja' : 'Mestre'}
+                     {user.role_name || (user.role_id === 6 ? 'Lojista' : 'Membro')}
                    </span>
                 </div>
                 
