@@ -513,18 +513,40 @@ export const getUserProfile = async (userId: string | number) => {
   }
 };
 
+export const getRandomUser = async () => {
+  try {
+    // Attempt to get a random user from the database
+    // We fetch a larger pool and pick one to avoid complex random SQL logic in client
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .limit(20);
+    
+    if (error) throw error;
+    if (data && data.length > 0) {
+      return data[Math.floor(Math.random() * data.length)];
+    }
+    return null;
+  } catch (error) {
+    console.error('Error fetching random user from DB:', error);
+    return null;
+  }
+};
+
 export const syncUser = async (userData: any) => {
   try {
-    console.log('API Call: syncUser', userData.email);
-    const response = await fetch('/api/sync-user', {
+    const url = '/api/sync-user';
+    console.log(`API Call: syncUser to ${url}`, userData.email);
+    
+    const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({ userData })
     }).catch(err => {
-      console.error('Fetch error in syncUser:', err);
-      throw err;
+      console.error(`Network error or blocked fetch to ${url}:`, err);
+      throw new Error(`Failed to connect to server at ${url}. Possible network or CORS issue.`);
     });
     
     if (!response.ok) {
@@ -828,8 +850,16 @@ export const getStoreTournaments = async (username: string) => {
 
 export const getFullUserProfile = async (username: string, followerId?: string) => {
   try {
-    const response = await fetch(`/api/users/${username}/profile${followerId ? `?follower_id=${followerId}` : ''}`);
-    if (!response.ok) throw new Error('Failed to fetch full user profile');
+    const url = `/api/users/${encodeURIComponent(String(username))}/profile${followerId ? `?follower_id=${followerId}` : ''}`;
+    const response = await fetch(url).catch(err => {
+      console.error(`Network error fetching profile from ${url}:`, err);
+      throw err;
+    });
+    
+    if (!response.ok) {
+      console.error(`Profile fetch error: ${response.status} for ${url}`);
+      throw new Error('Failed to fetch full user profile');
+    }
     return await response.json();
   } catch (error) {
     console.error('Error fetching full user profile:', error);

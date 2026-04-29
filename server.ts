@@ -56,17 +56,52 @@ async function startServer() {
   const supabaseUrl = process.env.VITE_SUPABASE_URL;
   const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   
+  if (!supabaseUrl) console.warn("[WARN] VITE_SUPABASE_URL is missing in environment variables.");
+  if (!supabaseServiceKey) console.warn("[WARN] SUPABASE_SERVICE_ROLE_KEY is missing in environment variables.");
+
   const supabaseAdmin = (supabaseUrl && supabaseServiceKey) 
-    ? createClient(supabaseUrl, supabaseServiceKey)
+    ? createClient(supabaseUrl, supabaseServiceKey, {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      })
     : null;
 
+  if (supabaseAdmin) {
+    console.log("[INFO] Supabase Admin initialized successfully.");
+  } else {
+    console.error("[ERROR] Supabase Admin failed to initialize. Check your environment variables.");
+  }
+
   // Diagnosis Route
-  app.get("/api/health", (req, res) => {
+  app.get("/api/health", async (req, res) => {
+    let dbStatus = "not_configured";
+    let dbDetails = null;
+
+    if (supabaseAdmin) {
+      try {
+        // Test a real query
+        const { error } = await supabaseAdmin.from('users').select('id').limit(1);
+        if (error) {
+          dbStatus = "error";
+          dbDetails = error;
+        } else {
+          dbStatus = "connected";
+        }
+      } catch (err: any) {
+        dbStatus = "exception";
+        dbDetails = err.message;
+      }
+    }
+
     res.json({ 
       status: "ok", 
       time: new Date().toISOString(),
       env: process.env.NODE_ENV || 'development',
-      supabase: !!supabaseAdmin
+      supabase: !!supabaseAdmin,
+      database_connectivity: dbStatus,
+      database_error: dbDetails
     });
   });
 
@@ -205,16 +240,28 @@ async function startServer() {
         .maybeSingle();
 
       if (updateError) {
-        console.error('Supabase update error:', updateError);
-        throw updateError;
+        console.error(`[DB ERROR] update-profile failure: ${updateError.code} - ${updateError.message}`, updateError.details);
+        return res.status(errorToStatus(updateError)).json({ 
+          error: "Erro ao atualizar perfil no banco de dados", 
+          code: updateError.code,
+          message: updateError.message 
+        });
       }
       
       return res.json(data);
     } catch (error: any) {
-      console.error('Error updating profile:', error);
-      res.status(500).json({ error: error.message });
+      console.error('[SERVER EXCEPTION] update-profile:', error);
+      res.status(500).json({ error: "Erro interno no servidor", details: error.message });
     }
   });
+
+  // Helper filter for Supabase Errors
+  function errorToStatus(error: any) {
+    if (error.code === 'PGRST116') return 404; // Not found
+    if (error.code?.startsWith('23')) return 409; // Conflict/Unique constraint
+    if (error.code?.startsWith('42')) return 403; // Permission/Schema
+    return 500;
+  }
 
   // Store Routes - Replicating Python logic
   app.get("/api/rankings/colecao", async (req: express.Request, res: express.Response) => {
@@ -840,8 +887,11 @@ async function startServer() {
     }
   });
 
+  // API Call: syncUser
   app.post("/api/sync-user", async (req: express.Request, res: express.Response) => {
+    console.log(`[SYNC-USER] Request received for: ${req.body?.userData?.email}`);
     if (!supabaseAdmin) {
+      console.error("[SYNC-USER] Error: Supabase Admin client not configured");
       return res.status(500).json({ error: "Supabase Admin client not configured" });
     }
 
@@ -851,7 +901,7 @@ async function startServer() {
         return res.status(400).json({ error: "Invalid user data" });
       }
 
-      console.log('Syncing user via backend:', userData.email);
+      console.log(`[SYNC-USER] Fetching existing user by email: ${userData.email}`);
 
       // Try to find user by email
       const { data: existing, error: fetchError } = await supabaseAdmin
@@ -860,11 +910,15 @@ async function startServer() {
         .eq('email', userData.email)
         .maybeSingle();
       
-      if (fetchError && fetchError.code !== 'PGRST116') throw fetchError;
+      if (fetchError && fetchError.code !== 'PGRST116') {
+        console.error(`[SYNC-USER] [DB FETCH ERROR] ${fetchError.code}: ${fetchError.message}`);
+        throw fetchError;
+      }
 
       const isAdmin = userData.email === 'cardumyapp@gmail.com';
 
       if (existing) {
+        console.log(`[SYNC-USER] User found (ID: ${existing.id}). Updating...`);
         // Update user but handle potential codename conflicts if necessary
         // Actually, if we are syncing, we might want to keep the existing codename if the new one is null
         const { data, error: updateError } = await supabaseAdmin
@@ -880,9 +934,10 @@ async function startServer() {
           .maybeSingle();
 
         if (updateError) {
+          console.error(`[SYNC-USER] [DB UPDATE ERROR] ${updateError.code}: ${updateError.message}`);
           // If update fails due to codename uniqueness, try updating without codename
           if (updateError.message?.includes('users_codename_key')) {
-             console.warn('Codename conflict, updating without codename');
+             console.warn('[SYNC-USER] Codename conflict, retrying without codename update');
              const { data: data2, error: err2 } = await supabaseAdmin
                .from('users')
                .update({
@@ -900,6 +955,7 @@ async function startServer() {
         }
         return res.json(data);
       } else {
+        console.log(`[SYNC-USER] Creating new user record for: ${userData.email}`);
         // Create new user
         // Ensure unique username
         const baseUsername = (userData.displayName || 'user').split(' ')[0].toLowerCase().replace(/[^a-z0-9]/g, '');

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { syncUser } from '../services/supabaseService';
+import { syncUser, getRandomUser } from '../services/supabaseService';
 
 interface AuthContextType {
   user: any;
@@ -10,17 +10,6 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-const MOCK_USERS_POOL = [
-  { id: 3, displayName: 'Caos Gamer', email: 'caos@cardumy.com', photoURL: 'https://i.pravatar.cc/150?u=caos' },
-  { id: 4, displayName: 'Luffy King', email: 'luffy@cardumy.com', photoURL: 'https://i.pravatar.cc/150?u=luffy' },
-  { id: 5, displayName: 'Zoro Master', email: 'zoro@cardumy.com', photoURL: 'https://i.pravatar.cc/150?u=zoro' },
-  { id: 6, displayName: 'Nami Navigator', email: 'nami@cardumy.com', photoURL: 'https://i.pravatar.cc/150?u=nami' },
-  { id: 7, displayName: 'Sanji Cook', email: 'sanji@cardumy.com', photoURL: 'https://i.pravatar.cc/150?u=sanji' },
-  { id: 8, displayName: 'Chopper Doc', email: 'chopper@cardumy.com', photoURL: 'https://i.pravatar.cc/150?u=chopper' },
-  { id: 9, displayName: 'Robin Archaeologist', email: 'robin@cardumy.com', photoURL: 'https://i.pravatar.cc/150?u=robin' },
-  { id: 10, displayName: 'Franky Shipwright', email: 'franky@cardumy.com', photoURL: 'https://i.pravatar.cc/150?u=franky' },
-];
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<any>(null);
@@ -41,22 +30,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   useEffect(() => {
-    // Para ambiente de teste: Se não houver usuário logado, tenta pegar um aleatório do Supabase
+    // Para ambiente de teste: Busca um usuário real do banco de dados
     const setupTestSession = async () => {
       setLoading(true);
       try {
-        console.log('Ambiente de teste: Buscando usuário aleatório...');
+        console.log('Ambiente de teste: Buscando usuário real do banco...');
         
-        // Primeiro tentamos ver se já temos um no pool local para não demorar
-        const randomMock = MOCK_USERS_POOL[Math.floor(Math.random() * MOCK_USERS_POOL.length)];
+        // Tenta buscar um usuário aleatório do banco
+        const dbUser = await getRandomUser();
         
-        // Sincroniza com o Supabase para garantir que temos um perfil real
-        const syncedProfile = await syncUser(randomMock);
-        
-        if (syncedProfile) {
-          setUser(syncedProfile);
+        if (dbUser) {
+          console.log(`Usuário real encontrado: ${dbUser.display_name || dbUser.username || dbUser.email}`);
+          setUser(dbUser);
         } else {
-          setUser(randomMock);
+          console.warn('Nenhum usuário encontrado no banco. Fallback para mock necessário para inicialização.');
+          // Fallback mínimo se o banco estiver vazio para não quebrar o app
+          const defaultUser = { 
+            id: 1, 
+            displayName: 'Admin User', 
+            email: 'cardumyapp@gmail.com',
+            photoURL: 'https://i.pravatar.cc/150?u=admin'
+          };
+          const synced = await syncUser(defaultUser);
+          setUser(synced || defaultUser);
         }
       } catch (error) {
         console.error('Erro ao configurar sessão de teste:', error);

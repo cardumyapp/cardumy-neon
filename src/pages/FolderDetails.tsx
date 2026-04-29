@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../components/AuthProvider';
+import { useNotification } from '../components/NotificationProvider';
 import { 
   getBinderWithCards, 
   getListCards, 
@@ -26,6 +27,7 @@ export const FolderDetails: React.FC = () => {
   const [searchParams] = useSearchParams();
   const ownerId = searchParams.get('user');
   const { user: currentUser } = useAuth();
+  const { showNotification } = useNotification();
   const navigate = useNavigate();
   const [folder, setFolder] = useState<any>(null);
   const [cards, setCards] = useState<BinderCard[]>([]);
@@ -121,9 +123,11 @@ export const FolderDetails: React.FC = () => {
       } else {
         await removeCardFromBinder(folderId, card.dbId);
       }
+      showNotification(`${card.name} removido de ${folder.name}`, 'info');
       setCards(prev => prev.filter(c => c.dbId !== card.dbId));
     } catch (error) {
-      alert('Erro ao remover carta.');
+      console.error('Error removing card:', error);
+      showNotification('Erro ao remover carta', 'error');
     }
   };
 
@@ -149,9 +153,10 @@ export const FolderDetails: React.FC = () => {
       setCards(prev => prev.map(c => 
         c.dbId === card.dbId ? { ...c, quantity: newQuantity } : c
       ));
+      showNotification(`Quantidade de ${card.name} atualizada para ${newQuantity}`, 'success');
     } catch (error) {
       console.error('Error updating quantity:', error);
-      alert('Erro ao atualizar quantidade.');
+      showNotification('Erro ao atualizar quantidade', 'error');
     }
   };
 
@@ -162,9 +167,11 @@ export const FolderDetails: React.FC = () => {
     setIsDeletingBinder(true);
     try {
       await deleteBinder(currentUser.id, folderId);
+      showNotification(`Pasta "${folder.name}" excluída com sucesso`, 'info');
       navigate('/pastas');
     } catch (error) {
-      alert('Erro ao excluir pasta.');
+      console.error('Error deleting binder:', error);
+      showNotification('Erro ao excluir pasta', 'error');
       setIsDeletingBinder(false);
     }
   };

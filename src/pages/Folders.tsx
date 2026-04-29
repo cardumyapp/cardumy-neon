@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../components/AuthProvider';
+import { useNotification } from '../components/NotificationProvider';
 import { getBinders, createBinder, getFoldersStats } from '../services/supabaseService';
 import { GAMES } from '../constants';
 import { useNavigate } from 'react-router-dom';
@@ -20,6 +21,7 @@ interface Folder {
 
 export const FoldersPage: React.FC = () => {
   const { user, isOffline } = useAuth();
+  const { showNotification } = useNotification();
   const navigate = useNavigate();
   const [folders, setFolders] = useState<Folder[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -75,9 +77,15 @@ export const FoldersPage: React.FC = () => {
   const handleCreateBinder = async () => {
     if (!user || !newFolderName.trim() || !selectedGameId) return;
     const game = dbGames.find(g => g.id.toString() === selectedGameId);
-    await createBinder(user.id, newFolderName, selectedGameId, game?.name || '');
-    setIsModalOpen(false);
-    setNewFolderName('');
+    try {
+      await createBinder(user.id, newFolderName, selectedGameId, game?.name || '');
+      showNotification(`Pasta "${newFolderName}" criada com sucesso!`, 'success');
+      setIsModalOpen(false);
+      setNewFolderName('');
+    } catch (err) {
+      console.error('Error creating binder:', err);
+      showNotification('Erro ao criar pasta', 'error');
+    }
   };
 
   return (

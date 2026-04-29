@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { GameType, Card } from '../types';
 import { useAuth } from '../components/AuthProvider';
+import { useNotification } from '../components/NotificationProvider';
 import { addCardToList, searchExternalCards, getBinders, addCardToBinder } from '../services/supabaseService';
 
 interface Folder {
@@ -40,6 +41,7 @@ const DetailField: React.FC<{
 
 export const Search: React.FC<SearchProps> = ({ activeGame }) => {
   const { user } = useAuth();
+  const { showNotification } = useNotification();
   const [searchQuery, setSearchQuery] = useState('');
   const [addingToFolder, setAddingToFolder] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
@@ -100,10 +102,12 @@ export const Search: React.FC<SearchProps> = ({ activeGame }) => {
       } else {
         await addCardToList(user.id, folder.listType, card);
       }
+      showNotification(`${card.name} adicionado à ${folder.name}`, 'success');
       setLastAdded({ cardId: card.id, folderName: folder.name });
       setTimeout(() => setLastAdded(null), 3000);
     } catch (err) {
       console.error('Error adding card:', err);
+      showNotification('Erro ao adicionar carta', 'error');
     }
   };
 

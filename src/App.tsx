@@ -24,6 +24,7 @@ import { EditProfile } from './pages/EditProfile';
 import { Product, CartItem, GameType } from './types';
 import { GAMES } from './constants';
 import { AuthProvider, useAuth } from './components/AuthProvider';
+import { NotificationProvider } from './components/NotificationProvider';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
 import { getCardgames } from './services/supabaseService';
@@ -352,9 +353,11 @@ const App: React.FC = () => {
   return (
     <ErrorBoundary>
       <AuthProvider>
-        <Router>
-          <AppContent />
-        </Router>
+        <NotificationProvider>
+          <Router>
+            <AppContent />
+          </Router>
+        </NotificationProvider>
       </AuthProvider>
     </ErrorBoundary>
   );

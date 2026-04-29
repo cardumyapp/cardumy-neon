@@ -101,12 +101,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ activeGame }) => {
             A central definitiva para gerenciar coleções e dominar o meta de {activeGame === 'All' ? 'qualquer TCG' : activeGame}.
           </p>
           <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-4 pt-2">
-             <button className="bg-purple-600 hover:bg-purple-700 text-white font-black px-8 py-3.5 rounded-2xl transition-all shadow-lg shadow-purple-600/20 active:scale-95 text-sm md:text-base">
+             <Link to="/pastas/colecao" className="bg-purple-600 hover:bg-purple-700 text-white font-black px-8 py-3.5 rounded-2xl transition-all shadow-lg shadow-purple-600/20 active:scale-95 text-sm md:text-base flex items-center justify-center">
                Minha Coleção
-             </button>
-             <button className="bg-slate-800 hover:bg-slate-700 text-white font-black px-8 py-3.5 rounded-2xl transition-all border border-white/5 active:scale-95 text-sm md:text-base">
+             </Link>
+             <Link to="/deckbuilder" className="bg-slate-800 hover:bg-slate-700 text-white font-black px-8 py-3.5 rounded-2xl transition-all border border-white/5 active:scale-95 text-sm md:text-base flex items-center justify-center">
                Novo Deck
-             </button>
+             </Link>
           </div>
         </div>
         
