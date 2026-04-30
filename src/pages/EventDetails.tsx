@@ -3,6 +3,7 @@ import React from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { Product } from '../types';
+import { useAuth } from '../components/AuthProvider';
 
 interface EventDetailsProps {
   onAddToCart: (product: Product) => void;
@@ -10,6 +11,8 @@ interface EventDetailsProps {
 
 export const EventDetails: React.FC<EventDetailsProps> = ({ onAddToCart }) => {
   const { id } = useParams();
+  const { user } = useAuth();
+  const isLojista = user?.role_id === 6;
 
   // Mock event data
   const event = {
@@ -80,13 +83,21 @@ export const EventDetails: React.FC<EventDetailsProps> = ({ onAddToCart }) => {
              </div>
 
              <div className="space-y-3">
-                <button 
-                  onClick={() => onAddToCart({ id: event.id!, name: event.name, price: event.price, type: 'Ingresso' } as any)}
-                  className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-black py-4 rounded-xl shadow-xl shadow-purple-600/20 transition-all active:scale-95 flex items-center justify-center space-x-3"
-                >
-                  <i className="fas fa-ticket text-sm"></i>
-                  <span>Garantir Vaga</span>
-                </button>
+                {!isLojista ? (
+                  <button 
+                    onClick={() => onAddToCart({ id: event.id!, name: event.name, price: event.price, type: 'Ingresso' } as any)}
+                    className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-black py-4 rounded-xl shadow-xl shadow-purple-600/20 transition-all active:scale-95 flex items-center justify-center space-x-3"
+                  >
+                    <i className="fas fa-ticket text-sm"></i>
+                    <span>Garantir Vaga</span>
+                  </button>
+                ) : (
+                  <div className="bg-slate-800/50 border border-slate-700/50 p-4 rounded-xl text-center">
+                    <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">
+                      Contas lojistas não podem adquirir ingressos.
+                    </p>
+                  </div>
+                )}
                 <div className="flex items-center justify-center space-x-2 text-[10px] text-slate-500 font-bold uppercase tracking-widest">
                    <i className="fas fa-lock"></i>
                    <span>Pagamento 100% Seguro</span>

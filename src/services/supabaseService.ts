@@ -10,7 +10,7 @@ export const getProducts = (callback: (products: any[]) => void) => {
   const fetchProducts = async () => {
     const { data, error } = await supabase
       .from('products')
-      .select('*')
+      .select('*, cardgames(name), product_types(name)')
       .order('created_at', { ascending: false });
     
     if (error) {
@@ -32,6 +32,24 @@ export const getProducts = (callback: (products: any[]) => void) => {
   return () => {
     supabase.removeChannel(subscription);
   };
+};
+
+export const getPrimaryAddress = async () => {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
+    
+    const response = await fetch('/api/user/address/primary', {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+    if (!response.ok) return null;
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching primary address:', error);
+    return null;
+  }
 };
 
 export const getStores = (callback: (stores: any[]) => void) => {
@@ -727,12 +745,18 @@ export const getStoreHours = async (storeId: string) => {
   }
 };
 
-export const updateStoreStock = async (store_id: string | number, card_id: number | string, quantity: number) => {
+export const updateStoreStock = async (store_id: string | number, product_id: number | string, quantity: number, price?: number, pre_sale?: boolean) => {
   try {
     const response = await fetch('/api/lojas/estoque/update', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ store_id, card_id, quantity })
+      body: JSON.stringify({ 
+        store_id, 
+        product_id, 
+        quantity,
+        store_price: price,
+        pre_sale
+      })
     });
     if (!response.ok) throw new Error('Failed to update store stock');
     return await response.json();
@@ -1124,7 +1148,7 @@ export const getProductTypes = async (gameId?: string | number) => {
 
 export const getProductsByFilters = async (filters: { game_id?: string | number, product_type_id?: string | number }) => {
   try {
-    let query = supabase.from('products').select('*');
+    let query = supabase.from('products').select('*, cardgames(name), product_types(name)');
     if (filters.game_id && filters.game_id !== 'all') query = query.eq('game_id', filters.game_id);
     if (filters.product_type_id && filters.product_type_id !== 'all') query = query.eq('product_type_id', filters.product_type_id);
     

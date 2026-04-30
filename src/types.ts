@@ -29,17 +29,43 @@ export interface Product {
   id: string;
   slug: string;
   name: string;
-  type: ProductType;
-  price: number;
+  beauty_name?: string;
+  description?: string;
+  type?: string;
+  product_type_id?: number | string;
+  price?: number;
+  mspr?: number;
   originalPrice?: number;
-  imageUrl: string;
-  storeName: string;
-  storeId: string;
+  imageUrl?: string;
+  image_url?: string;
+  storeName?: string;
+  storeId?: string;
+  store_id?: string;
   storeHandle?: string;
   storeLogo?: string;
-  isOfficialPartner: boolean;
-  game?: GameType;
+  isOfficialPartner?: boolean;
+  is_official?: boolean;
+  is_sponsored?: boolean;
+  game?: GameType | string;
+  game_id?: number | string;
   stock?: number;
+  release_date?: string;
+  prerelease?: boolean;
+  ext_link?: string;
+  weight?: number;
+}
+
+export interface UserAddress {
+  id: string;
+  user_id: string;
+  street: string;
+  number: string;
+  complement?: string;
+  neighborhood: string;
+  city: string;
+  state: string;
+  zip_code: string;
+  is_primary: boolean;
 }
 
 export interface CartItem extends Product {

@@ -23,7 +23,8 @@ const DAY_ORDER = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 
 export const StoreProfile: React.FC<StoreProfileProps> = ({ onAddToCart }) => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { isOffline } = useAuth();
+  const { isOffline, user } = useAuth();
+  const isLojista = user?.role_id === 6;
   
   const [store, setStore] = useState<Store | null>(null);
   const [storeEvents, setStoreEvents] = useState<StoreEvent[]>([]);
@@ -486,12 +487,14 @@ export const StoreProfile: React.FC<StoreProfileProps> = ({ onAddToCart }) => {
                               {highlightedEvent.description}
                            </p>
                            <div className="flex flex-col sm:flex-row items-center space-y-3 sm:space-y-0 sm:space-x-4 pt-2">
-                             <button 
-                               onClick={() => handleBuyTicket(highlightedEvent)}
-                               className="w-full sm:w-auto bg-gradient-to-r from-purple-600 to-pink-600 text-white font-black px-10 py-3.5 rounded-xl shadow-lg active:scale-95 text-sm"
-                             >
-                               Participar agora
-                             </button>
+                             {!isLojista && (
+                               <button 
+                                 onClick={() => handleBuyTicket(highlightedEvent)}
+                                 className="w-full sm:w-auto bg-gradient-to-r from-purple-600 to-pink-600 text-white font-black px-10 py-3.5 rounded-xl shadow-lg active:scale-95 text-sm"
+                               >
+                                 Participar agora
+                               </button>
+                             )}
                            </div>
                         </div>
                     </div>
@@ -621,12 +624,14 @@ export const StoreProfile: React.FC<StoreProfileProps> = ({ onAddToCart }) => {
                          </div>
                          <div className="flex justify-between items-center pt-2">
                            <p className="text-sm font-black text-white">R$ {p.price}</p>
-                           <button 
-                             onClick={() => onAddToCart(p)}
-                             className="w-8 h-8 bg-emerald-600 text-white rounded-lg flex items-center justify-center transition-all active:scale-90"
-                           >
-                             <i className="fas fa-plus text-xs"></i>
-                           </button>
+                           {!isLojista && (
+                             <button 
+                               onClick={() => onAddToCart(p)}
+                               className="w-8 h-8 bg-emerald-600 text-white rounded-lg flex items-center justify-center transition-all active:scale-90"
+                             >
+                               <i className="fas fa-plus text-xs"></i>
+                             </button>
+                           )}
                          </div>
                        </div>
                      </div>

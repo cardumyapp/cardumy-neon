@@ -1,7 +1,8 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { getProducts, getCardgames, getProductTypes } from '../services/supabaseService';
+import { getProducts, getCardgames, getProductTypes, updateStoreStock } from '../services/supabaseService';
 import { ProductType, Product, GameType } from '../types';
 import { useAuth } from '../components/AuthProvider';
+import { useNotification } from '../components/NotificationProvider';
 import { OfflineWarning } from '../components/OfflineWarning';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -13,7 +14,9 @@ interface ProductsProps {
 type SortOption = 'newest' | 'price_asc' | 'price_desc' | 'relevance';
 
 export const Products: React.FC<ProductsProps> = ({ onAddToCart, activeGame }) => {
-  const { isOffline } = useAuth();
+  const { isOffline, user } = useAuth();
+  const { showNotification } = useNotification();
+  const isLojista = user?.role_id === 6;
   const [selectedSlug, setSelectedSlug] = useState<string | null>(null);
   const [dbGames, setDbGames] = useState<any[]>([]);
   const [dbProductTypes, setDbProductTypes] = useState<any[]>([]);
@@ -25,7 +28,35 @@ export const Products: React.FC<ProductsProps> = ({ onAddToCart, activeGame }) =
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [store, setStore] = useState<any>(null);
   const itemsPerPage = 12;
+
+  useEffect(() => {
+    if (isLojista && user?.username) {
+        fetch(`/api/lojas/${user.username}`)
+            .then(r => r.json())
+            .then(d => setStore(d.store))
+            .catch(e => console.error("Error fetching store:", e));
+    }
+  }, [isLojista, user?.username]);
+
+  const handleAddToStock = async (product: any) => {
+    if (!store?.id) {
+        showNotification("Loja não encontrada para sua conta.", "error");
+        return;
+    }
+
+    try {
+        const res = await updateStoreStock(store.id, product.id, 1, product.price || 0, false);
+        if (res && res.status === 'ok') {
+            showNotification(`${product.name} adicionado ao seu estoque!`, "success");
+        } else {
+            throw new Error("Falha ao atualizar estoque");
+        }
+    } catch (err: any) {
+        showNotification(err.message, "error");
+    }
+  };
 
   // Filter product types based on the selected game
   const visibleProductTypes = useMemo(() => {
@@ -70,7 +101,7 @@ export const Products: React.FC<ProductsProps> = ({ onAddToCart, activeGame }) =
       imageUrl: p.image_url || p.imageUrl || 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&q=80&w=400',
       name: p.beauty_name || p.name,
       price: p.msrp || p.price || 0,
-      type: p.product_type || p.type
+      type: p.product_types?.name || p.product_type || p.type
     }));
   }, [products]);
 
@@ -158,11 +189,40 @@ export const Products: React.FC<ProductsProps> = ({ onAddToCart, activeGame }) =
                 {selectedBaseProduct.game || 'TCG'}
               </span>
               <h2 className="text-3xl md:text-4xl font-black text-white uppercase leading-tight">{selectedBaseProduct.name}</h2>
+              
               <div className="flex flex-wrap gap-2 justify-center md:justify-start">
                 <span className="px-3 py-1 bg-slate-800 rounded-lg text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                   {selectedBaseProduct.type}
                 </span>
+                {selectedBaseProduct.release_date && (
+                   <span className="px-3 py-1 bg-slate-800 rounded-lg text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                     Lançamento: {new Date(selectedBaseProduct.release_date).toLocaleDateString('pt-BR')}
+                   </span>
+                )}
+                {selectedBaseProduct.msrp && (
+                   <span className="px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-[10px] font-bold text-emerald-400 uppercase tracking-wider">
+                     MSRP: R$ {Number(selectedBaseProduct.msrp).toFixed(2)}
+                   </span>
+                )}
               </div>
+
+              {selectedBaseProduct.description && (
+                <p className="text-sm text-slate-400 leading-relaxed max-w-2xl">
+                  {selectedBaseProduct.description}
+                </p>
+              )}
+
+              {selectedBaseProduct.ext_link && (
+                <a 
+                  href={selectedBaseProduct.ext_link} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center space-x-2 text-xs font-black text-purple-400 hover:text-purple-300 transition-colors uppercase tracking-widest"
+                >
+                  <i className="fas fa-external-link-alt"></i>
+                  <span>Mais informações oficiais</span>
+                </a>
+              )}
             </div>
           </div>
         </div>
@@ -170,11 +230,19 @@ export const Products: React.FC<ProductsProps> = ({ onAddToCart, activeGame }) =
         <div className="space-y-4">
           <div className="flex items-center justify-between px-2">
             <h3 className="text-sm font-black text-slate-500 uppercase tracking-widest">Ofertas Disponíveis</h3>
+            {isLojista && (
+                <button 
+                  onClick={() => handleAddToStock(selectedBaseProduct)}
+                  className="bg-purple-600 hover:bg-purple-500 text-white text-[10px] font-black px-4 py-2 rounded-xl transition-all uppercase tracking-widest shadow-lg shadow-purple-600/20"
+                >
+                  Adicionar ao meu estoque
+                </button>
+            )}
             <span className="text-[10px] font-bold text-slate-600 uppercase">{productOffers.length} {productOffers.length === 1 ? 'vendedor' : 'vendedores'}</span>
           </div>
           <div className="space-y-3">
             {productOffers.map((offer) => (
-              <OfferRow key={offer.id} offer={offer} onAddToCart={onAddToCart} />
+              <OfferRow key={offer.id} offer={offer} onAddToCart={onAddToCart} isLojista={isLojista} />
             ))}
           </div>
         </div>
@@ -415,8 +483,16 @@ export const Products: React.FC<ProductsProps> = ({ onAddToCart, activeGame }) =
                             <span className="text-[8px] font-bold text-slate-600 uppercase">A partir de</span>
                             <span className="text-sm font-black text-emerald-400">R$ {(product.price || 0).toFixed(2)}</span>
                           </div>
-                          <div className="w-9 h-9 rounded-xl bg-slate-800 flex items-center justify-center text-slate-500 group-hover:bg-purple-600 group-hover:text-white transition-all shadow-inner group-hover:rotate-90">
-                            <i className="fas fa-plus text-[10px]"></i>
+                          <div 
+                            onClick={(e) => {
+                                if (isLojista) {
+                                    e.stopPropagation();
+                                    handleAddToStock(product);
+                                }
+                            }}
+                            className="w-9 h-9 rounded-xl bg-slate-800 flex items-center justify-center text-slate-500 group-hover:bg-purple-600 group-hover:text-white transition-all shadow-inner group-hover:rotate-90"
+                          >
+                            <i className={`fas ${isLojista ? 'fa-box-archive' : 'fa-plus'} text-[10px]`}></i>
                           </div>
                         </div>
                       </div>
@@ -508,7 +584,7 @@ const FilterButton: React.FC<{ isActive: boolean; onClick: () => void; label: st
   </button>
 );
 
-const OfferRow: React.FC<{ offer: Product; onAddToCart: (p: Product) => void }> = ({ offer, onAddToCart }) => {
+const OfferRow: React.FC<{ offer: Product; onAddToCart: (p: Product) => void; isLojista: boolean }> = ({ offer, onAddToCart, isLojista }) => {
   return (
     <motion.div 
       initial={{ opacity: 0, x: -10 }}
@@ -535,17 +611,19 @@ const OfferRow: React.FC<{ offer: Product; onAddToCart: (p: Product) => void }> 
           <span className="text-[10px] font-bold text-slate-500 uppercase leading-none mb-1">Preço Unitário</span>
           <span className="text-2xl font-black text-emerald-400">R$ {(offer.price || 0).toFixed(2)}</span>
         </div>
-        <button 
-          onClick={() => onAddToCart({ ...offer, quantity: 1 } as any)}
-          disabled={offer.stock === 0}
-          className={`px-10 py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest transition-all shadow-xl active:scale-95 ${
-            offer.stock === 0 
-            ? 'bg-slate-800 text-slate-500 cursor-not-allowed' 
-            : 'bg-purple-600 hover:bg-purple-500 text-white shadow-[0_10px_25px_-5px_rgba(139,92,246,0.3)]'
-          }`}
-        >
-          {offer.stock === 0 ? 'Esgotado' : (offer.type === 'Ingresso' ? 'Garantir Vaga' : 'Adicionar')}
-        </button>
+        {!isLojista && (
+          <button 
+            onClick={() => onAddToCart({ ...offer, quantity: 1 } as any)}
+            disabled={offer.stock === 0}
+            className={`px-10 py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest transition-all shadow-xl active:scale-95 ${
+              offer.stock === 0 
+              ? 'bg-slate-800 text-slate-500 cursor-not-allowed' 
+              : 'bg-purple-600 hover:bg-purple-500 text-white shadow-[0_10px_25px_-5px_rgba(139,92,246,0.3)]'
+            }`}
+          >
+            {offer.stock === 0 ? 'Esgotado' : (offer.type === 'Ingresso' ? 'Garantir Vaga' : 'Adicionar')}
+          </button>
+        )}
       </div>
     </motion.div>
   );

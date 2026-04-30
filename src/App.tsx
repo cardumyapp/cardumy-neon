@@ -21,6 +21,7 @@ import { Tournaments } from './pages/Tournaments';
 import { Social } from './pages/Social';
 import { AdminStats } from './pages/AdminStats';
 import { EditProfile } from './pages/EditProfile';
+import { ManageStock } from './pages/ManageStock';
 import { Product, CartItem, GameType } from './types';
 import { GAMES } from './constants';
 import { AuthProvider, useAuth } from './components/AuthProvider';
@@ -250,6 +251,7 @@ const AppContent: React.FC = () => {
           <SidebarGroup label="Mercado" collapsed={isSidebarCollapsed}>
             {!isLojista && <SidebarItem to="/carrinho" icon="fa-shopping-cart" label="Carrinho" active={location.pathname === '/carrinho'} badge={cartCount} collapsed={isSidebarCollapsed} />}
             <SidebarItem to="/lojas" icon="fa-shop" label="Lojas" active={location.pathname === '/lojas' || location.pathname.startsWith('/loja/')} collapsed={isSidebarCollapsed} />
+            {isLojista && <SidebarItem to="/meu-estoque" icon="fa-boxes-stacked" label="Gerenciar Estoque" active={location.pathname === '/meu-estoque'} collapsed={isSidebarCollapsed} />}
             <SidebarItem to="/pedidos" icon="fa-clipboard-list" label="Pedidos" active={location.pathname === '/pedidos' || location.pathname.startsWith('/pedido/')} collapsed={isSidebarCollapsed} />
             <SidebarItem to="/produtos" icon="fa-bag-shopping" label="Produtos" active={location.pathname === '/produtos'} collapsed={isSidebarCollapsed} />
           </SidebarGroup>
@@ -366,6 +368,7 @@ const AppContent: React.FC = () => {
             <Route path="/comunidade" element={<Social />} />
             <Route path="/pedidos" element={<Orders />} />
             <Route path="/pedido/:id" element={<OrderDetails />} />
+            <Route path="/meu-estoque" element={<ManageStock />} />
             <Route path="/carrinho" element={<CartPage cart={cart} updateQuantity={updateQuantity} removeFromCart={removeFromCart} />} />
             <Route path="/suporte" element={<SupportPage />} />
             <Route path="/admin/stats" element={<AdminStats />} />

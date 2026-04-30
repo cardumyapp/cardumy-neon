@@ -1,8 +1,10 @@
 
-import React from 'react';
-import { CartItem } from '../types';
+import React, { useEffect, useState } from 'react';
+import { CartItem, UserAddress } from '../types';
 import { motion } from 'motion/react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../components/AuthProvider';
+import { getPrimaryAddress } from '../services/supabaseService';
 
 interface CartPageProps {
   cart: CartItem[];
@@ -11,7 +13,32 @@ interface CartPageProps {
 }
 
 export const CartPage: React.FC<CartPageProps> = ({ cart, updateQuantity, removeFromCart }) => {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const [address, setAddress] = useState<UserAddress | null>(null);
+  const isLojista = user?.role_id === 6;
   const total = cart.reduce((acc, item) => acc + ((item.price || 0) * (item.quantity || 0)), 0);
+
+  useEffect(() => {
+    if (isLojista) {
+      navigate('/');
+    } else if (user) {
+      getPrimaryAddress().then(setAddress);
+    }
+  }, [isLojista, navigate, user]);
+
+  if (isLojista) return null;
+
+  const cartByStore = cart.reduce((groups, item) => {
+    const storeId = item.storeId || item.store_id || 'unknown';
+    const storeName = item.storeName || 'Marketplace';
+    if (!groups[storeId]) {
+      groups[storeId] = { name: storeName, items: [], total: 0 };
+    }
+    groups[storeId].items.push(item);
+    groups[storeId].total += (Number(item.price) || 0) * (item.quantity || 1);
+    return groups;
+  }, {} as Record<string, { name: string, items: CartItem[], total: number }>);
 
   return (
     <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in duration-500">
@@ -24,48 +51,93 @@ export const CartPage: React.FC<CartPageProps> = ({ cart, updateQuantity, remove
 
       {cart.length > 0 ? (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-2 space-y-4">
-            {cart.map((item) => (
-              <motion.div 
-                layout
-                key={item.id} 
-                className="bg-slate-900/50 border border-slate-800 p-4 rounded-2xl flex items-center gap-4 group hover:border-purple-500/30 transition-colors"
-              >
-                <div className="w-20 h-20 rounded-xl overflow-hidden bg-slate-800 shrink-0">
-                  <img 
-                    src={item.imageUrl || (item as any).image_url || 'https://via.placeholder.com/150'} 
-                    alt={item.name} 
-                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                  />
+          <div className="lg:col-span-2 space-y-8">
+            {address && (
+              <div className="bg-slate-900/40 border border-slate-800 p-6 rounded-3xl space-y-4">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-sm font-black text-white uppercase tracking-widest flex items-center">
+                    <i className="fas fa-truck-fast text-purple-400 mr-2"></i>
+                    Endereço de Entrega
+                  </h2>
+                  <Link to="/perfil/editar" className="text-[10px] font-bold text-slate-500 hover:text-purple-400 uppercase tracking-widest">
+                    Alterar
+                  </Link>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-bold text-white truncate">{item.name}</h3>
-                  <p className="text-sm text-slate-500 font-medium">R$ {(Number(item.price) || 0).toFixed(2)} / un</p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center bg-slate-950 rounded-lg border border-slate-800">
-                    <button 
-                      onClick={() => updateQuantity(item.id, -1)}
-                      className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800 rounded-l-lg transition-colors"
-                    >
-                      <i className="fas fa-minus text-[10px]"></i>
-                    </button>
-                    <span className="w-8 text-center text-xs font-bold text-white">{item.quantity}</span>
-                    <button 
-                      onClick={() => updateQuantity(item.id, 1)}
-                      className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800 rounded-r-lg transition-colors"
-                    >
-                      <i className="fas fa-plus text-[10px]"></i>
-                    </button>
+                <div className="flex items-start space-x-3">
+                  <div className="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center text-slate-400 shrink-0">
+                    <i className="fas fa-location-dot"></i>
                   </div>
-                  <button 
-                    onClick={() => removeFromCart(item.id)}
-                    className="w-10 h-10 flex items-center justify-center text-slate-500 hover:text-red-400 hover:bg-red-400/10 rounded-xl transition-all"
-                  >
-                    <i className="fas fa-trash-can text-sm"></i>
-                  </button>
+                  <div>
+                    <p className="text-white font-bold text-sm">
+                      {address.street}, {address.number}
+                      {address.complement && ` - ${address.complement}`}
+                    </p>
+                    <p className="text-slate-500 text-xs">
+                      {address.neighborhood}, {address.city} - {address.state}
+                    </p>
+                    <p className="text-slate-500 text-xs mt-1">CEP: {address.zip_code}</p>
+                  </div>
                 </div>
-              </motion.div>
+              </div>
+            )}
+
+            {Object.entries(cartByStore).map(([storeId, storeGroup]) => (
+              <div key={storeId} className="space-y-4">
+                <div className="flex items-center justify-between px-2">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-8 h-8 rounded-lg bg-purple-600/20 flex items-center justify-center border border-purple-500/20">
+                      <i className="fas fa-shop text-xs text-purple-400"></i>
+                    </div>
+                    <span className="text-sm font-black text-white uppercase tracking-widest">{storeGroup.name}</span>
+                  </div>
+                  <span className="text-xs font-bold text-emerald-400">Subtotal: R$ {storeGroup.total.toFixed(2)}</span>
+                </div>
+                
+                <div className="space-y-3">
+                  {storeGroup.items.map((item) => (
+                    <motion.div 
+                      layout
+                      key={item.id} 
+                      className="bg-slate-900/50 border border-slate-800 p-4 rounded-2xl flex items-center gap-4 group hover:border-purple-500/30 transition-colors"
+                    >
+                      <div className="w-16 h-16 rounded-xl overflow-hidden bg-slate-800 shrink-0">
+                        <img 
+                          src={item.imageUrl || (item as any).image_url || 'https://via.placeholder.com/150'} 
+                          alt={item.name} 
+                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                        />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-bold text-white text-sm truncate">{item.name}</h3>
+                        <p className="text-xs text-slate-500 font-medium">R$ {(Number(item.price) || 0).toFixed(2)} / un</p>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center bg-slate-950 rounded-lg border border-slate-800 scale-90 md:scale-100">
+                          <button 
+                            onClick={() => updateQuantity(item.id, -1)}
+                            className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800 rounded-l-lg transition-colors"
+                          >
+                            <i className="fas fa-minus text-[10px]"></i>
+                          </button>
+                          <span className="w-8 text-center text-xs font-bold text-white">{item.quantity}</span>
+                          <button 
+                            onClick={() => updateQuantity(item.id, 1)}
+                            className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800 rounded-r-lg transition-colors"
+                          >
+                            <i className="fas fa-plus text-[10px]"></i>
+                          </button>
+                        </div>
+                        <button 
+                          onClick={() => removeFromCart(item.id)}
+                          className="w-8 h-8 flex items-center justify-center text-slate-500 hover:text-red-400 hover:bg-red-400/10 rounded-xl transition-all"
+                        >
+                          <i className="fas fa-trash-can text-sm"></i>
+                        </button>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              </div>
             ))}
           </div>
 
