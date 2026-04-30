@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../components/AuthProvider';
 import { useNotification } from '../components/NotificationProvider';
+import { updateStoreStock } from '../services/supabaseService';
 
 interface StockItem {
   id: number;
@@ -65,20 +66,9 @@ export const ManageStock: React.FC = () => {
     if (!store?.id) return;
 
     try {
-      const response = await fetch('/api/lojas/estoque/update', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          store_id: store.id,
-          product_id: productId,
-          quantity,
-          store_price: price,
-          pre_sale: preSale
-        })
-      });
-
-      const result = await response.json();
-      if (result.error) throw new Error(result.error);
+      const result = await updateStoreStock(store.id, productId, quantity, price, preSale);
+      
+      if (!result || result.error) throw new Error(result?.error || "Falha ao atualizar estoque");
 
       showNotification("Estoque atualizado com sucesso!", "success");
 

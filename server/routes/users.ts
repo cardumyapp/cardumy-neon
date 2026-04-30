@@ -1,7 +1,13 @@
 import express from "express";
 import { supabaseAdmin } from "../supabase.js";
 
+import { authenticate } from "../middleware/auth.js";
+
 const router = express.Router();
+
+router.get("/users/me", authenticate, async (req: any, res) => {
+  res.json(req.user);
+});
 
 router.post("/update-profile", async (req, res) => {
   if (!supabaseAdmin) return res.status(500).json({ error: "Supabase Admin not configured" });
@@ -224,6 +230,56 @@ router.get("/user/address/primary", async (req, res) => {
     const { data, error } = await supabaseAdmin.from('user_addresses').select('*').eq('user_id', user.id).eq('is_primary', true) .maybeSingle();
     if (error) throw error;
     res.json(data);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.get("/notifications", authenticate, async (req: any, res) => {
+  if (!supabaseAdmin) return res.status(500).json({ error: "Supabase not configured" });
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('notifications')
+      .select('*')
+      .eq('user_id', req.user.id)
+      .order('created_at', { ascending: false });
+    
+    if (error) throw error;
+    res.json(data);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.post("/notifications/:id/read", authenticate, async (req: any, res) => {
+  if (!supabaseAdmin) return res.status(500).json({ error: "Supabase not configured" });
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('notifications')
+      .update({ is_read: true })
+      .eq('id', req.params.id)
+      .eq('user_id', req.user.id)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    res.json(data);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.post("/notifications/read-all", authenticate, async (req: any, res) => {
+  if (!supabaseAdmin) return res.status(500).json({ error: "Supabase not configured" });
+  try {
+    const { error } = await supabaseAdmin
+      .from('notifications')
+      .update({ is_read: true })
+      .eq('user_id', req.user.id)
+      .eq('is_read', false);
+    
+    if (error) throw error;
+    res.json({ ok: true });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }

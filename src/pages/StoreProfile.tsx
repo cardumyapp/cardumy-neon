@@ -108,7 +108,7 @@ export const StoreProfile: React.FC<StoreProfileProps> = ({ onAddToCart }) => {
         if (realSchedule && realSchedule.length > 0) {
           mappedStore.schedule = realSchedule.map((s: any) => ({
             day: s.dia,
-            game: s.jogo as GameType,
+            game: (s.game_name || s.jogo) as GameType,
             time: s.horario,
             fee: s.valor_insc ? `R$ ${s.valor_insc}` : 'Gratuito'
           }));
@@ -271,9 +271,10 @@ export const StoreProfile: React.FC<StoreProfileProps> = ({ onAddToCart }) => {
 
   const sortedSchedule = useMemo(() => {
     if (!store || !store.schedule) return [];
-    return [...store.schedule].sort((a, b) => {
-      return DAY_ORDER.indexOf(a.day) - DAY_ORDER.indexOf(b.day);
-    });
+    return [...store.schedule]
+      .sort((a, b) => {
+        return DAY_ORDER.indexOf(a.day) - DAY_ORDER.indexOf(b.day);
+      });
   }, [store]);
 
   const highlightedEvent = useMemo(() => {

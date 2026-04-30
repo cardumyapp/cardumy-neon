@@ -515,6 +515,79 @@ export const removeCardFromBinder = async (binderId: string | number, cardId: st
   }
 };
 
+export const getMyStore = async () => {
+    try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return null;
+        const token = session.access_token;
+        
+        const response = await fetch('/api/lojas/minha', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!response.ok) return null;
+        return await response.json();
+    } catch (error) {
+        console.error('Error fetching my store:', error);
+        return null;
+    }
+};
+
+export const updateStoreInfo = async (storeId: any, updates: any) => {
+    try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const token = session?.access_token;
+
+        const response = await fetch(`/api/lojas/${storeId}`, {
+            method: 'PATCH',
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify(updates)
+        });
+        
+        if (!response.ok) throw new Error('Failed to update store info');
+        return true;
+    } catch (error) {
+        console.error('Error updating store info:', error);
+        return false;
+    }
+};
+
+export const addStoreSchedule = async (params: any) => {
+    try {
+        const response = await fetch('/api/lojas/semanais', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(params)
+        });
+        return response.ok;
+    } catch (error) {
+        console.error('Error adding store schedule:', error);
+        return false;
+    }
+};
+
+export const updateTournamentPoints = async (entryId: number, points: number) => {
+    try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const token = session?.access_token;
+        const response = await fetch(`/api/torneios/entries/${entryId}/points`, {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ points })
+        });
+        if (!response.ok) throw new Error('Failed to update tournament points');
+        return true;
+    } catch (error) {
+        console.error('Error updating tournament points:', error);
+        return false;
+    }
+};
+
 export const getGlobalStats = async () => {
   const stats = {
     users: 0,
@@ -550,6 +623,54 @@ export const getGlobalStats = async () => {
   } catch (e) { console.warn('Table orders not found or inaccessible'); }
 
   return stats;
+};
+
+export const getNotifications = async () => {
+    try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return [];
+        const token = session.access_token;
+        const response = await fetch('/api/notifications', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!response.ok) return [];
+        return await response.json();
+    } catch (error) {
+        console.error('Error fetching notifications:', error);
+        return [];
+    }
+};
+
+export const markNotificationAsRead = async (id: number | string) => {
+    try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return false;
+        const token = session.access_token;
+        const response = await fetch(`/api/notifications/${id}/read`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        return response.ok;
+    } catch (error) {
+        console.error('Error marking notification as read:', error);
+        return false;
+    }
+};
+
+export const markAllNotificationsAsRead = async () => {
+    try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return false;
+        const token = session.access_token;
+        const response = await fetch('/api/notifications/read-all', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        return response.ok;
+    } catch (error) {
+        console.error('Error marking all notifications as read:', error);
+        return false;
+    }
 };
 
 export const getUserProfile = async (userId: string | number) => {
@@ -747,9 +868,15 @@ export const getStoreHours = async (storeId: string) => {
 
 export const updateStoreStock = async (store_id: string | number, product_id: number | string, quantity: number, price?: number, pre_sale?: boolean) => {
   try {
-    const response = await fetch('/api/lojas/estoque/update', {
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
+
+    const response = await fetch('/api/lojas/estoque', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
       body: JSON.stringify({ 
         store_id, 
         product_id, 
@@ -868,6 +995,126 @@ export const getCardgames = async () => {
   } catch (error) {
     console.error('Error fetching cardgames:', error);
     return [];
+  }
+};
+
+export const getTournamentFormats = async () => {
+  try {
+    const { data, error } = await supabase
+      .from('tournament_formats')
+      .select('*')
+      .order('name', { ascending: true });
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching tournament formats:', error);
+    return [];
+  }
+};
+
+export const getMyTournaments = async () => {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
+    const response = await fetch('/api/meus-torneios', {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (!response.ok) throw new Error('Failed to fetch tournaments');
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching my tournaments:', error);
+    return [];
+  }
+};
+
+export const createTournament = async (tournamentData: any) => {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
+    const response = await fetch('/api/torneios', {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify(tournamentData)
+    });
+    if (!response.ok) throw new Error('Failed to create tournament');
+    return await response.json();
+  } catch (error) {
+    console.error('Error creating tournament:', error);
+    return { error: 'Failed to create tournament' };
+  }
+};
+
+export const startTournament = async (id: number | string) => {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
+    const response = await fetch(`/api/torneios/${id}/iniciar`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (!response.ok) throw new Error('Failed to start tournament');
+    return await response.json();
+  } catch (error) {
+    console.error('Error starting tournament:', error);
+    return { error: 'Failed to start tournament' };
+  }
+};
+
+export const getTournamentEntries = async (id: number | string) => {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
+    const response = await fetch(`/api/torneios/${id}/entries`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (!response.ok) throw new Error('Failed to fetch entries');
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching entries:', error);
+    return [];
+  }
+};
+
+export const updateEntryStatus = async (entryId: number | string, status: string) => {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
+    const response = await fetch(`/api/torneios/entries/${entryId}/status`, {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ status })
+    });
+    if (!response.ok) throw new Error('Failed to update entry status');
+    return await response.json();
+  } catch (error) {
+    console.error('Error updating entry status:', error);
+    return { error: 'Failed to update entry status' };
+  }
+};
+
+export const finalizeTournament = async (id: number | string, tops: { top1?: string; top2?: string; top3?: string }) => {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
+    const response = await fetch(`/api/torneios/${id}/finalizar`, {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify(tops)
+    });
+    if (!response.ok) throw new Error('Failed to finalize tournament');
+    return await response.json();
+  } catch (error) {
+    console.error('Error finalizing tournament:', error);
+    return { error: 'Failed to finalize tournament' };
   }
 };
 

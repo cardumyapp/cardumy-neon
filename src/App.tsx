@@ -22,13 +22,17 @@ import { Social } from './pages/Social';
 import { AdminStats } from './pages/AdminStats';
 import { EditProfile } from './pages/EditProfile';
 import { ManageStock } from './pages/ManageStock';
+import { ManageStore } from './pages/ManageStore';
+import { ManageTournaments } from './pages/ManageTournaments';
+import { ManageTournamentDetails } from './pages/ManageTournamentDetails';
+import { CreateTournament } from './pages/CreateTournament';
 import { Product, CartItem, GameType } from './types';
 import { GAMES } from './constants';
 import { AuthProvider, useAuth } from './components/AuthProvider';
 import { NotificationProvider } from './components/NotificationProvider';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
-import { getCardgames } from './services/supabaseService';
+import { getCardgames, getNotifications } from './services/supabaseService';
 
 const SidebarItem: React.FC<{ to: string; icon: string; label: string; active: boolean; collapsed: boolean; badge?: number; onClick?: () => void }> = ({ to, icon, label, active, collapsed, badge, onClick }) => (
   <Link 
@@ -74,6 +78,7 @@ const AppContent: React.FC = () => {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [dbGames, setDbGames] = useState<{id: any, name: string, slug?: string}[]>([]);
+  const [unreadNotifs, setUnreadNotifs] = useState(0);
 
   useEffect(() => {
     const fetchGames = async () => {
@@ -82,6 +87,20 @@ const AppContent: React.FC = () => {
     };
     fetchGames();
   }, []);
+
+  useEffect(() => {
+    const fetchUnread = async () => {
+      if (user) {
+        const notifs = await getNotifications();
+        setUnreadNotifs(notifs.filter((n: any) => !n.is_read).length);
+      }
+    };
+    fetchUnread();
+    
+    // Refresh every minute
+    const interval = setInterval(fetchUnread, 60000);
+    return () => clearInterval(interval);
+  }, [user, location.pathname]);
 
   useEffect(() => {
     setIsMobileMenuOpen(false);
@@ -252,6 +271,7 @@ const AppContent: React.FC = () => {
             {!isLojista && <SidebarItem to="/carrinho" icon="fa-shopping-cart" label="Carrinho" active={location.pathname === '/carrinho'} badge={cartCount} collapsed={isSidebarCollapsed} />}
             <SidebarItem to="/lojas" icon="fa-shop" label="Lojas" active={location.pathname === '/lojas' || location.pathname.startsWith('/loja/')} collapsed={isSidebarCollapsed} />
             {isLojista && <SidebarItem to="/meu-estoque" icon="fa-boxes-stacked" label="Gerenciar Estoque" active={location.pathname === '/meu-estoque'} collapsed={isSidebarCollapsed} />}
+            {isLojista && <SidebarItem to="/meus-torneios" icon="fa-trophy" label="Meus Torneios" active={location.pathname === '/meus-torneios' || location.pathname === '/novo-torneio'} collapsed={isSidebarCollapsed} />}
             <SidebarItem to="/pedidos" icon="fa-clipboard-list" label="Pedidos" active={location.pathname === '/pedidos' || location.pathname.startsWith('/pedido/')} collapsed={isSidebarCollapsed} />
             <SidebarItem to="/produtos" icon="fa-bag-shopping" label="Produtos" active={location.pathname === '/produtos'} collapsed={isSidebarCollapsed} />
           </SidebarGroup>
@@ -301,7 +321,11 @@ const AppContent: React.FC = () => {
           <div className="flex items-center space-x-3 md:space-x-6">
             <Link to="/notificacoes" className="relative p-2 rounded-xl hover:bg-slate-800 group">
               <i className="fas fa-bell text-slate-400 group-hover:text-purple-400"></i>
-              <span className="absolute top-0 right-0 w-2 h-2 bg-pink-600 rounded-full border border-slate-900"></span>
+              {unreadNotifs > 0 && (
+                <span className="absolute top-0 right-0 w-4 h-4 bg-pink-600 text-white text-[9px] flex items-center justify-center rounded-full border border-slate-900 font-bold animate-pulse">
+                  {unreadNotifs > 9 ? '9+' : unreadNotifs}
+                </span>
+              )}
             </Link>
             {!isLojista && (
               <Link to="/carrinho" className="relative p-2 rounded-xl hover:bg-slate-800 group">
@@ -332,6 +356,11 @@ const AppContent: React.FC = () => {
                   <Link to="/perfil" className="block w-full text-left px-4 py-2 text-xs font-bold text-slate-300 hover:bg-slate-800 rounded-lg transition-colors mb-1">
                     <i className="fas fa-user-circle mr-2"></i> Ver Perfil
                   </Link>
+                  {isLojista && (
+                    <Link to="/minha-loja" className="block w-full text-left px-4 py-2 text-xs font-bold text-purple-400 hover:bg-slate-800 rounded-lg transition-colors mb-1">
+                      <i className="fas fa-store mr-2"></i> Gerenciar Loja
+                    </Link>
+                  )}
                   <button onClick={logout} className="w-full text-left px-4 py-2 text-xs font-bold text-red-400 hover:bg-red-500/10 rounded-lg transition-colors">
                     <i className="fas fa-sign-out-alt mr-2"></i> Sair
                   </button>
@@ -369,6 +398,10 @@ const AppContent: React.FC = () => {
             <Route path="/pedidos" element={<Orders />} />
             <Route path="/pedido/:id" element={<OrderDetails />} />
             <Route path="/meu-estoque" element={<ManageStock />} />
+            <Route path="/minha-loja" element={<ManageStore />} />
+            <Route path="/meus-torneios" element={<ManageTournaments />} />
+            <Route path="/torneio/:id/gerenciar" element={<ManageTournamentDetails />} />
+            <Route path="/novo-torneio" element={<CreateTournament />} />
             <Route path="/carrinho" element={<CartPage cart={cart} updateQuantity={updateQuantity} removeFromCart={removeFromCart} />} />
             <Route path="/suporte" element={<SupportPage />} />
             <Route path="/admin/stats" element={<AdminStats />} />

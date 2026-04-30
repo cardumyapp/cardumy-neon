@@ -104,6 +104,53 @@ router.post("/cards/sync", async (req, res) => {
   }
 });
 
+router.post("/produtos/add_nogame", async (req, res) => {
+  if (!supabaseAdmin) return res.status(500).json({ error: "Supabase not configured" });
+  try {
+    const { name, slug, product_type, image_url, mspr } = req.body;
+    
+    if (!name || !slug) {
+      return res.status(400).json({ error: "Nome e slug são obrigatórios." });
+    }
+
+    // Attempt to find product_type_id if product_type (string name) is passed
+    let product_type_id = null;
+    if (product_type) {
+      if (!isNaN(Number(product_type))) {
+        product_type_id = Number(product_type);
+      } else {
+        const { data: typeData } = await supabaseAdmin
+          .from('product_types')
+          .select('id')
+          .eq('name', product_type)
+          .maybeSingle();
+        if (typeData) product_type_id = typeData.id;
+      }
+    }
+
+    const { data, error } = await supabaseAdmin
+      .from('products')
+      .insert({
+        game_id: null,
+        name,
+        slug,
+        product_type_id,
+        image_url,
+        mspr: mspr || null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .select('id')
+      .single();
+
+    if (error) throw error;
+    res.json({ success: true, id: data.id });
+  } catch (error: any) {
+    console.error("Erro ao inserir produto (add_nogame):", error);
+    res.status(500).json({ error: "Erro ao inserir produto", message: error.message });
+  }
+});
+
 router.get("/produtos", async (req, res) => {
   if (!supabaseAdmin) return res.status(500).json({ error: "Supabase not configured" });
   try {
@@ -169,7 +216,7 @@ router.get("/produtos/:id", async (req, res) => {
           )
         )
       `)
-      .eq('card_id', id)
+      .eq('product_id', id)
       .gt('quantity', 0)
       .order('store_price', { ascending: true });
     

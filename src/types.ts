@@ -161,6 +161,7 @@ export interface Store {
     day: string;
     time: string;
     fee?: string;
+    tipo?: string;
   }>;
   businessHours?: Array<{
     day_of_week: number;
