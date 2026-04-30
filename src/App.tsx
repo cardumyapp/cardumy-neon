@@ -164,6 +164,10 @@ const AppContent: React.FC = () => {
     setCart(prev => prev.filter(item => item.id !== id));
   };
 
+  const clearCart = () => {
+    setCart([]);
+  };
+
   return (
     <div className="flex h-screen overflow-hidden bg-slate-950 text-slate-200">
       {/* Mobile Sidebar Overlay */}
@@ -249,32 +253,45 @@ const AppContent: React.FC = () => {
         </div>
         
         <nav className="flex-1 px-4 py-4 overflow-y-auto scrollbar-hide">
-          <SidebarGroup label="Geral" collapsed={isSidebarCollapsed}>
-            {!isLojista && <SidebarItem to="/comunidade" icon="fa-users" label="Comunidade" active={location.pathname === '/comunidade'} collapsed={isSidebarCollapsed} />}
-            <SidebarItem to="/" icon="fa-house" label="Início" active={location.pathname === '/'} collapsed={isSidebarCollapsed} />
-            <SidebarItem to="/perfil" icon="fa-user" label="Perfil" active={location.pathname === '/perfil'} collapsed={isSidebarCollapsed} />
-            <SidebarItem to="/suporte" icon="fa-circle-question" label="Suporte" active={location.pathname === '/suporte'} collapsed={isSidebarCollapsed} />
-          </SidebarGroup>
+          {isLojista ? (
+            <div className="space-y-1">
+              <SidebarItem to="/" icon="fa-house" label="Dashboard" active={location.pathname === '/'} collapsed={isSidebarCollapsed} />
+              <SidebarItem to="/minha-loja" icon="fa-store" label="Dados da Loja" active={location.pathname === '/minha-loja'} collapsed={isSidebarCollapsed} />
+              <SidebarItem to="/meu-estoque" icon="fa-boxes-stacked" label="Meu Estoque" active={location.pathname === '/meu-estoque'} collapsed={isSidebarCollapsed} />
+              <SidebarItem to="/meus-torneios" icon="fa-trophy" label="Meus Torneios" active={location.pathname === '/meus-torneios' || location.pathname === '/novo-torneio' || location.pathname.includes('/gerenciar')} collapsed={isSidebarCollapsed} />
+              <SidebarItem to="/pedidos" icon="fa-clipboard-list" label="Pedidos" active={location.pathname === '/pedidos' || location.pathname.startsWith('/pedido/')} collapsed={isSidebarCollapsed} />
+              <SidebarItem to="/produtos" icon="fa-bag-shopping" label="Produtos" active={location.pathname === '/produtos'} collapsed={isSidebarCollapsed} />
+              <SidebarItem to="/perfil" icon="fa-user" label="Meu Perfil" active={location.pathname === '/perfil'} collapsed={isSidebarCollapsed} />
+              <SidebarItem to="/suporte" icon="fa-circle-question" label="Suporte" active={location.pathname === '/suporte'} collapsed={isSidebarCollapsed} />
+            </div>
+          ) : (
+            <>
+              <SidebarGroup label="Geral" collapsed={isSidebarCollapsed}>
+                <SidebarItem to="/comunidade" icon="fa-users" label="Comunidade" active={location.pathname === '/comunidade'} collapsed={isSidebarCollapsed} />
+                <SidebarItem to="/" icon="fa-house" label="Início" active={location.pathname === '/'} collapsed={isSidebarCollapsed} />
+                <SidebarItem to="/perfil" icon="fa-user" label="Perfil" active={location.pathname === '/perfil'} collapsed={isSidebarCollapsed} />
+                <SidebarItem to="/suporte" icon="fa-circle-question" label="Suporte" active={location.pathname === '/suporte'} collapsed={isSidebarCollapsed} />
+              </SidebarGroup>
 
-          <SidebarGroup label="Coleção" collapsed={isSidebarCollapsed}>
-            {!isLojista && <SidebarItem to="/busca" icon="fa-magnifying-glass" label="Cartas" active={location.pathname === '/busca'} collapsed={isSidebarCollapsed} />}
-            {!isLojista && <SidebarItem to="/deckbuilder" icon="fa-hammer" label="Deckbuilder" active={location.pathname === '/deckbuilder'} collapsed={isSidebarCollapsed} />}
-            {!isLojista && <SidebarItem to="/pastas" icon="fa-folder-open" label="Pastas" active={location.pathname === '/pastas'} collapsed={isSidebarCollapsed} />}
-            {!isLojista && <SidebarItem to="/trocas" icon="fa-right-left" label="Trocas" active={location.pathname === '/trocas'} collapsed={isSidebarCollapsed} />}
-          </SidebarGroup>
+              <SidebarGroup label="Coleção" collapsed={isSidebarCollapsed}>
+                <SidebarItem to="/busca" icon="fa-magnifying-glass" label="Cartas" active={location.pathname === '/busca'} collapsed={isSidebarCollapsed} />
+                <SidebarItem to="/deckbuilder" icon="fa-hammer" label="Deckbuilder" active={location.pathname === '/deckbuilder'} collapsed={isSidebarCollapsed} />
+                <SidebarItem to="/pastas" icon="fa-folder-open" label="Pastas" active={location.pathname === '/pastas'} collapsed={isSidebarCollapsed} />
+                <SidebarItem to="/trocas" icon="fa-right-left" label="Trocas" active={location.pathname === '/trocas'} collapsed={isSidebarCollapsed} />
+              </SidebarGroup>
 
-          <SidebarGroup label="Eventos" collapsed={isSidebarCollapsed}>
-            <SidebarItem to="/torneios" icon="fa-trophy" label="Torneios" active={location.pathname === '/torneios'} collapsed={isSidebarCollapsed} />
-          </SidebarGroup>
+              <SidebarGroup label="Eventos" collapsed={isSidebarCollapsed}>
+                <SidebarItem to="/torneios" icon="fa-trophy" label="Torneios" active={location.pathname === '/torneios'} collapsed={isSidebarCollapsed} />
+              </SidebarGroup>
 
-          <SidebarGroup label="Mercado" collapsed={isSidebarCollapsed}>
-            {!isLojista && <SidebarItem to="/carrinho" icon="fa-shopping-cart" label="Carrinho" active={location.pathname === '/carrinho'} badge={cartCount} collapsed={isSidebarCollapsed} />}
-            <SidebarItem to="/lojas" icon="fa-shop" label="Lojas" active={location.pathname === '/lojas' || location.pathname.startsWith('/loja/')} collapsed={isSidebarCollapsed} />
-            {isLojista && <SidebarItem to="/meu-estoque" icon="fa-boxes-stacked" label="Gerenciar Estoque" active={location.pathname === '/meu-estoque'} collapsed={isSidebarCollapsed} />}
-            {isLojista && <SidebarItem to="/meus-torneios" icon="fa-trophy" label="Meus Torneios" active={location.pathname === '/meus-torneios' || location.pathname === '/novo-torneio'} collapsed={isSidebarCollapsed} />}
-            <SidebarItem to="/pedidos" icon="fa-clipboard-list" label="Pedidos" active={location.pathname === '/pedidos' || location.pathname.startsWith('/pedido/')} collapsed={isSidebarCollapsed} />
-            <SidebarItem to="/produtos" icon="fa-bag-shopping" label="Produtos" active={location.pathname === '/produtos'} collapsed={isSidebarCollapsed} />
-          </SidebarGroup>
+              <SidebarGroup label="Mercado" collapsed={isSidebarCollapsed}>
+                <SidebarItem to="/carrinho" icon="fa-shopping-cart" label="Carrinho" active={location.pathname === '/carrinho'} badge={cartCount} collapsed={isSidebarCollapsed} />
+                <SidebarItem to="/lojas" icon="fa-shop" label="Lojas" active={location.pathname === '/lojas' || location.pathname.startsWith('/loja/')} collapsed={isSidebarCollapsed} />
+                <SidebarItem to="/pedidos" icon="fa-clipboard-list" label="Pedidos" active={location.pathname === '/pedidos' || location.pathname.startsWith('/pedido/')} collapsed={isSidebarCollapsed} />
+                <SidebarItem to="/produtos" icon="fa-bag-shopping" label="Produtos" active={location.pathname === '/produtos'} collapsed={isSidebarCollapsed} />
+              </SidebarGroup>
+            </>
+          )}
         </nav>
 
         {/* Social Links Sidebar - Only shown when NOT collapsed and NOT on small height */}
@@ -402,7 +419,7 @@ const AppContent: React.FC = () => {
             <Route path="/meus-torneios" element={<ManageTournaments />} />
             <Route path="/torneio/:id/gerenciar" element={<ManageTournamentDetails />} />
             <Route path="/novo-torneio" element={<CreateTournament />} />
-            <Route path="/carrinho" element={<CartPage cart={cart} updateQuantity={updateQuantity} removeFromCart={removeFromCart} />} />
+            <Route path="/carrinho" element={<CartPage cart={cart} updateQuantity={updateQuantity} removeFromCart={removeFromCart} clearCart={clearCart} />} />
             <Route path="/suporte" element={<SupportPage />} />
             <Route path="/admin/stats" element={<AdminStats />} />
           </Routes>

@@ -9,6 +9,35 @@ const generateTicket = () => {
     return randomBytes(4).toString('hex'); // 8 characters
 };
 
+router.get("/torneios/:id", async (req, res) => {
+    if (!supabaseAdmin) return res.status(500).json({ error: "Supabase not configured" });
+    try {
+        const { id } = req.params;
+        const { data, error } = await supabaseAdmin
+            .from('tournaments')
+            .select(`
+                *,
+                cardgames(name),
+                tournament_formats(name),
+                creator:users(id, username, codename, avatar),
+                tickets:tournament_tickets(
+                    *,
+                    product:products(
+                        *,
+                        stores:store_stock(store_id)
+                    )
+                )
+            `)
+            .eq('id', id)
+            .single();
+        
+        if (error) throw error;
+        res.json(data);
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 router.get("/torneios", async (req, res) => {
   if (!supabaseAdmin) return res.status(500).json({ error: "Supabase not configured" });
   try {
@@ -81,7 +110,10 @@ router.get("/torneios/:id", async (req, res) => {
 router.post("/torneios", authenticate, requireLojista, async (req: any, res) => {
     if (!supabaseAdmin) return res.status(500).json({ error: "Supabase not configured" });
     try {
-        const { name, cardgame_id, format_id, max_players, start_date, status, top1, top2, top3 } = req.body;
+        const { 
+            name, cardgame_id, format_id, max_players, start_date, status, top1, top2, top3,
+            has_ticket, ticket_price, sale_start, sale_end, ticket_quantity 
+        } = req.body;
         const ticket = generateTicket();
 
         const tournamentData: any = {
@@ -108,6 +140,83 @@ router.post("/torneios", authenticate, requireLojista, async (req: any, res) => 
             .single();
         
         if (error) throw error;
+
+        // TICKET LOGIC
+        if (has_ticket && ticket_price > 0) {
+            // 1. Find or Ensure Ticket Product Type
+            let ticketTypeId = null;
+            const { data: typeData } = await supabaseAdmin
+                .from('product_types')
+                .select('id')
+                .eq('name', 'Ingresso')
+                .maybeSingle();
+            
+            if (typeData) {
+                ticketTypeId = typeData.id;
+            } else {
+                const { data: newType } = await supabaseAdmin
+                    .from('product_types')
+                    .insert({ name: 'Ingresso' })
+                    .select('id')
+                    .single();
+                if (newType) ticketTypeId = newType.id;
+            }
+
+            // 2. Create Product (the Ticket)
+            const slugify = (text: string) => text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+            const productSlug = slugify(`${name}-ticket-${ticket}`);
+            
+            const { data: product, error: prodError } = await supabaseAdmin
+                .from('products')
+                .insert({
+                    name: `Ingresso - ${name}`,
+                    slug: productSlug,
+                    product_type_id: ticketTypeId,
+                    game_id: cardgame_id,
+                    mspr: ticket_price,
+                    image_url: 'https://images.unsplash.com/photo-1540317580384-e5d43616b9aa?auto=format&fit=crop&q=80&w=400',
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                })
+                .select('id')
+                .single();
+            
+            if (prodError) throw prodError;
+
+            // 3. Create Tournament Ticket Link
+            if (product) {
+                const { error: ticketRelError } = await supabaseAdmin
+                    .from('tournament_tickets')
+                    .insert({
+                        tournament_id: data.id,
+                        product_id: product.id,
+                        sale_start: sale_start || new Date().toISOString(),
+                        sale_end: sale_end || start_date,
+                        max_quantity: ticket_quantity || max_players,
+                        sold_quantity: 0,
+                        is_active: true
+                    });
+                
+                if (ticketRelError) console.error("Error creating tournament_tickets entry:", ticketRelError);
+
+                // 4. Add to Store Stock (The lojista's store)
+                const { data: store } = await supabaseAdmin
+                    .from('stores')
+                    .select('id')
+                    .eq('user_id', req.user.id)
+                    .single();
+                
+                if (store) {
+                    await supabaseAdmin.from('store_stock').insert({
+                        store_id: store.id,
+                        product_id: product.id,
+                        quantity: ticket_quantity || max_players,
+                        store_price: ticket_price,
+                        updated_at: new Date().toISOString()
+                    });
+                }
+            }
+        }
 
         // If finished, we could create notifications here like in the legacy code
         if (status === 'finished' && (top1 || top2 || top3)) {

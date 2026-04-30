@@ -10,7 +10,7 @@ export const getProducts = (callback: (products: any[]) => void) => {
   const fetchProducts = async () => {
     const { data, error } = await supabase
       .from('products')
-      .select('*, cardgames(name), product_types(name)')
+      .select('*, cardgames(id, name), product_types(id, name)')
       .order('created_at', { ascending: false });
     
     if (error) {
@@ -588,6 +588,27 @@ export const updateTournamentPoints = async (entryId: number, points: number) =>
     }
 };
 
+export const getRankings = async (limit: number = 5) => {
+  try {
+    const { data: topCollectors, error: collectorsError } = await supabase
+      .rpc('get_top_user_cards_with_profile', { p_limit: limit });
+    
+    const { data: topTraders, error: tradersError } = await supabase
+      .rpc('get_top_offerlist_users_with_profile', { p_limit: limit });
+
+    if (collectorsError) throw collectorsError;
+    if (tradersError) throw tradersError;
+
+    return {
+      topCollectors: topCollectors || [],
+      topTraders: topTraders || []
+    };
+  } catch (error) {
+    console.error('Error fetching rankings:', error);
+    return { topCollectors: [], topTraders: [] };
+  }
+};
+
 export const getGlobalStats = async () => {
   const stats = {
     users: 0,
@@ -1031,19 +1052,64 @@ export const createTournament = async (tournamentData: any) => {
   try {
     const { data: { session } } = await supabase.auth.getSession();
     const token = session?.access_token;
+    
+    // Ensure all numeric fields are actually numbers
+    const payload = {
+        ...tournamentData,
+        max_players: Number(tournamentData.max_players) || 32,
+        cardgame_id: Number(tournamentData.cardgame_id),
+        format_id: Number(tournamentData.format_id),
+        ticket_price: Number(tournamentData.ticket_price) || 0,
+        ticket_quantity: Number(tournamentData.ticket_quantity) || 0
+    };
+
     const response = await fetch('/api/torneios', {
       method: 'POST',
       headers: { 
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`
       },
-      body: JSON.stringify(tournamentData)
+      body: JSON.stringify(payload)
     });
     if (!response.ok) throw new Error('Failed to create tournament');
     return await response.json();
   } catch (error) {
     console.error('Error creating tournament:', error);
     return { error: 'Failed to create tournament' };
+  }
+};
+
+export const checkout = async (items: any[], addressId?: string | number) => {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
+
+    const response = await fetch('/api/checkout', {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ 
+        items: items.map(i => ({
+            product_id: i.id,
+            store_id: i.storeId || i.store_id,
+            quantity: i.quantity,
+            price: i.price,
+            name: i.name
+        })),
+        address_id: addressId
+      })
+    });
+
+    if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || 'Erro no checkout');
+    }
+    return await response.json();
+  } catch (error: any) {
+    console.error('Error during checkout:', error);
+    throw error;
   }
 };
 
@@ -1405,5 +1471,16 @@ export const getProductsByFilters = async (filters: { game_id?: string | number,
   } catch (error) {
     console.error('Error fetching filtered products:', error);
     return [];
+  }
+};
+
+export const getTournamentDetails = async (id: number | string) => {
+  try {
+    const response = await fetch(`/api/torneios/${id}`);
+    if (!response.ok) throw new Error('Failed to fetch tournament details');
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching tournament details:', error);
+    return null;
   }
 };

@@ -14,6 +14,7 @@ import storesRouter from "./server/routes/stores.js";
 import usersRouter from "./server/routes/users.js";
 import socialRouter from "./server/routes/social.js";
 import eventsRouter from "./server/routes/events.js";
+import ordersRouter from "./server/routes/orders.js";
 
 dotenv.config();
 
@@ -118,6 +119,7 @@ async function startServer() {
   app.use("/api", usersRouter);
   app.use("/api", socialRouter);
   app.use("/api", eventsRouter);
+  app.use("/api", ordersRouter);
 
   // 404 for API routes
   app.use('/api', (req, res) => {

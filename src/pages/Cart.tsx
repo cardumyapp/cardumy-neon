@@ -4,18 +4,22 @@ import { CartItem, UserAddress } from '../types';
 import { motion } from 'motion/react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../components/AuthProvider';
-import { getPrimaryAddress } from '../services/supabaseService';
+import { getPrimaryAddress, checkout } from '../services/supabaseService';
+import { useNotification } from '../components/NotificationProvider';
 
 interface CartPageProps {
   cart: CartItem[];
   updateQuantity: (id: string, delta: number) => void;
   removeFromCart: (id: string) => void;
+  clearCart: () => void;
 }
 
-export const CartPage: React.FC<CartPageProps> = ({ cart, updateQuantity, removeFromCart }) => {
+export const CartPage: React.FC<CartPageProps> = ({ cart, updateQuantity, removeFromCart, clearCart }) => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { showNotification } = useNotification();
   const [address, setAddress] = useState<UserAddress | null>(null);
+  const [isCheckingOut, setIsCheckingOut] = useState(false);
   const isLojista = user?.role_id === 6;
   const total = cart.reduce((acc, item) => acc + ((item.price || 0) * (item.quantity || 0)), 0);
 
@@ -26,6 +30,26 @@ export const CartPage: React.FC<CartPageProps> = ({ cart, updateQuantity, remove
       getPrimaryAddress().then(setAddress);
     }
   }, [isLojista, navigate, user]);
+
+  const handleCheckout = async () => {
+    if (!user) {
+        showNotification("Faça login para finalizar o pedido", "error");
+        return;
+    }
+    if (cart.length === 0) return;
+
+    setIsCheckingOut(true);
+    try {
+        const res = await checkout(cart, address?.id);
+        showNotification("Pedido realizado com sucesso!", "success");
+        clearCart();
+        navigate(`/pedido/${res.order_id}`);
+    } catch (error: any) {
+        showNotification(error.message || "Erro ao processar pedido", "error");
+    } finally {
+        setIsCheckingOut(false);
+    }
+  };
 
   if (isLojista) return null;
 
@@ -158,9 +182,13 @@ export const CartPage: React.FC<CartPageProps> = ({ cart, updateQuantity, remove
                   <span className="text-purple-400">R$ {(total || 0).toFixed(2)}</span>
                 </div>
               </div>
-              <button className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-black py-4 rounded-xl shadow-xl shadow-purple-600/20 transition-all active:scale-95 flex items-center justify-center space-x-2">
-                <span>Finalizar Pedido</span>
-                <i className="fas fa-arrow-right text-xs"></i>
+              <button 
+                onClick={handleCheckout}
+                disabled={isCheckingOut || cart.length === 0}
+                className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-black py-4 rounded-xl shadow-xl shadow-purple-600/20 transition-all active:scale-95 flex items-center justify-center space-x-2 disabled:opacity-50"
+              >
+                <span>{isCheckingOut ? 'Finalizando...' : 'Finalizar Pedido'}</span>
+                {!isCheckingOut && <i className="fas fa-arrow-right text-xs"></i>}
               </button>
               <Link to="/produtos" className="block text-center text-xs font-bold text-slate-500 hover:text-white transition-colors">
                 Continuar comprando

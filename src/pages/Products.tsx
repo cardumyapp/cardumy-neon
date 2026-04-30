@@ -96,13 +96,20 @@ export const Products: React.FC<ProductsProps> = ({ onAddToCart, activeGame }) =
   }, [activeGame, dbGames]);
 
   const mappedProducts = useMemo(() => {
-    return products.map(p => ({
-      ...p,
-      imageUrl: p.image_url || p.imageUrl || 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&q=80&w=400',
-      name: p.beauty_name || p.name,
-      price: p.msrp || p.price || 0,
-      type: p.product_types?.name || p.product_type || p.type
-    }));
+    return products.map(p => {
+      const gameData = Array.isArray(p.cardgames) ? p.cardgames[0] : p.cardgames;
+      const typeData = Array.isArray(p.product_types) ? p.product_types[0] : p.product_types;
+      
+      return {
+        ...p,
+        imageUrl: p.image_url || p.imageUrl || 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&q=80&w=400',
+        name: p.beauty_name || p.name,
+        price: p.msrp || p.price || 0,
+        type: typeData?.name || p.product_type || p.type,
+        game: gameData?.name || p.game || 'TCG',
+        game_id: p.game_id || gameData?.id
+      };
+    });
   }, [products]);
 
   const filteredProducts = useMemo(() => {
@@ -110,7 +117,11 @@ export const Products: React.FC<ProductsProps> = ({ onAddToCart, activeGame }) =
     
     // Filter by Game
     if (gameFilterId !== 'all') {
-      list = list.filter(p => p.game_id?.toString() === gameFilterId.toString() || p.cardgames?.id?.toString() === gameFilterId.toString());
+      const targetId = gameFilterId.toString();
+      list = list.filter(p => {
+        const gameIdValue = p.game_id?.toString();
+        return gameIdValue === targetId;
+      });
     }
     
     // Filter by Type

@@ -20,6 +20,4 @@ export const supabaseAdmin = (supabaseUrl && supabaseServiceKey)
 
 if (supabaseAdmin) {
   console.log("[INFO] Supabase Admin initialized successfully.");
-} else {
-  console.error("[ERROR] Supabase Admin failed to initialize. Check your environment variables.");
 }

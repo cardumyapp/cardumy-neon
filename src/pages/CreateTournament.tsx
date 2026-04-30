@@ -21,7 +21,13 @@ export const CreateTournament: React.FC = () => {
         status: 'open',
         top1: '',
         top2: '',
-        top3: ''
+        top3: '',
+        description: '',
+        has_ticket: false,
+        ticket_price: 0,
+        ticket_quantity: 8,
+        sale_start: '',
+        sale_end: ''
     });
 
     useEffect(() => {
@@ -56,7 +62,7 @@ export const CreateTournament: React.FC = () => {
                 max_players: Number(formData.max_players)
             });
 
-            if (res.status === 'ok') {
+            if (res.status === 'ok' || res.id) {
                 showNotification("Torneio criado com sucesso!", "success");
                 navigate('/meus-torneios');
             } else {
@@ -92,6 +98,17 @@ export const CreateTournament: React.FC = () => {
                         className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-purple-500 transition-colors"
                         value={formData.name}
                         onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    />
+                </div>
+
+                <div className="space-y-2">
+                    <label className="text-xs font-black uppercase tracking-widest text-slate-500">Descrição do Evento</label>
+                    <textarea 
+                        placeholder="Descreva as regras, premiação e detalhes do torneio..."
+                        rows={4}
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-purple-500 transition-colors resize-none"
+                        value={formData.description}
+                        onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                     />
                 </div>
 
@@ -143,6 +160,69 @@ export const CreateTournament: React.FC = () => {
                             onChange={(e) => setFormData({ ...formData, max_players: parseInt(e.target.value) })}
                         />
                     </div>
+                </div>
+
+                {/* Ticket Config */}
+                <div className="space-y-4 pt-4 border-t border-slate-800">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <h4 className="text-sm font-black text-white italic uppercase tracking-tight">Venda de Ingressos</h4>
+                            <p className="text-[10px] text-slate-500 font-medium lowercase">venda entradas pela plataforma</p>
+                        </div>
+                        <button 
+                            type="button"
+                            onClick={() => setFormData(prev => ({ ...prev, has_ticket: !prev.has_ticket }))}
+                            className={`w-12 h-6 rounded-full transition-all relative ${formData.has_ticket ? 'bg-purple-600' : 'bg-slate-800'}`}
+                        >
+                            <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${formData.has_ticket ? 'left-7' : 'left-1'}`}></div>
+                        </button>
+                    </div>
+
+                    {formData.has_ticket && (
+                        <div className="space-y-4 animate-in fade-in zoom-in-95 duration-300">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-bold text-slate-600 uppercase tracking-widest">Preço (R$)</label>
+                                    <input 
+                                        type="number"
+                                        step="0.01"
+                                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white text-sm"
+                                        value={formData.ticket_price}
+                                        onChange={(e) => setFormData({ ...formData, ticket_price: parseFloat(e.target.value) })}
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-bold text-slate-600 uppercase tracking-widest">Qtd. Ingressos</label>
+                                    <input 
+                                        type="number"
+                                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white text-sm"
+                                        value={formData.ticket_quantity}
+                                        onChange={(e) => setFormData({ ...formData, ticket_quantity: parseInt(e.target.value) })}
+                                    />
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-bold text-slate-600 uppercase tracking-widest">Início Vendas</label>
+                                    <input 
+                                        type="datetime-local"
+                                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white text-sm"
+                                        value={formData.sale_start}
+                                        onChange={(e) => setFormData({ ...formData, sale_start: e.target.value })}
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-bold text-slate-600 uppercase tracking-widest">Fim Vendas</label>
+                                    <input 
+                                        type="datetime-local"
+                                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white text-sm"
+                                        value={formData.sale_end}
+                                        onChange={(e) => setFormData({ ...formData, sale_end: e.target.value })}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 <div className="space-y-2">

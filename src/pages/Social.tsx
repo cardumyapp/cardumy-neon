@@ -1,8 +1,13 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Link } from 'react-router-dom';
-import { searchUsers, getCollectionRanking, getOffersRanking, getActivities } from '../services/supabaseService';
+import { 
+    searchUsers, 
+    getRankings, 
+    getActivities, 
+    getGlobalStats 
+} from '../services/supabaseService';
 
 export const Social: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -11,6 +16,10 @@ export const Social: React.FC = () => {
   const [rankLoading, setRankLoading] = useState(false);
   const [activities, setActivities] = useState<any[]>([]);
   const [activitiesLoading, setActivitiesLoading] = useState(true);
+  const [globalStats, setGlobalStats] = useState<any>(null);
+
+  const [collectionRankings, setCollectionRankings] = useState<any[]>([]);
+  const [offersRankings, setOffersRankings] = useState<any[]>([]);
 
   useEffect(() => {
     const fetchActivities = async () => {
@@ -42,19 +51,17 @@ export const Social: React.FC = () => {
     return () => clearTimeout(delayDebounceFn);
   }, [searchTerm]);
 
-  const [collectionRankings, setCollectionRankings] = useState<any[]>([]);
-  const [offersRankings, setOffersRankings] = useState<any[]>([]);
-
   useEffect(() => {
     const fetchAllRankings = async () => {
       setRankLoading(true);
       try {
-        const [collData, offData] = await Promise.all([
-          getCollectionRanking(5),
-          getOffersRanking(5)
+        const [rankingData, stats] = await Promise.all([
+          getRankings(5),
+          getGlobalStats()
         ]);
-        setCollectionRankings(collData);
-        setOffersRankings(offData);
+        setCollectionRankings(rankingData.topCollectors);
+        setOffersRankings(rankingData.topTraders);
+        setGlobalStats(stats);
       } catch (err) {
         // Error handling remained
       } finally {
@@ -99,16 +106,11 @@ export const Social: React.FC = () => {
                 </div>
               ) : collectionRankings.length > 0 ? (
                 collectionRankings.map((item, idx) => (
-                  <Link key={item.id} to={`/perfil/${item.username}`} className="flex items-center justify-between p-3 rounded-2xl hover:bg-white/5 transition-all group/item border border-transparent hover:border-white/5">
+                  <Link key={item.user_id || `coll-${idx}`} to={`/perfil/${item.username}`} className="flex items-center justify-between p-3 rounded-2xl hover:bg-white/5 transition-all group/item border border-transparent hover:border-white/5">
                     <div className="flex items-center space-x-4">
                       <div className={`w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-black ${idx === 0 ? 'bg-yellow-500 text-black shadow-lg shadow-yellow-500/20 scale-110' : idx === 1 ? 'bg-slate-300 text-black' : idx === 2 ? 'bg-orange-600 text-white' : 'bg-slate-800 text-slate-500'}`}>
                         {idx + 1}
                       </div>
-                      <img 
-                        src={item.avatar || `https://ui-avatars.com/api/?name=${item.username}&background=8b5cf6&color=fff`} 
-                        className="w-10 h-10 rounded-xl border-2 border-slate-700 group-hover/item:border-purple-500 transition-all object-cover shadow-xl" 
-                        alt="" 
-                      />
                       <span className="text-sm font-bold text-slate-200 group-hover/item:text-white transition-colors truncate max-w-[100px]">{item.username}</span>
                     </div>
                     <div className="text-right">
@@ -146,20 +148,15 @@ export const Social: React.FC = () => {
                 </div>
               ) : offersRankings.length > 0 ? (
                 offersRankings.map((item, idx) => (
-                  <Link key={item.id} to={`/perfil/${item.username}`} className="flex items-center justify-between p-3 rounded-2xl hover:bg-white/5 transition-all group/item border border-transparent hover:border-white/5">
+                  <Link key={item.user_id || `off-${idx}`} to={`/perfil/${item.username}`} className="flex items-center justify-between p-3 rounded-2xl hover:bg-white/5 transition-all group/item border border-transparent hover:border-white/5">
                     <div className="flex items-center space-x-4">
                       <div className={`w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-black ${idx === 0 ? 'bg-yellow-500 text-black shadow-lg shadow-yellow-500/20 scale-110' : idx === 1 ? 'bg-slate-300 text-black' : idx === 2 ? 'bg-orange-600 text-white' : 'bg-slate-800 text-slate-500'}`}>
                         {idx + 1}
                       </div>
-                      <img 
-                        src={item.avatar || `https://ui-avatars.com/api/?name=${item.username}&background=ec4899&color=fff`} 
-                        className="w-10 h-10 rounded-xl border-2 border-slate-700 group-hover/item:border-pink-500 transition-all object-cover shadow-xl" 
-                        alt="" 
-                      />
                       <span className="text-sm font-bold text-slate-200 group-hover/item:text-white transition-colors truncate max-w-[100px]">{item.username}</span>
                     </div>
                     <div className="text-right">
-                      <span className="text-sm font-black text-white">{item.offers_count}</span>
+                      <span className="text-sm font-black text-white">{item.total_cards}</span>
                       <span className="text-[8px] text-slate-500 uppercase block font-black leading-none mt-1">Ofertas</span>
                     </div>
                   </Link>
@@ -239,7 +236,7 @@ export const Social: React.FC = () => {
             </div>
           ) : activities.length > 0 ? activities.map((action, idx) => (
             <motion.div
-              key={idx}
+              key={action.id || `act-${idx}`}
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: idx * 0.1 }}
