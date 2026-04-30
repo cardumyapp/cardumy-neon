@@ -7,6 +7,7 @@ interface AuthContextType {
   isOffline: boolean;
   login: () => Promise<void>;
   logout: () => Promise<void>;
+  switchUser: (newUser: any) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -72,8 +73,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(null);
   };
 
+  const switchUser = (newUser: any) => {
+    setUser(newUser);
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, isOffline, login, logout }}>
+    <AuthContext.Provider value={{ user, loading, isOffline, login, logout, switchUser }}>
       {!loading && children}
     </AuthContext.Provider>
   );

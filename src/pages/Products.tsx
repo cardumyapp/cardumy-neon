@@ -99,12 +99,31 @@ export const Products: React.FC<ProductsProps> = ({ onAddToCart, activeGame }) =
     return products.map(p => {
       const gameData = Array.isArray(p.cardgames) ? p.cardgames[0] : p.cardgames;
       const typeData = Array.isArray(p.product_types) ? p.product_types[0] : p.product_types;
+      const isTicket = typeData?.name === 'Ingresso';
+      
+      let stock = 0;
+      let price = p.msrp || p.price || 0;
+
+      if (isTicket) {
+        const ticketInfo = Array.isArray(p.tournament_tickets) ? p.tournament_tickets[0] : p.tournament_tickets;
+        if (ticketInfo) {
+          stock = (ticketInfo.max_quantity || 0) - (ticketInfo.sold_quantity || 0);
+        }
+      } else {
+        const stockItems = Array.isArray(p.store_stock) ? p.store_stock : [];
+        stock = stockItems.reduce((acc: number, curr: any) => acc + (curr.quantity || 0), 0);
+        // If multiple stores have the item, we show the lowest price if not ticket
+        if (stockItems.length > 0) {
+          price = Math.min(...stockItems.map((si: any) => si.store_price || p.msrp || 0));
+        }
+      }
       
       return {
         ...p,
         imageUrl: p.image_url || p.imageUrl || 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&q=80&w=400',
         name: p.beauty_name || p.name,
-        price: p.msrp || p.price || 0,
+        price,
+        stock,
         type: typeData?.name || p.product_type || p.type,
         game: gameData?.name || p.game || 'TCG',
         game_id: p.game_id || gameData?.id

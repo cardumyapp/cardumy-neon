@@ -10,7 +10,13 @@ export const getProducts = (callback: (products: any[]) => void) => {
   const fetchProducts = async () => {
     const { data, error } = await supabase
       .from('products')
-      .select('*, cardgames(id, name), product_types(id, name)')
+      .select(`
+        *, 
+        cardgames(id, name), 
+        product_types(id, name),
+        tournament_tickets:tournament_tickets!fk_tickets_product(max_quantity, sold_quantity),
+        store_stock(quantity, store_price)
+      `)
       .order('created_at', { ascending: false });
     
     if (error) {
@@ -739,6 +745,80 @@ export const getUserProfile = async (userId: string | number) => {
   } catch (error) {
     console.error('Error fetching user profile:', error);
     return null;
+  }
+};
+
+export const getUserOrders = async () => {
+    try {
+        const response = await fetch('/api/orders');
+        if (!response.ok) throw new Error('Failed to fetch orders');
+        return await response.json();
+    } catch (error) {
+        console.error('Error in getUserOrders:', error);
+        return [];
+    }
+};
+
+export const getReceivedOrders = async () => {
+    try {
+        const response = await fetch('/api/orders/received');
+        if (!response.ok) throw new Error('Failed to fetch received orders');
+        return await response.json();
+    } catch (error) {
+        console.error('Error in getReceivedOrders:', error);
+        return [];
+    }
+};
+
+export const getOrderDetails = async (orderId: string) => {
+    try {
+        const response = await fetch(`/api/orders/${orderId}`);
+        if (!response.ok) throw new Error('Failed to fetch order details');
+        return await response.json();
+    } catch (error) {
+        console.error('Error in getOrderDetails:', error);
+        return null;
+    }
+};
+
+export const updateOrderStatus = async (orderId: string, status: string) => {
+    try {
+        const response = await fetch(`/api/orders/${orderId}/status`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status })
+        });
+        if (!response.ok) throw new Error('Failed to update order status');
+        return await response.json();
+    } catch (error) {
+        console.error('Error in updateOrderStatus:', error);
+        return null;
+    }
+};
+
+export const cleanupExpiredOrders = async () => {
+    try {
+        const response = await fetch('/api/orders/cleanup', { method: 'POST' });
+        if (!response.ok) throw new Error('Failed to cleanup orders');
+        return await response.json();
+    } catch (error) {
+        console.error('Error in cleanupExpiredOrders:', error);
+        return { ok: false };
+    }
+};
+
+export const getAllUsers = async () => {
+  try {
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .order('codename', { ascending: true });
+    
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching all users from DB:', error);
+    return [];
   }
 };
 

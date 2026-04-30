@@ -30,6 +30,7 @@ import { Product, CartItem, GameType } from './types';
 import { GAMES } from './constants';
 import { AuthProvider, useAuth } from './components/AuthProvider';
 import { NotificationProvider } from './components/NotificationProvider';
+import { UserPicker } from './components/UserPicker';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
 import { getCardgames, getNotifications } from './services/supabaseService';
@@ -70,11 +71,12 @@ const SidebarGroup: React.FC<{ label: string; collapsed: boolean; children: Reac
 
 const AppContent: React.FC = () => {
   const location = useLocation();
-  const { user, login, logout } = useAuth();
+  const { user, login, logout, switchUser } = useAuth();
   const isLojista = useMemo(() => user?.role_id === 6, [user]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [activeGame, setActiveGame] = useState<GameType | 'All'>('All');
   const [isGamePickerOpen, setIsGamePickerOpen] = useState(false);
+  const [isUserPickerOpen, setIsUserPickerOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [dbGames, setDbGames] = useState<{id: any, name: string, slug?: string}[]>([]);
@@ -382,6 +384,12 @@ const AppContent: React.FC = () => {
                       <i className="fas fa-store mr-2"></i> Gerenciar Loja
                     </Link>
                   )}
+                  <button 
+                    onClick={() => setIsUserPickerOpen(true)} 
+                    className="w-full text-left px-4 py-2 text-xs font-bold text-slate-300 hover:bg-slate-800 rounded-lg transition-colors mb-1"
+                  >
+                    <i className="fas fa-random mr-2"></i> Mudar Sessão
+                  </button>
                   <button onClick={logout} className="w-full text-left px-4 py-2 text-xs font-bold text-red-400 hover:bg-red-500/10 rounded-lg transition-colors">
                     <i className="fas fa-sign-out-alt mr-2"></i> Sair
                   </button>
@@ -428,6 +436,16 @@ const AppContent: React.FC = () => {
             <Route path="/admin/stats" element={<AdminStats />} />
           </Routes>
         </div>
+
+        {isUserPickerOpen && (
+          <UserPicker 
+            onClose={() => setIsUserPickerOpen(false)} 
+            onSelect={(newUser) => {
+              switchUser(newUser);
+              setIsUserPickerOpen(false);
+            }} 
+          />
+        )}
       </main>
     </div>
   );
