@@ -92,7 +92,11 @@ const AppContent: React.FC = () => {
     const fetchUnread = async () => {
       if (user) {
         const notifs = await getNotifications();
-        setUnreadNotifs(notifs.filter((n: any) => !n.is_read).length);
+        if (Array.isArray(notifs)) {
+          setUnreadNotifs(notifs.filter((n: any) => !n.is_read).length);
+        } else {
+          setUnreadNotifs(0);
+        }
       }
     };
     fetchUnread();

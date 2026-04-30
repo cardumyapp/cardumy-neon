@@ -1,5 +1,5 @@
 import express from "express";
-import { supabaseAdmin } from "../supabase.js";
+import { supabaseAI } from "../supabase.js";
 import { authenticate, requireLojista } from "../middleware/auth.js";
 import { randomBytes } from "crypto";
 
@@ -10,10 +10,10 @@ const generateTicket = () => {
 };
 
 router.get("/torneios/:id", async (req, res) => {
-    if (!supabaseAdmin) return res.status(500).json({ error: "Supabase not configured" });
+    if (!supabaseAI) return res.status(500).json({ error: "Supabase not configured" });
     try {
         const { id } = req.params;
-        const { data, error } = await supabaseAdmin
+        const { data, error } = await supabaseAI
             .from('tournaments')
             .select(`
                 *,
@@ -39,11 +39,11 @@ router.get("/torneios/:id", async (req, res) => {
 });
 
 router.get("/torneios", async (req, res) => {
-  if (!supabaseAdmin) return res.status(500).json({ error: "Supabase not configured" });
+  if (!supabaseAI) return res.status(500).json({ error: "Supabase not configured" });
   try {
-    const { data, error } = await supabaseAdmin.from('tournaments').select(`*, cardgame:cardgames(name), format:tournament_formats(name)` ).order('start_date', { ascending: true });
+    const { data, error } = await supabaseAI.from('tournaments').select(`*, cardgame:cardgames(name), format:tournament_formats(name)` ).order('start_date', { ascending: true });
     if (error) {
-      const { data: simpleData } = await supabaseAdmin.from('tournaments').select('*').order('start_date', { ascending: true });
+      const { data: simpleData } = await supabaseAI.from('tournaments').select('*').order('start_date', { ascending: true });
       return res.json(simpleData);
     }
     res.json((data || []).map(t => ({ ...t, cardgames: (t as any).cardgame, tournament_formats: (t as any).format })));
@@ -54,12 +54,12 @@ router.get("/torneios", async (req, res) => {
 
 // Search by ticket
 router.get("/torneios/busca", async (req, res) => {
-    if (!supabaseAdmin) return res.status(500).json({ error: "Supabase not configured" });
+    if (!supabaseAI) return res.status(500).json({ error: "Supabase not configured" });
     const { ticket } = req.query;
     if (!ticket) return res.status(400).json({ error: "Ticket is required" });
 
     try {
-        const { data, error } = await supabaseAdmin
+        const { data, error } = await supabaseAI
             .from('tournaments')
             .select(`id, name, ticket, cardgame_id, status`)
             .eq('ticket', ticket)
@@ -76,9 +76,9 @@ router.get("/torneios/busca", async (req, res) => {
 
 // User's own tournaments
 router.get("/meus-torneios", authenticate, requireLojista, async (req: any, res) => {
-    if (!supabaseAdmin) return res.status(500).json({ error: "Supabase not configured" });
+    if (!supabaseAI) return res.status(500).json({ error: "Supabase not configured" });
     try {
-        const { data, error } = await supabaseAdmin
+        const { data, error } = await supabaseAI
             .from('tournaments')
             .select(`*, cardgame:cardgames(name), format:tournament_formats(name)`)
             .eq('created_by', req.user.id)
@@ -92,9 +92,9 @@ router.get("/meus-torneios", authenticate, requireLojista, async (req: any, res)
 });
 
 router.get("/torneios/:id", async (req, res) => {
-    if (!supabaseAdmin) return res.status(500).json({ error: "Supabase not configured" });
+    if (!supabaseAI) return res.status(500).json({ error: "Supabase not configured" });
     try {
-        const { data, error } = await supabaseAdmin
+        const { data, error } = await supabaseAI
             .from('tournaments')
             .select(`*, cardgame:cardgames(name), format:tournament_formats(name)`)
             .eq('id', req.params.id)
@@ -108,7 +108,7 @@ router.get("/torneios/:id", async (req, res) => {
 });
 
 router.post("/torneios", authenticate, requireLojista, async (req: any, res) => {
-    if (!supabaseAdmin) return res.status(500).json({ error: "Supabase not configured" });
+    if (!supabaseAI) return res.status(500).json({ error: "Supabase not configured" });
     try {
         const { 
             name, cardgame_id, format_id, max_players, start_date, status, top1, top2, top3,
@@ -133,7 +133,7 @@ router.post("/torneios", authenticate, requireLojista, async (req: any, res) => 
             tournamentData.top3 = top3 || null;
         }
 
-        const { data, error } = await supabaseAdmin
+        const { data, error } = await supabaseAI
             .from('tournaments')
             .insert(tournamentData)
             .select()
@@ -145,7 +145,7 @@ router.post("/torneios", authenticate, requireLojista, async (req: any, res) => 
         if (has_ticket && ticket_price > 0) {
             // 1. Find or Ensure Ticket Product Type
             let ticketTypeId = null;
-            const { data: typeData } = await supabaseAdmin
+            const { data: typeData } = await supabaseAI
                 .from('product_types')
                 .select('id')
                 .eq('name', 'Ingresso')
@@ -154,7 +154,7 @@ router.post("/torneios", authenticate, requireLojista, async (req: any, res) => 
             if (typeData) {
                 ticketTypeId = typeData.id;
             } else {
-                const { data: newType } = await supabaseAdmin
+                const { data: newType } = await supabaseAI
                     .from('product_types')
                     .insert({ name: 'Ingresso' })
                     .select('id')
@@ -166,7 +166,7 @@ router.post("/torneios", authenticate, requireLojista, async (req: any, res) => 
             const slugify = (text: string) => text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
             const productSlug = slugify(`${name}-ticket-${ticket}`);
             
-            const { data: product, error: prodError } = await supabaseAdmin
+            const { data: product, error: prodError } = await supabaseAI
                 .from('products')
                 .insert({
                     name: `Ingresso - ${name}`,
@@ -185,7 +185,7 @@ router.post("/torneios", authenticate, requireLojista, async (req: any, res) => 
 
             // 3. Create Tournament Ticket Link
             if (product) {
-                const { error: ticketRelError } = await supabaseAdmin
+                const { error: ticketRelError } = await supabaseAI
                     .from('tournament_tickets')
                     .insert({
                         tournament_id: data.id,
@@ -200,14 +200,14 @@ router.post("/torneios", authenticate, requireLojista, async (req: any, res) => 
                 if (ticketRelError) console.error("Error creating tournament_tickets entry:", ticketRelError);
 
                 // 4. Add to Store Stock (The lojista's store)
-                const { data: store } = await supabaseAdmin
+                const { data: store } = await supabaseAI
                     .from('stores')
                     .select('id')
                     .eq('user_id', req.user.id)
                     .single();
                 
                 if (store) {
-                    await supabaseAdmin.from('store_stock').insert({
+                    await supabaseAI.from('store_stock').insert({
                         store_id: store.id,
                         product_id: product.id,
                         quantity: ticket_quantity || max_players,
@@ -227,7 +227,7 @@ router.post("/torneios", authenticate, requireLojista, async (req: any, res) => 
             ].filter(t => t.id);
 
             for (const top of tops) {
-                await supabaseAdmin.from('notifications').insert({
+                await supabaseAI.from('notifications').insert({
                     user_id: top.id,
                     type: "tournament_result",
                     message: `Você ficou em ${top.place} no torneio ${name}. Envie sua decklist.`,
@@ -244,10 +244,10 @@ router.post("/torneios", authenticate, requireLojista, async (req: any, res) => 
 });
 
 router.post("/torneios/:id/iniciar", authenticate, requireLojista, async (req: any, res) => {
-    if (!supabaseAdmin) return res.status(500).json({ error: "Supabase not configured" });
+    if (!supabaseAI) return res.status(500).json({ error: "Supabase not configured" });
     try {
         // Simple validation check: ensure it belongs to user
-        const { data: tourney } = await supabaseAdmin
+        const { data: tourney } = await supabaseAI
             .from('tournaments')
             .select('created_by')
             .eq('id', req.params.id)
@@ -258,7 +258,7 @@ router.post("/torneios/:id/iniciar", authenticate, requireLojista, async (req: a
         }
 
         const now = new Date().toLocaleTimeString('pt-BR', { hour12: false });
-        const { data, error } = await supabaseAdmin
+        const { data, error } = await supabaseAI
             .from('tournaments')
             .update({ 
                 start_time: now, 
@@ -276,10 +276,10 @@ router.post("/torneios/:id/iniciar", authenticate, requireLojista, async (req: a
 });
 
 router.get("/torneios/:id/entries", authenticate, requireLojista, async (req: any, res) => {
-    if (!supabaseAdmin) return res.status(500).json({ error: "Supabase not configured" });
+    if (!supabaseAI) return res.status(500).json({ error: "Supabase not configured" });
     try {
         const { id } = req.params;
-        const { data, error } = await supabaseAdmin
+        const { data, error } = await supabaseAI
             .from('tournament_entries')
             .select(`*, user:users(id, username, display_name, avatar_url)`)
             .eq('tournament_id', id);
@@ -292,12 +292,12 @@ router.get("/torneios/:id/entries", authenticate, requireLojista, async (req: an
 });
 
 router.post("/torneios/entries/:entryId/points", authenticate, requireLojista, async (req: any, res) => {
-    if (!supabaseAdmin) return res.status(500).json({ error: "Supabase not configured" });
+    if (!supabaseAI) return res.status(500).json({ error: "Supabase not configured" });
     const { entryId } = req.params;
     const { points } = req.body;
 
     try {
-        const { data, error } = await supabaseAdmin
+        const { data, error } = await supabaseAI
             .from('tournament_entries')
             .update({ points })
             .eq('id', entryId)
@@ -312,12 +312,12 @@ router.post("/torneios/entries/:entryId/points", authenticate, requireLojista, a
 });
 
 router.post("/torneios/entries/:entryId/status", authenticate, requireLojista, async (req: any, res) => {
-    if (!supabaseAdmin) return res.status(500).json({ error: "Supabase not configured" });
+    if (!supabaseAI) return res.status(500).json({ error: "Supabase not configured" });
     const { entryId } = req.params;
     const { status } = req.body;
 
     try {
-        const { data, error } = await supabaseAdmin
+        const { data, error } = await supabaseAI
             .from('tournament_entries')
             .update({ status })
             .eq('id', entryId)
@@ -332,12 +332,12 @@ router.post("/torneios/entries/:entryId/status", authenticate, requireLojista, a
 });
 
 router.post("/torneios/:id/finalizar", authenticate, requireLojista, async (req: any, res) => {
-    if (!supabaseAdmin) return res.status(500).json({ error: "Supabase not configured" });
+    if (!supabaseAI) return res.status(500).json({ error: "Supabase not configured" });
     const { id } = req.params;
     const { top1, top2, top3 } = req.body;
 
     try {
-        const { data, error } = await supabaseAdmin
+        const { data, error } = await supabaseAI
             .from('tournaments')
             .update({
                 status: 'finished',
@@ -360,7 +360,7 @@ router.post("/torneios/:id/finalizar", authenticate, requireLojista, async (req:
         ].filter(t => t.id);
 
         for (const top of tops) {
-            await supabaseAdmin.from('notifications').insert({
+            await supabaseAI.from('notifications').insert({
                 user_id: top.id,
                 type: "tournament_result",
                 message: `Você ficou em ${top.place} no torneio ${data.name}. Envie sua decklist.`,

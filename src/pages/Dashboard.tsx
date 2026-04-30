@@ -44,6 +44,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ activeGame }) => {
   }, []);
 
   const filteredActions = useMemo(() => {
+    if (!activities) return [];
     if (activeGame === 'All') return activities;
     // For now, if activeGame is set, we might not have a direct filter on activity_type 
     // but we can try to find relevant strings in target or action if we wanted.
@@ -52,14 +53,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ activeGame }) => {
   }, [activeGame, activities]);
 
   const upcomingTournaments = useMemo(() => {
+    if (!tournaments || !Array.isArray(tournaments)) return [];
     return tournaments
-      .filter(t => t.status === 'scheduled' || t.status === 'Aberto')
+      .filter(t => t && (t.status === 'scheduled' || t.status === 'Aberto'))
       .slice(0, 2)
       .map(t => ({
         id: t.id,
         name: t.name,
         game: t.cardgames?.name || 'TCG',
-        date: new Date(t.start_date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
+        date: t.start_date ? new Date(t.start_date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : 'TBD',
         location: 'Local da Loja',
         imageUrl: t.image_url || 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&q=80&w=400'
       }));
@@ -217,7 +219,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ activeGame }) => {
             <Link to="/comunidade" className="text-[9px] font-black uppercase text-slate-500 hover:text-white tracking-widest">Ver Feed</Link>
           </div>
           <div className="bg-slate-900/50 border border-slate-800 rounded-3xl p-3 md:p-4 divide-y divide-slate-800/50 shadow-xl">
-            {filteredActions.length > 0 ? filteredActions.map((action, idx) => (
+            {filteredActions && filteredActions.length > 0 ? filteredActions.map((action, idx) => (
               <div key={idx} className="py-4 flex items-center space-x-3 md:space-x-4 px-2">
                 <Link to={`/perfil/${action.userId}`} className="relative flex-shrink-0">
                   <img src={action.avatar || `https://i.pravatar.cc/150?u=${action.user}`} className="w-8 h-8 md:w-10 md:h-10 rounded-full border border-slate-700" alt="" />

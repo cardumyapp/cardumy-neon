@@ -35,7 +35,7 @@ export const Tournaments: React.FC = () => {
     fetchTourneys();
   }, []);
 
-  const filteredTournaments = torneios.filter(t => activeGame === 'All' || t.game === activeGame);
+  const filteredTournaments = (torneios || []).filter(t => t && (activeGame === 'All' || t.game === activeGame));
 
   return (
     <div className="space-y-8">

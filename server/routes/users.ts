@@ -111,8 +111,8 @@ router.get("/users/:username/profile", async (req, res) => {
       .limit(20);
 
     const { data: counters } = await supabaseAdmin.from('user_reviews').select('is_positive').eq('reviewed_id', user.id);
-    const likes = counters?.filter(c => c.is_positive).length || 0;
-    const dislikes = counters?.filter(c => !c.is_positive).length || 0;
+    const likes = (counters || []).filter(c => c.is_positive).length;
+    const dislikes = (counters || []).filter(c => !c.is_positive).length;
 
     res.json({
       user,

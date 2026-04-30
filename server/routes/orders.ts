@@ -1,11 +1,11 @@
 import express from "express";
-import { supabaseAdmin } from "../supabase.js";
+import { supabaseAI } from "../supabase.js";
 import { authenticate } from "../middleware/auth.js";
 
 const router = express.Router();
 
 router.post("/checkout", authenticate, async (req: any, res) => {
-    if (!supabaseAdmin) return res.status(500).json({ error: "Supabase not configured" });
+    if (!supabaseAI) return res.status(500).json({ error: "Supabase not configured" });
     
     const { items, address_id } = req.body;
     const userId = req.user.id;
@@ -19,7 +19,7 @@ router.post("/checkout", authenticate, async (req: any, res) => {
         // Check availability of each item
         for (const item of items) {
             // Check if it's a ticket
-            const { data: ticketData } = await supabaseAdmin
+            const { data: ticketData } = await supabaseAI
                 .from('tournament_tickets')
                 .select('*')
                 .eq('product_id', item.product_id)
@@ -38,7 +38,7 @@ router.post("/checkout", authenticate, async (req: any, res) => {
                 }
             } else {
                 // Check normal stock
-                const { data: stock } = await supabaseAdmin
+                const { data: stock } = await supabaseAI
                     .from('store_stock')
                     .select('quantity')
                     .eq('product_id', item.product_id)
@@ -54,7 +54,7 @@ router.post("/checkout", authenticate, async (req: any, res) => {
         // 2. Create Order
         const total = items.reduce((acc, item) => acc + (item.price * item.quantity), 0);
         
-        const { data: order, error: orderError } = await supabaseAdmin
+        const { data: order, error: orderError } = await supabaseAI
             .from('orders')
             .insert({
                 user_id: userId,
@@ -70,7 +70,7 @@ router.post("/checkout", authenticate, async (req: any, res) => {
 
         // 3. Create Order Items and Update Stock/Sold count
         for (const item of items) {
-            await supabaseAdmin.from('order_items').insert({
+            await supabaseAI.from('order_items').insert({
                 order_id: order.id,
                 product_id: item.product_id,
                 store_id: item.store_id,
@@ -79,14 +79,14 @@ router.post("/checkout", authenticate, async (req: any, res) => {
             });
 
             // Check if it's a ticket again to update sold_quantity
-            const { data: ticketData } = await supabaseAdmin
+            const { data: ticketData } = await supabaseAI
                 .from('tournament_tickets')
                 .select('id, sold_quantity')
                 .eq('product_id', item.product_id)
                 .maybeSingle();
             
             if (ticketData) {
-                const { data: updatedTicket } = await supabaseAdmin
+                const { data: updatedTicket } = await supabaseAI
                     .from('tournament_tickets')
                     .update({ sold_quantity: ticketData.sold_quantity + item.quantity })
                     .eq('id', ticketData.id)
@@ -94,7 +94,7 @@ router.post("/checkout", authenticate, async (req: any, res) => {
                     .single();
                 
                 // Update normal stock as well
-                const { data: stock } = await supabaseAdmin
+                const { data: stock } = await supabaseAI
                     .from('store_stock')
                     .select('id, quantity')
                     .eq('product_id', item.product_id)
@@ -102,21 +102,21 @@ router.post("/checkout", authenticate, async (req: any, res) => {
                     .maybeSingle();
                 
                 if (stock) {
-                    await supabaseAdmin
+                    await supabaseAI
                         .from('store_stock')
                         .update({ quantity: Math.max(0, stock.quantity - item.quantity) })
                         .eq('id', stock.id);
                 }
 
                 // Create entry in tournament_entries automatically
-                const { data: ticketDetail } = await supabaseAdmin
+                const { data: ticketDetail } = await supabaseAI
                     .from('tournament_tickets')
                     .select('tournament_id')
                     .eq('id', ticketData.id)
                     .single();
                 
                 if (ticketDetail) {
-                    await supabaseAdmin.from('tournament_entries').insert({
+                    await supabaseAI.from('tournament_entries').insert({
                         tournament_id: ticketDetail.tournament_id,
                         user_id: userId,
                         status: 'paid',
@@ -126,7 +126,7 @@ router.post("/checkout", authenticate, async (req: any, res) => {
                 }
             } else {
                 // Normal stock update
-                const { data: stock } = await supabaseAdmin
+                const { data: stock } = await supabaseAI
                     .from('store_stock')
                     .select('id, quantity')
                     .eq('product_id', item.product_id)
@@ -134,7 +134,7 @@ router.post("/checkout", authenticate, async (req: any, res) => {
                     .maybeSingle();
 
                 if (stock) {
-                    await supabaseAdmin
+                    await supabaseAI
                         .from('store_stock')
                         .update({ quantity: Math.max(0, stock.quantity - item.quantity) })
                         .eq('id', stock.id);
