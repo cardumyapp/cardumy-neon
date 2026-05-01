@@ -23,6 +23,7 @@ export const ManageStock: React.FC = () => {
   const { user } = useAuth();
   const { showNotification } = useNotification();
   const [stock, setStock] = useState<StockItem[]>([]);
+  const [editingStock, setEditingStock] = useState<Record<number, { quantity: number, price: number, preSale: boolean }>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [store, setStore] = useState<any>(null);
@@ -49,6 +50,16 @@ export const ManageStock: React.FC = () => {
         
         if (Array.isArray(stockData)) {
           setStock(stockData);
+          // Initialize editing state
+          const initialEditingState: Record<number, { quantity: number, price: number, preSale: boolean }> = {};
+          stockData.forEach(item => {
+            initialEditingState[item.product_id] = {
+              quantity: item.quantity,
+              price: item.store_price || 0,
+              preSale: !!item.pre_sale
+            };
+          });
+          setEditingStock(initialEditingState);
         } else {
           setStock([]);
         }
@@ -62,20 +73,55 @@ export const ManageStock: React.FC = () => {
     fetchStoreAndStock();
   }, [user]);
 
-  const handleUpdate = async (productId: number, quantity: number, price: number, preSale: boolean) => {
+  const handleLocalChange = (productId: number, field: string, value: any) => {
+    setEditingStock(prev => ({
+      ...prev,
+      [productId]: {
+        ...prev[productId],
+        [field]: value
+      }
+    }));
+  };
+
+  const handleSave = async (productId: number) => {
     if (!store?.id) return;
+    const editData = editingStock[productId];
+    if (!editData) return;
 
     try {
-      const result = await updateStoreStock(store.id, productId, quantity, price, preSale);
+      const result = await updateStoreStock(store.id, productId, editData.quantity, editData.price, editData.preSale);
       
       if (!result || result.error) throw new Error(result?.error || "Falha ao atualizar estoque");
 
-      showNotification("Estoque atualizado com sucesso!", "success");
+      showNotification("Estoque atualizado!", "success");
 
-      // Update local state
       setStock(prev => prev.map(item => 
         item.product_id === productId 
-          ? { ...item, quantity, store_price: price, pre_sale: preSale } 
+          ? { ...item, quantity: editData.quantity, store_price: editData.price, pre_sale: editData.preSale } 
+          : item
+      ));
+    } catch (err: any) {
+      showNotification(err.message, "error");
+    }
+  };
+
+  const handleRemove = async (productId: number) => {
+    if (!store?.id || !window.confirm("Deseja zerar o estoque deste item?")) return;
+    
+    try {
+      const result = await updateStoreStock(store.id, productId, 0, 0, false);
+      if (!result || result.error) throw new Error(result?.error || "Falha ao remover item");
+      
+      showNotification("Item zerado no estoque!", "success");
+      
+      setEditingStock(prev => ({
+        ...prev,
+        [productId]: { quantity: 0, price: 0, preSale: false }
+      }));
+      
+      setStock(prev => prev.map(item => 
+        item.product_id === productId 
+          ? { ...item, quantity: 0, store_price: 0, pre_sale: false } 
           : item
       ));
     } catch (err: any) {
@@ -130,97 +176,111 @@ export const ManageStock: React.FC = () => {
             <p className="text-slate-500 text-sm">Você ainda não tem produtos em seu estoque ou o filtro não retornou resultados.</p>
           </div>
         ) : (
-          filteredStock.map((item) => (
-            <div key={item.id} className="bg-slate-900/50 backdrop-blur-sm border border-slate-800 p-4 md:p-6 rounded-3xl flex flex-col md:flex-row items-center gap-6 group hover:border-purple-500/50 transition-all duration-500">
-              <div className="relative shrink-0">
-                <img 
-                  src={item.products.image_url || 'https://via.placeholder.com/150'} 
-                  alt={item.products.name}
-                  className="w-24 h-32 object-cover rounded-xl border border-white/5 shadow-2xl group-hover:scale-105 transition-transform duration-500"
-                />
-                {!item.quantity && (
-                  <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px] rounded-xl flex items-center justify-center">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 rotate-12">Sem Estoque</span>
-                  </div>
-                )}
-              </div>
+          filteredStock.map((item) => {
+            const edit = editingStock[item.product_id] || { quantity: 0, price: 0, preSale: false };
+            const hasChanges = edit.quantity !== item.quantity || 
+                             edit.price !== (item.store_price || 0) || 
+                             edit.preSale !== !!item.pre_sale;
 
-              <div className="flex-1 min-w-0 text-center md:text-left">
-                <div className="flex items-center justify-center md:justify-start space-x-2 mb-1">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded-full">
-                    {item.products.cardgames.name}
-                  </span>
-                  {item.pre_sale && (
-                    <span className="text-[10px] font-black uppercase tracking-widest text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full">
-                       Pré-Venda
-                    </span>
+            return (
+              <div key={item.id} className="bg-slate-900/50 backdrop-blur-sm border border-slate-800 p-4 md:p-6 rounded-3xl flex flex-col md:flex-row items-center gap-6 group hover:border-purple-500/50 transition-all duration-500">
+                <div className="relative shrink-0">
+                  <img 
+                    src={item.products.image_url || 'https://via.placeholder.com/150'} 
+                    alt={item.products.name}
+                    className="w-24 h-32 object-cover rounded-xl border border-white/5 shadow-2xl group-hover:scale-105 transition-transform duration-500"
+                  />
+                  {edit.quantity === 0 && (
+                    <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px] rounded-xl flex items-center justify-center">
+                      <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 rotate-12">Sem Estoque</span>
+                    </div>
                   )}
                 </div>
-                <h3 className="text-lg font-bold text-white mb-1 truncate">{item.products.name}</h3>
-                <p className="text-xs text-slate-500 font-mono">ID: {item.product_id}</p>
-              </div>
 
-              <div className="grid grid-cols-2 lg:grid-cols-4 items-center gap-4 w-full lg:w-auto">
-                <div className="space-y-1">
-                  <label className="text-[9px] font-black uppercase tracking-widest text-slate-500 block">Quantidade</label>
-                  <div className="flex items-center space-x-2 bg-slate-950 px-3 py-2 rounded-xl border border-slate-800">
-                    <button 
-                      onClick={() => handleUpdate(item.product_id, Math.max(0, item.quantity - 1), item.store_price || 0, item.pre_sale)}
-                      className="text-slate-500 hover:text-white transition-colors"
-                    >
-                      <i className="fas fa-minus text-xs"></i>
-                    </button>
-                    <input 
-                      type="number"
-                      value={item.quantity}
-                      onChange={(e) => handleUpdate(item.product_id, parseInt(e.target.value) || 0, item.store_price || 0, item.pre_sale)}
-                      className="bg-transparent w-12 text-center text-sm font-bold focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                    />
-                    <button 
-                      onClick={() => handleUpdate(item.product_id, item.quantity + 1, item.store_price || 0, item.pre_sale)}
-                      className="text-slate-500 hover:text-white transition-colors"
-                    >
-                      <i className="fas fa-plus text-xs"></i>
-                    </button>
+                <div className="flex-1 min-w-0 text-center md:text-left">
+                  <div className="flex items-center justify-center md:justify-start space-x-2 mb-1">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded-full">
+                      {item.products.cardgames.name}
+                    </span>
+                    {edit.preSale && (
+                      <span className="text-[10px] font-black uppercase tracking-widest text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full">
+                         Pré-Venda
+                      </span>
+                    )}
+                  </div>
+                  <h3 className="text-lg font-bold text-white mb-1 truncate">{item.products.name}</h3>
+                  <p className="text-xs text-slate-500 font-mono">ID: {item.product_id}</p>
+                </div>
+
+                <div className="grid grid-cols-2 lg:grid-cols-5 items-center gap-4 w-full lg:w-auto">
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black uppercase tracking-widest text-slate-500 block">Quantidade</label>
+                    <div className="flex items-center space-x-2 bg-slate-950 px-3 py-2 rounded-xl border border-slate-800">
+                      <button 
+                        onClick={() => handleLocalChange(item.product_id, 'quantity', Math.max(0, edit.quantity - 1))}
+                        className="text-slate-500 hover:text-white transition-colors"
+                      >
+                        <i className="fas fa-minus text-xs"></i>
+                      </button>
+                      <input 
+                        type="number"
+                        value={edit.quantity}
+                        onChange={(e) => handleLocalChange(item.product_id, 'quantity', parseInt(e.target.value) || 0)}
+                        className="bg-transparent w-12 text-center text-sm font-bold focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      />
+                      <button 
+                        onClick={() => handleLocalChange(item.product_id, 'quantity', edit.quantity + 1)}
+                        className="text-slate-500 hover:text-white transition-colors"
+                      >
+                        <i className="fas fa-plus text-xs"></i>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black uppercase tracking-widest text-slate-500 block">Preço (R$)</label>
+                    <div className="bg-slate-950 px-3 py-2 rounded-xl border border-slate-800 flex items-center">
+                      <span className="text-slate-600 text-xs mr-1">R$</span>
+                      <input 
+                        type="number"
+                        step="0.01"
+                        value={edit.price}
+                        onChange={(e) => handleLocalChange(item.product_id, 'price', parseFloat(e.target.value) || 0)}
+                        className="bg-transparent w-full text-sm font-bold focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col items-center justify-center space-y-1">
+                     <label className="text-[9px] font-black uppercase tracking-widest text-slate-500 block">Pré-Venda</label>
+                     <button 
+                       onClick={() => handleLocalChange(item.product_id, 'preSale', !edit.preSale)}
+                       className={`w-10 h-6 rounded-full transition-all relative ${edit.preSale ? 'bg-amber-600' : 'bg-slate-800'}`}
+                     >
+                       <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${edit.preSale ? 'left-5' : 'left-1'}`}></div>
+                     </button>
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                     <button 
+                       disabled={!hasChanges}
+                       onClick={() => handleSave(item.product_id)}
+                       className={`flex-1 h-10 font-black text-[10px] uppercase tracking-widest rounded-xl transition-all border ${hasChanges ? 'bg-purple-600 text-white border-purple-500 shadow-lg shadow-purple-950/20' : 'bg-slate-800/50 text-slate-600 border-slate-800 cursor-not-allowed opacity-50'}`}
+                     >
+                       SALVAR
+                     </button>
+                     <button 
+                       className="w-10 h-10 bg-red-600/10 hover:bg-red-600 text-red-500 hover:text-white rounded-xl transition-all flex items-center justify-center border border-red-600/20"
+                       onClick={() => handleRemove(item.product_id)}
+                       title="Zerar estoque"
+                     >
+                       <i className="fas fa-trash-can text-sm"></i>
+                     </button>
                   </div>
                 </div>
-
-                <div className="space-y-1">
-                  <label className="text-[9px] font-black uppercase tracking-widest text-slate-500 block">Preço (R$)</label>
-                  <div className="bg-slate-950 px-3 py-2 rounded-xl border border-slate-800 flex items-center">
-                    <span className="text-slate-600 text-xs mr-1">R$</span>
-                    <input 
-                      type="number"
-                      step="0.01"
-                      value={item.store_price || 0}
-                      onChange={(e) => handleUpdate(item.product_id, item.quantity, parseFloat(e.target.value) || 0, item.pre_sale)}
-                      className="bg-transparent w-full text-sm font-bold focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex flex-col items-center justify-center space-y-1">
-                   <label className="text-[9px] font-black uppercase tracking-widest text-slate-500 block">Pré-Venda</label>
-                   <button 
-                     onClick={() => handleUpdate(item.product_id, item.quantity, item.store_price || 0, !item.pre_sale)}
-                     className={`w-10 h-6 rounded-full transition-all relative ${item.pre_sale ? 'bg-amber-600' : 'bg-slate-800'}`}
-                   >
-                     <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${item.pre_sale ? 'left-5' : 'left-1'}`}></div>
-                   </button>
-                </div>
-
-                <div className="flex items-center justify-end">
-                   <button 
-                     className="w-10 h-10 bg-red-600/10 hover:bg-red-600 text-red-500 hover:text-white rounded-xl transition-all flex items-center justify-center border border-red-600/20"
-                     onClick={() => handleUpdate(item.product_id, 0, item.store_price || 0, item.pre_sale)}
-                     title="Remover do estoque (Zerado)"
-                   >
-                     <i className="fas fa-trash-can text-sm"></i>
-                   </button>
-                </div>
               </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
     </div>

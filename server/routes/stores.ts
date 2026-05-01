@@ -226,7 +226,7 @@ router.get("/lojas/:username/estoque", async (req, res) => {
     if (!user) return res.status(404).json({ error: "Usuário não encontrado" });
 
     const { data: store } = await supabaseAdmin.from('stores').select('id').eq('user_id', user.id).maybeSingle();
-    if (!store) return res.status(404).json({ error: "Loja não encontrada" });
+    if (!store) return res.json([]); 
 
     const { data, error } = await supabaseAdmin
       .from('store_stock')
@@ -374,42 +374,25 @@ router.post("/lojas/estoque", authenticate, requireLojista, async (req, res) => 
       return res.status(403).json({ error: "Você não tem permissão para gerenciar esta loja" });
     }
 
-    // Check if exists
-    const { data: existing } = await supabaseAdmin
+    // Using upsert with conflict on (store_id, product_id)
+    const { data: result, error: upsertError } = await supabaseAdmin
       .from('store_stock')
-      .select('id')
-      .eq('store_id', store_id)
-      .eq('product_id', product_id)
-      .maybeSingle();
-
-    let result;
-    if (existing) {
-      result = await supabaseAdmin
-        .from('store_stock')
-        .update({ 
-          quantity: quantity || 0,
-          store_price: store_price || 0,
-          pre_sale: !!pre_sale,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', existing.id)
-        .select();
-    } else {
-      result = await supabaseAdmin
-        .from('store_stock')
-        .insert({ 
+      .upsert({ 
           store_id, 
           product_id, 
           quantity: quantity || 0,
           store_price: store_price || 0,
           pre_sale: !!pre_sale,
           updated_at: new Date().toISOString()
-        })
-        .select();
+      }, { onConflict: 'store_id,product_id' })
+      .select();
+
+    if (upsertError) {
+        console.error("Upsert error in store_stock:", upsertError);
+        throw upsertError;
     }
     
-    if (result.error) throw result.error;
-    res.json({ status: "ok", data: result.data });
+    res.json({ status: "ok", data: result });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }

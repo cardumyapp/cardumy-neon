@@ -20,7 +20,7 @@ router.get("/torneios/:id", async (req, res) => {
                 cardgames(name),
                 tournament_formats(name),
                 creator:users(id, username, codename, avatar),
-                tickets:tournament_tickets(
+                tickets:tournament_tickets!fk_tickets_product(
                     *,
                     product:products(
                         *,

@@ -748,9 +748,30 @@ export const getUserProfile = async (userId: string | number) => {
   }
 };
 
+const getAuthHeaders = async (contentType = 'application/json') => {
+    const { data: { session } } = await supabase.auth.getSession();
+    const headers: any = {
+        'Content-Type': contentType
+    };
+    
+    if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`;
+    }
+
+    // Dev impersonation support
+    const impersonated = localStorage.getItem('cardumy_impersonated_user');
+    if (impersonated) {
+        const user = JSON.parse(impersonated);
+        headers['X-Impersonate-User-Id'] = user.id;
+    }
+
+    return headers;
+};
+
 export const getUserOrders = async () => {
     try {
-        const response = await fetch('/api/orders');
+        const headers = await getAuthHeaders();
+        const response = await fetch('/api/orders', { headers });
         if (!response.ok) throw new Error('Failed to fetch orders');
         return await response.json();
     } catch (error) {
@@ -761,7 +782,8 @@ export const getUserOrders = async () => {
 
 export const getReceivedOrders = async () => {
     try {
-        const response = await fetch('/api/orders/received');
+        const headers = await getAuthHeaders();
+        const response = await fetch('/api/orders/received', { headers });
         if (!response.ok) throw new Error('Failed to fetch received orders');
         return await response.json();
     } catch (error) {
@@ -772,7 +794,8 @@ export const getReceivedOrders = async () => {
 
 export const getOrderDetails = async (orderId: string) => {
     try {
-        const response = await fetch(`/api/orders/${orderId}`);
+        const headers = await getAuthHeaders();
+        const response = await fetch(`/api/orders/${orderId}`, { headers });
         if (!response.ok) throw new Error('Failed to fetch order details');
         return await response.json();
     } catch (error) {
@@ -783,9 +806,10 @@ export const getOrderDetails = async (orderId: string) => {
 
 export const updateOrderStatus = async (orderId: string, status: string) => {
     try {
+        const headers = await getAuthHeaders();
         const response = await fetch(`/api/orders/${orderId}/status`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers,
             body: JSON.stringify({ status })
         });
         if (!response.ok) throw new Error('Failed to update order status');
@@ -798,7 +822,11 @@ export const updateOrderStatus = async (orderId: string, status: string) => {
 
 export const cleanupExpiredOrders = async () => {
     try {
-        const response = await fetch('/api/orders/cleanup', { method: 'POST' });
+        const headers = await getAuthHeaders();
+        const response = await fetch('/api/orders/cleanup', { 
+            method: 'POST',
+            headers
+        });
         if (!response.ok) throw new Error('Failed to cleanup orders');
         return await response.json();
     } catch (error) {
@@ -969,15 +997,11 @@ export const getStoreHours = async (storeId: string) => {
 
 export const updateStoreStock = async (store_id: string | number, product_id: number | string, quantity: number, price?: number, pre_sale?: boolean) => {
   try {
-    const { data: { session } } = await supabase.auth.getSession();
-    const token = session?.access_token;
+    const headers = await getAuthHeaders();
 
     const response = await fetch('/api/lojas/estoque', {
       method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
+      headers,
       body: JSON.stringify({ 
         store_id, 
         product_id, 
@@ -1115,10 +1139,9 @@ export const getTournamentFormats = async () => {
 
 export const getMyTournaments = async () => {
   try {
-    const { data: { session } } = await supabase.auth.getSession();
-    const token = session?.access_token;
+    const headers = await getAuthHeaders();
     const response = await fetch('/api/meus-torneios', {
-      headers: { 'Authorization': `Bearer ${token}` }
+      headers
     });
     if (!response.ok) throw new Error('Failed to fetch tournaments');
     return await response.json();
@@ -1161,15 +1184,11 @@ export const createTournament = async (tournamentData: any) => {
 
 export const checkout = async (items: any[], addressId?: string | number) => {
   try {
-    const { data: { session } } = await supabase.auth.getSession();
-    const token = session?.access_token;
+    const headers = await getAuthHeaders();
 
     const response = await fetch('/api/checkout', {
       method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
+      headers,
       body: JSON.stringify({ 
         items: items.map(i => ({
             product_id: i.id,

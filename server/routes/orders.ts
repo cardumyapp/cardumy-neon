@@ -37,9 +37,9 @@ router.get("/orders/received", authenticate, requireLojista, async (req: any, re
             .from('stores')
             .select('id')
             .eq('user_id', req.user.id)
-            .single();
+            .maybeSingle();
         
-        if (!store) return res.status(404).json({ error: "Store not found" });
+        if (!store) return res.json([]); // Return empty list if no store profile yet
 
         const { data, error } = await supabaseAdmin
             .from('orders')
@@ -113,14 +113,14 @@ router.post("/orders/cleanup", async (req, res) => {
     if (!supabaseAdmin) return res.status(500).json({ error: "Supabase not configured" });
     
     try {
-        const expirationTime = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+        const now = new Date().toISOString();
         
-        // 1. Find pending orders older than 24h
+        // 1. Find pending orders that are expired
         const { data: expiredOrders, error: findError } = await supabaseAdmin
             .from('orders')
             .select('id, store_id')
             .eq('status', 'pending')
-            .lt('created_at', expirationTime);
+            .lt('expires_at', now);
 
         if (findError) throw findError;
 
@@ -211,6 +211,7 @@ router.post("/checkout", authenticate, async (req: any, res) => {
         // 2. Create Order
         const total = items.reduce((acc, item) => acc + (item.price * item.quantity), 0);
         const externalRef = `ORD-${Date.now()}-${userId}`;
+        const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
         
         const { data: order, error: orderError } = await supabaseAdmin
             .from('orders')
@@ -220,7 +221,8 @@ router.post("/checkout", authenticate, async (req: any, res) => {
                 status: 'pending',
                 store_id: items[0]?.store_id || null, // Best effort: pick first store if mixed (ideally checkout is per store)
                 external_reference: externalRef,
-                created_at: new Date().toISOString()
+                created_at: new Date().toISOString(),
+                expires_at: expiresAt
             })
             .select()
             .single();

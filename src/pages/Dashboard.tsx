@@ -8,12 +8,20 @@ import { useAuth } from '../components/AuthProvider';
 import { OfflineWarning } from '../components/OfflineWarning';
 import { fetchLatestPosts, BlogPost } from '../services/blogService';
 
+import { LojistaDashboard } from './LojistaDashboard';
+
 interface DashboardProps {
   activeGame: GameType | 'All';
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({ activeGame }) => {
   const { user, login, isOffline } = useAuth();
+  const isLojista = user?.role_id === 6;
+
+  if (isLojista) {
+      return <LojistaDashboard />;
+  }
+
   const [products, setProducts] = useState<any[]>([]);
   const [stores, setStores] = useState<any[]>([]);
   const [activities, setActivities] = useState<any[]>([]);

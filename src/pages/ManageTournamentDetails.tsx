@@ -158,12 +158,12 @@ export const ManageTournamentDetails: React.FC = () => {
                                                     <img src={entry.user.avatar_url} alt="" className="w-full h-full object-cover" />
                                                 ) : (
                                                     <div className="w-full h-full flex items-center justify-center text-slate-600 font-bold">
-                                                        {entry.user?.display_name?.charAt(0) || '?'}
+                                                        {entry.user?.username?.charAt(0) || entry.user?.codename?.charAt(0) || '?'}
                                                     </div>
                                                 )}
                                             </div>
                                             <div>
-                                                <div className="font-bold text-white text-sm">{entry.user?.display_name || entry.user?.username}</div>
+                                                <div className="font-bold text-white text-sm">{entry.user?.username || entry.user?.codename || 'Membro'}</div>
                                                 <div className="text-[10px] text-slate-500 font-mono tracking-tight uppercase">@{entry.user?.username}</div>
                                             </div>
                                         </div>

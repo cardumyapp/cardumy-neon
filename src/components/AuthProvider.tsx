@@ -35,14 +35,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const setupTestSession = async () => {
       setLoading(true);
       try {
+        // First check localStorage for impersonated user
+        const savedUser = localStorage.getItem('cardumy_impersonated_user');
+        if (savedUser) {
+          console.log('Ambiente de teste: Carregando usuário salvo no localStorage');
+          setUser(JSON.parse(savedUser));
+          setLoading(false);
+          return;
+        }
+
         console.log('Ambiente de teste: Buscando usuário real do banco...');
         
         // Tenta buscar um usuário aleatório do banco
         const dbUser = await getRandomUser();
         
         if (dbUser) {
-          console.log(`Usuário real encontrado: ${dbUser.display_name || dbUser.username || dbUser.email}`);
+          console.log(`Usuário real encontrado: ${dbUser.username || dbUser.codename || dbUser.email}`);
           setUser(dbUser);
+          localStorage.setItem('cardumy_impersonated_user', JSON.stringify(dbUser));
         } else {
           console.warn('Nenhum usuário encontrado no banco. Fallback para mock necessário para inicialização.');
           // Fallback mínimo se o banco estiver vazio para não quebrar o app
@@ -71,10 +81,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = async () => {
     setUser(null);
+    localStorage.removeItem('cardumy_impersonated_user');
   };
 
   const switchUser = (newUser: any) => {
     setUser(newUser);
+    localStorage.setItem('cardumy_impersonated_user', JSON.stringify(newUser));
+    // Reload to ensure all services/headers are updated
+    window.location.reload();
   };
 
   return (
