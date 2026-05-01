@@ -1,15 +1,23 @@
 
 import React, { useState, useEffect } from 'react';
-import { GAMES } from '../constants';
 import { GameType, Tournament } from '../types';
 import { motion } from 'motion/react';
 import { Link } from 'react-router-dom';
-import { getAllTournaments } from '../services/supabaseService';
+import { getCardgames, getAllTournaments, getGameIcon } from '../services/supabaseService';
 
 export const Tournaments: React.FC = () => {
   const [activeGame, setActiveGame] = useState<GameType | 'All'>('All');
   const [torneios, setTorneios] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [dbGames, setDbGames] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchMetadata = async () => {
+      const games = await getCardgames();
+      setDbGames(games);
+    };
+    fetchMetadata();
+  }, []);
 
   useEffect(() => {
     const fetchTourneys = async () => {
@@ -52,14 +60,14 @@ export const Tournaments: React.FC = () => {
           >
             Todos
           </button>
-          {GAMES.map(game => (
+          {dbGames.map(game => (
             <button 
-              key={game.type}
-              onClick={() => setActiveGame(game.type)}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all border flex items-center space-x-2 ${activeGame === game.type ? 'bg-purple-600 border-purple-500 text-white shadow-lg shadow-purple-600/20' : 'bg-slate-900/50 border-slate-800 text-slate-500 hover:text-slate-300'}`}
+              key={game.id}
+              onClick={() => setActiveGame((game.slug || game.name) as GameType)}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all border flex items-center space-x-2 ${activeGame === (game.slug || game.name) ? 'bg-purple-600 border-purple-500 text-white shadow-lg shadow-purple-600/20' : 'bg-slate-900/50 border-slate-800 text-slate-500 hover:text-slate-300'}`}
             >
-              <i className={`fas ${game.icon}`}></i>
-              <span>{game.type}</span>
+              <i className={`fas ${getGameIcon(game.name)}`}></i>
+              <span>{game.name}</span>
             </button>
           ))}
         </div>

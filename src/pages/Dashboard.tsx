@@ -1,6 +1,6 @@
 
 import React, { useMemo, useState, useEffect } from 'react';
-import { GAMES, MOCK_UPDATES } from '../constants';
+import { MOCK_UPDATES } from '../constants';
 import { GameType } from '../types';
 import { Link } from 'react-router-dom';
 import { getProducts, getStores, getActivities, getAllTournaments } from '../services/supabaseService';

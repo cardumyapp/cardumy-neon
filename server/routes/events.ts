@@ -188,7 +188,7 @@ router.post("/torneios", authenticate, requireLojista, async (req: any, res) => 
                     .from('stores')
                     .select('id')
                     .eq('user_id', req.user.id)
-                    .single();
+                    .maybeSingle();
                 
                 if (store) {
                     await supabaseAdmin.from('store_stock').insert({
@@ -265,7 +265,7 @@ router.get("/torneios/:id/entries", authenticate, requireLojista, async (req: an
         const { id } = req.params;
         const { data, error } = await supabaseAdmin
             .from('tournament_entries')
-            .select(`*, user:users(id, username, codename, avatar_url)`)
+            .select(`*, user:users(id, username, codename, avatar)`)
             .eq('tournament_id', id);
         
         if (error) throw error;

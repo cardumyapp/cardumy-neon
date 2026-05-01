@@ -1,18 +1,5 @@
 
-export enum GameType {
-  ONE_PIECE = 'One Piece',
-  DIGIMON = 'Digimon',
-  POKEMON = 'Pokémon',
-  MAGIC = 'Magic',
-  DRAGON_BALL = 'Dragon Ball',
-  YU_GI_OH = 'Yu-Gi-Oh!',
-  GUNDAM = 'Gundam',
-  RIFTBOUND = 'Riftbound',
-  SORCERY = 'Sorcery',
-  LORCANA = 'Disney Lorcana',
-  VANGUARD = 'Cardfight!! Vanguard',
-  UNION_ARENA = 'Union Arena'
-}
+export type GameType = string;
 
 export enum ProductType {
   CARD = 'Carta Avulsa',
@@ -303,18 +290,11 @@ export const PREDEFINED_COVERS = [
   'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&q=80&w=1200',
   'https://images.unsplash.com/photo-1614850523459-c2f4c699c52e?auto=format&fit=crop&q=80&w=1200',
   'https://images.unsplash.com/photo-1611996598518-d767f21d651f?auto=format&fit=crop&q=80&w=1200',
-  'https://images.unsplash.com/photo-1549490349-8643362247b5?auto=format&fit=crop&q=80&w=1200'
+  'https://images.unsplash.com/photo-1549490349-8643362247b5?auto=format&fit=crop&q=80&w=1200',
+  'https://images.unsplash.com/photo-1620641788421-7a1c342ea42e?auto=format&fit=crop&q=80&w=1200',
+  'https://images.unsplash.com/photo-1550684848-fac1c5b4e853?auto=format&fit=crop&q=80&w=1200',
+  'https://images.unsplash.com/photo-1557683316-973673baf926?auto=format&fit=crop&q=80&w=1200',
+  'https://images.unsplash.com/photo-1558591710-4b4a1ae0f04d?auto=format&fit=crop&q=80&w=1200',
+  'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80&w=1200'
 ];
 
-export const TCG_GAMES = [
-  'One Piece TCG',
-  'Digimon Card Game',
-  'Pokémon TCG',
-  'Yu-Gi-Oh!',
-  'Magic: The Gathering',
-  'Disney Lorcana',
-  'Dragon Ball Super',
-  'Cardfight!! Vanguard',
-  'Union Arena',
-  'Gundam Card Game'
-];

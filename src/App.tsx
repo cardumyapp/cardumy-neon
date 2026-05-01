@@ -27,13 +27,12 @@ import { ManageTournaments } from './pages/ManageTournaments';
 import { ManageTournamentDetails } from './pages/ManageTournamentDetails';
 import { CreateTournament } from './pages/CreateTournament';
 import { Product, CartItem, GameType } from './types';
-import { GAMES } from './constants';
 import { AuthProvider, useAuth } from './components/AuthProvider';
 import { NotificationProvider } from './components/NotificationProvider';
 import { UserPicker } from './components/UserPicker';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
-import { getCardgames, getNotifications } from './services/supabaseService';
+import { getCardgames, getNotifications, getGameIcon } from './services/supabaseService';
 
 const SidebarItem: React.FC<{ to: string; icon: string; label: string; active: boolean; collapsed: boolean; badge?: number; onClick?: () => void }> = ({ to, icon, label, active, collapsed, badge, onClick }) => (
   <Link 
@@ -237,6 +236,7 @@ const AppContent: React.FC = () => {
                         onClick={() => { setActiveGame('All'); setIsGamePickerOpen(false); }}
                         className={`w-full text-left px-3 py-2.5 rounded-lg text-xs font-bold transition-colors mb-1 flex items-center space-x-3 ${activeGame === 'All' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:bg-slate-700 hover:text-white'}`}
                       >
+                        <i className="fas fa-layer-group w-4 text-center"></i>
                         <span>Ver Tudo</span>
                       </button>
                       {dbGames.map(game => (
@@ -245,7 +245,7 @@ const AppContent: React.FC = () => {
                           onClick={() => { setActiveGame((game.slug || game.name) as GameType); setIsGamePickerOpen(false); }}
                           className={`w-full text-left px-3 py-2.5 rounded-lg text-xs font-bold transition-colors mb-1 flex items-center space-x-3 ${activeGame === (game.slug || game.name) ? 'bg-purple-600 text-white' : 'text-slate-400 hover:bg-slate-700 hover:text-white'}`}
                         >
-                          <span className="w-1.5 h-1.5 rounded-full bg-slate-600"></span>
+                          <i className={`fas ${getGameIcon(game.name)} w-4 text-center`}></i>
                           <span>{game.name}</span>
                         </button>
                       ))}
@@ -345,8 +345,8 @@ const AppContent: React.FC = () => {
             {user ? (
               <div className="flex items-center space-x-2 md:space-x-3 bg-slate-800/50 pr-2 md:pr-4 pl-1 py-1 rounded-full border border-white/5 cursor-pointer group relative">
                 <img 
-                  src={user.avatar || user.photoURL || "https://i.pravatar.cc/150?u=viped"} 
-                  className="w-7 h-7 md:w-8 md:h-8 rounded-full border border-purple-500 object-cover" 
+                  src={(isLojista ? user.store_logo : user.avatar) || user.photoURL || "https://i.pravatar.cc/150?u=viped"} 
+                  className="w-7 h-7 md:w-8 md:h-8 rounded-full border border-purple-500 object-cover bg-slate-800" 
                   alt="Avatar" 
                 />
                 <div className="hidden sm:flex flex-col">

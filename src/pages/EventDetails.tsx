@@ -50,7 +50,7 @@ export const EventDetails: React.FC<EventDetailsProps> = ({ onAddToCart }) => {
     onAddToCart({
         id: product.id,
         name: product.name,
-        price: product.mspr || product.price,
+        price: product.msrp || product.mspr || product.price,
         image_url: product.image_url,
         storeId: storeId,
         quantity: 1,
@@ -146,7 +146,7 @@ export const EventDetails: React.FC<EventDetailsProps> = ({ onAddToCart }) => {
                     <div>
                     <p className="text-xs text-slate-500 uppercase font-black tracking-widest mb-1">Valor da Inscrição</p>
                     <div className="flex items-end space-x-2">
-                        <span className="text-4xl font-black text-emerald-400">R$ {(mainTicket.product?.mspr || 0).toFixed(2)}</span>
+                        <span className="text-4xl font-black text-emerald-400">R$ {(mainTicket.product?.msrp || mainTicket.product?.mspr || 0).toFixed(2)}</span>
                         <span className="text-slate-500 text-xs font-bold mb-1.5">/ ingresso</span>
                     </div>
                     </div>

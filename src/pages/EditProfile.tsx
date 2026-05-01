@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../components/AuthProvider';
 import { getUserProfile, updateUserProfile, getFighterTags } from '../services/supabaseService';
-import { PREDEFINED_AVATARS, PREDEFINED_COVERS, TCG_GAMES, UserProfile } from '../types';
+import { PREDEFINED_AVATARS, PREDEFINED_COVERS, UserProfile } from '../types';
 import { motion } from 'motion/react';
 
 export const EditProfile: React.FC = () => {

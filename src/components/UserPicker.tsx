@@ -66,8 +66,8 @@ export const UserPicker: React.FC<UserPickerProps> = ({ onSelect, onClose }) => 
                                     className="flex items-center space-x-3 p-3 rounded-xl hover:bg-slate-800 transition-all group"
                                 >
                                     <img 
-                                        src={u.avatar_url || u.avatar || `https://i.pravatar.cc/150?u=${u.id}`} 
-                                        className="w-10 h-10 rounded-full border-2 border-slate-700 group-hover:border-purple-500 transition-colors"
+                                        src={(u.role_id === 6 ? u.store_logo : u.avatar) || `https://i.pravatar.cc/150?u=${u.id}`} 
+                                        className="w-10 h-10 rounded-full border-2 border-slate-700 group-hover:border-purple-500 transition-colors object-cover bg-slate-800"
                                         alt=""
                                     />
                                     <div className="text-left">

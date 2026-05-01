@@ -1,5 +1,28 @@
 import { supabase } from '../lib/supabase';
 
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const cache: Record<string, { data: any; timestamp: number }> = {};
+
+const getFromCache = (key: string) => {
+    const entry = cache[key];
+    if (entry && Date.now() - entry.timestamp < CACHE_TTL) {
+        return entry.data;
+    }
+    return null;
+};
+
+const setToCache = (key: string, data: any) => {
+    cache[key] = { data, timestamp: Date.now() };
+};
+
+export const clearCache = (key?: string) => {
+    if (key) {
+        delete cache[key];
+    } else {
+        Object.keys(cache).forEach(k => delete cache[k]);
+    }
+};
+
 export const getProducts = (callback: (products: any[]) => void) => {
   // Test server connectivity on load
   fetch('/api/ping')
@@ -15,7 +38,7 @@ export const getProducts = (callback: (products: any[]) => void) => {
         cardgames(id, name), 
         product_types(id, name),
         tournament_tickets:tournament_tickets!fk_tickets_product(max_quantity, sold_quantity),
-        store_stock(quantity, store_price)
+        store_stock(quantity, store_price, stores(id, name, logo, slug, parceiro))
       `)
       .order('created_at', { ascending: false });
     
@@ -59,6 +82,11 @@ export const getPrimaryAddress = async () => {
 };
 
 export const getStores = (callback: (stores: any[]) => void) => {
+  const cached = getFromCache('stores');
+  if (cached) {
+    callback(cached);
+  }
+
   const fetchStores = async () => {
     const { data, error } = await supabase
       .from('stores')
@@ -69,6 +97,7 @@ export const getStores = (callback: (stores: any[]) => void) => {
       console.error('Error fetching stores:', error);
       return;
     }
+    setToCache('stores', data || []);
     callback(data || []);
   };
 
@@ -274,49 +303,41 @@ export const getBinders = (userId: string | number, callback: (binders: any[]) =
 
 export const addCardToBinder = async (userId: any, binderId: any, card: any) => {
   try {
-    // Ensure card is in our DB
+    // 1. Ensure we have the base card ID (BIGINT)
     let dbCardId = card.id;
-    let dbGameId = card.game_id;
-    if (isNaN(Number(card.id)) || !dbGameId) {
+    if (isNaN(Number(card.id))) {
       const synced = await syncCard(card);
-      if (!synced) throw new Error('Failed to sync card');
+      if (!synced) throw new Error('Falha ao sincronizar carta com o servidor');
       dbCardId = synced.id;
-      dbGameId = synced.game_id;
     }
 
-    let cardRecordId;
-    const { data: existingCard } = await supabase
+    // 2. Check if the card is already in the user's principal collection (user_cards)
+    const { data: userCard, error: userCardError } = await supabase
       .from('user_cards')
       .select('id')
       .eq('user_id', userId)
       .eq('card_id', dbCardId)
       .maybeSingle();
     
-    if (existingCard) {
-      cardRecordId = existingCard.id;
-    } else {
-      const { data: newCard, error: insertError } = await supabase
-        .from('user_cards')
-        .insert({
-          user_id: userId,
-          card_id: dbCardId,
-          quantidade: 1,
-          game_id: dbGameId
-        })
-        .select()
-        .maybeSingle();
-      if (insertError) throw insertError;
-      cardRecordId = newCard?.id;
+    if (userCardError) throw userCardError;
+    if (!userCard) {
+      throw new Error('Esta carta deve ser adicionada à sua coleção principal primeiro.');
     }
 
-    const { error } = await supabase
+    // 3. Add the link in binder_cards using user_card_id
+    const { error: insertError } = await supabase
       .from('binder_cards')
       .insert({
         binder_id: binderId,
-        card_id: cardRecordId
+        user_card_id: userCard.id
       });
     
-    if (error) throw error;
+    if (insertError) {
+      if (insertError.code === '23505') {
+        throw new Error('Esta carta já está nesta pasta.');
+      }
+      throw insertError;
+    }
   } catch (error) {
     console.error('Error adding card to binder:', error);
     throw error;
@@ -512,7 +533,7 @@ export const removeCardFromBinder = async (binderId: string | number, cardId: st
       .from('binder_cards')
       .delete()
       .eq('binder_id', binderId)
-      .eq('card_id', cardId); // This cardId refers to the ID in user_cards
+      .eq('user_card_id', cardId); // This cardId refers to the ID in user_cards
     
     if (error) throw error;
   } catch (error) {
@@ -523,12 +544,11 @@ export const removeCardFromBinder = async (binderId: string | number, cardId: st
 
 export const getMyStore = async () => {
     try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) return null;
-        const token = session.access_token;
+        const headers = await getAuthHeaders();
+        if (!headers['Authorization']) return null;
         
         const response = await fetch('/api/lojas/minha', {
-            headers: { 'Authorization': `Bearer ${token}` }
+            headers
         });
         if (!response.ok) return null;
         return await response.json();
@@ -616,6 +636,9 @@ export const getRankings = async (limit: number = 5) => {
 };
 
 export const getGlobalStats = async () => {
+  const cached = getFromCache('global_stats');
+  if (cached) return cached;
+
   const stats = {
     users: 0,
     stores: 0,
@@ -625,40 +648,39 @@ export const getGlobalStats = async () => {
   };
 
   try {
-    const { count: usersCount } = await supabase.from('users').select('*', { count: 'exact', head: true });
+    const [
+      { count: usersCount },
+      { count: storesCount },
+      { count: productsCount },
+      { count: tournamentsCount },
+      { count: ordersCount }
+    ] = await Promise.all([
+      supabase.from('users').select('*', { count: 'exact', head: true }),
+      supabase.from('stores').select('*', { count: 'exact', head: true }),
+      supabase.from('cards').select('*', { count: 'exact', head: true }),
+      supabase.from('tournaments').select('*', { count: 'exact', head: true }),
+      supabase.from('orders').select('*', { count: 'exact', head: true })
+    ]);
+
     stats.users = usersCount || 0;
-  } catch (e) { console.warn('Table users not found or inaccessible'); }
-
-  try {
-    const { count: storesCount } = await supabase.from('stores').select('*', { count: 'exact', head: true });
     stats.stores = storesCount || 0;
-  } catch (e) { console.warn('Table stores not found or inaccessible'); }
-
-  try {
-    const { count: productsCount } = await supabase.from('cards').select('*', { count: 'exact', head: true });
     stats.products = productsCount || 0;
-  } catch (e) { console.warn('Table cards not found or inaccessible'); }
-
-  try {
-    const { count: tournamentsCount } = await supabase.from('tournaments').select('*', { count: 'exact', head: true });
     stats.tournaments = tournamentsCount || 0;
-  } catch (e) { console.warn('Table tournaments not found or inaccessible'); }
-
-  try {
-    const { count: ordersCount } = await supabase.from('orders').select('*', { count: 'exact', head: true });
     stats.orders = ordersCount || 0;
-  } catch (e) { console.warn('Table orders not found or inaccessible'); }
+  } catch (e) { 
+    console.warn('Error fetching global stats:', e);
+  }
 
+  setToCache('global_stats', stats);
   return stats;
 };
 
 export const getNotifications = async () => {
     try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) return [];
-        const token = session.access_token;
+        const headers = await getAuthHeaders();
+        if (!headers['Authorization']) return [];
         const response = await fetch('/api/notifications', {
-            headers: { 'Authorization': `Bearer ${token}` }
+            headers
         });
         if (!response.ok) return [];
         return await response.json();
@@ -670,12 +692,11 @@ export const getNotifications = async () => {
 
 export const markNotificationAsRead = async (id: number | string) => {
     try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) return false;
-        const token = session.access_token;
+        const headers = await getAuthHeaders();
+        if (!headers['Authorization']) return false;
         const response = await fetch(`/api/notifications/${id}/read`, {
             method: 'POST',
-            headers: { 'Authorization': `Bearer ${token}` }
+            headers
         });
         return response.ok;
     } catch (error) {
@@ -686,12 +707,11 @@ export const markNotificationAsRead = async (id: number | string) => {
 
 export const markAllNotificationsAsRead = async () => {
     try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) return false;
-        const token = session.access_token;
+        const headers = await getAuthHeaders();
+        if (!headers['Authorization']) return false;
         const response = await fetch('/api/notifications/read-all', {
             method: 'POST',
-            headers: { 'Authorization': `Bearer ${token}` }
+            headers
         });
         return response.ok;
     } catch (error) {
@@ -839,11 +859,14 @@ export const getAllUsers = async () => {
   try {
     const { data, error } = await supabase
       .from('users')
-      .select('*')
+      .select('*, stores(logo)')
       .order('codename', { ascending: true });
     
     if (error) throw error;
-    return data || [];
+    return (data || []).map(u => ({
+      ...u,
+      store_logo: u.stores?.[0]?.logo || u.stores?.logo
+    }));
   } catch (error) {
     console.error('Error fetching all users from DB:', error);
     return [];
@@ -856,12 +879,16 @@ export const getRandomUser = async () => {
     // We fetch a larger pool and pick one to avoid complex random SQL logic in client
     const { data, error } = await supabase
       .from('users')
-      .select('*')
+      .select('*, stores(logo)')
       .limit(20);
     
     if (error) throw error;
     if (data && data.length > 0) {
-      return data[Math.floor(Math.random() * data.length)];
+      const u = data[Math.floor(Math.random() * data.length)];
+      return {
+        ...u,
+        store_logo: u.stores?.[0]?.logo || u.stores?.logo
+      };
     }
     return null;
   } catch (error) {
@@ -1010,11 +1037,15 @@ export const updateStoreStock = async (store_id: string | number, product_id: nu
         pre_sale
       })
     });
-    if (!response.ok) throw new Error('Failed to update store stock');
-    return await response.json();
-  } catch (error) {
+    
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.error || 'Failed to update store stock');
+    }
+    return data;
+  } catch (error: any) {
     console.error('Error updating store stock:', error);
-    return null;
+    return { error: error.message };
   }
 };
 
@@ -1098,7 +1129,7 @@ export const getCards = async (game?: string): Promise<any[]> => {
       game: p.cardgames?.name || 'Unknown',
       code: p.slug || p.id.toString(),
       rarity: p.product_type || 'Common',
-      price: p.msrp || 0,
+      price: p.msrp || p.mspr || 0,
       imageUrl: p.image_url || 'https://images.unsplash.com/photo-1614850523296-d8c1af93d400?auto=format&fit=crop&q=80&w=400',
       set: p.cardgames?.name || 'Base Set'
     }));
@@ -1108,7 +1139,29 @@ export const getCards = async (game?: string): Promise<any[]> => {
   }
 };
 
+export const getGameIcon = (gameName: string) => {
+  const name = gameName.toLowerCase();
+  if (name.includes('one piece')) return 'fa-anchor';
+  if (name.includes('digimon')) return 'fa-dragon';
+  if (name.includes('pokémon') || name.includes('pokemon')) return 'fa-bolt';
+  if (name.includes('magic')) return 'fa-wand-sparkles';
+  if (name.includes('yu-gi-oh') || name.includes('yugioh')) return 'fa-cards';
+  if (name.includes('dragon ball')) return 'fa-circle-dot';
+  if (name.includes('gundam')) return 'fa-robot';
+  if (name.includes('lorcana')) return 'fa-wand-magic-sparkles';
+  if (name.includes('union arena')) return 'fa-shield-halved';
+  if (name.includes('star wars')) return 'fa-jedi';
+  if (name.includes('vanguard')) return 'fa-sword';
+  if (name.includes('flesh and blood') || name.includes('fab')) return 'fa-khanda';
+  if (name.includes('sorcery')) return 'fa-scroll';
+  if (name.includes('riftbound')) return 'fa-fire-pulse';
+  return 'fa-gamepad';
+};
+
 export const getCardgames = async () => {
+  const cached = getFromCache('cardgames');
+  if (cached) return cached;
+  
   try {
     const { data, error } = await supabase
       .from('cardgames')
@@ -1116,6 +1169,7 @@ export const getCardgames = async () => {
       .order('name', { ascending: true });
     
     if (error) throw error;
+    setToCache('cardgames', data || []);
     return data || [];
   } catch (error) {
     console.error('Error fetching cardgames:', error);
@@ -1124,12 +1178,17 @@ export const getCardgames = async () => {
 };
 
 export const getTournamentFormats = async () => {
+  const cached = getFromCache('tournament_formats');
+  if (cached) return cached;
+
   try {
     const { data, error } = await supabase
       .from('tournament_formats')
       .select('*')
       .order('name', { ascending: true });
+    
     if (error) throw error;
+    setToCache('tournament_formats', data || []);
     return data || [];
   } catch (error) {
     console.error('Error fetching tournament formats:', error);
@@ -1153,9 +1212,9 @@ export const getMyTournaments = async () => {
 
 export const createTournament = async (tournamentData: any) => {
   try {
-    const { data: { session } } = await supabase.auth.getSession();
-    const token = session?.access_token;
-    
+    const headers = await getAuthHeaders();
+    if (!headers['Authorization']) throw new Error('Sessão expirada ou usuário não autenticado');
+
     // Ensure all numeric fields are actually numbers
     const payload = {
         ...tournamentData,
@@ -1168,17 +1227,18 @@ export const createTournament = async (tournamentData: any) => {
 
     const response = await fetch('/api/torneios', {
       method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
+      headers,
       body: JSON.stringify(payload)
     });
-    if (!response.ok) throw new Error('Failed to create tournament');
-    return await response.json();
-  } catch (error) {
+    
+    const data = await response.json();
+    if (!response.ok) {
+        throw new Error(data.error || 'Erro ao criar torneio');
+    }
+    return data;
+  } catch (error: any) {
     console.error('Error creating tournament:', error);
-    return { error: 'Failed to create tournament' };
+    return { error: error.message || 'Failed to create tournament' };
   }
 };
 
@@ -1545,12 +1605,17 @@ export const getReviewPhrases = async (type?: 'positive' | 'negative') => {
 };
 
 export const getProductTypes = async (gameId?: string | number) => {
+  const cacheKey = `product_types_${gameId || 'all'}`;
+  const cached = getFromCache(cacheKey);
+  if (cached) return cached;
+
   try {
     let query = supabase.from('product_types').select('*');
     if (gameId && gameId !== 'all') query = query.eq('game_id', gameId);
     
     const { data, error } = await query.order('name', { ascending: true });
     if (error) throw error;
+    setToCache(cacheKey, data || []);
     return data || [];
   } catch (error) {
     console.error('Error fetching product types:', error);

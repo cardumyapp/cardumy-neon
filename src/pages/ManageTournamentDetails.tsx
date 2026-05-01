@@ -154,8 +154,8 @@ export const ManageTournamentDetails: React.FC = () => {
                                     <div key={entry.id} className="p-4 flex items-center justify-between hover:bg-white/[0.02] transition-colors">
                                         <div className="flex items-center space-x-4">
                                             <div className="w-10 h-10 rounded-full bg-slate-800 border border-white/10 overflow-hidden shrink-0 shadow-inner">
-                                                {entry.user?.avatar_url ? (
-                                                    <img src={entry.user.avatar_url} alt="" className="w-full h-full object-cover" />
+                                                {entry.user?.avatar ? (
+                                                    <img src={entry.user.avatar} alt="" className="w-full h-full object-cover" />
                                                 ) : (
                                                     <div className="w-full h-full flex items-center justify-center text-slate-600 font-bold">
                                                         {entry.user?.username?.charAt(0) || entry.user?.codename?.charAt(0) || '?'}

@@ -359,41 +359,82 @@ router.post("/lojas/estoque", authenticate, requireLojista, async (req, res) => 
     const { store_id, product_id, quantity, store_price, pre_sale } = req.body;
     
     // Validate required fields
-    if (!store_id || !product_id) {
+    if (store_id === undefined || product_id === undefined) {
         return res.status(400).json({ error: "store_id and product_id are required" });
     }
 
+    const sId = Number(store_id);
+    const pId = Number(product_id);
+
+    if (isNaN(sId) || isNaN(pId)) {
+      return res.status(400).json({ error: "store_id and product_id must be valid numbers" });
+    }
+
     // Security check: Ensure the authenticated user owns this store
-    const { data: store } = await supabaseAdmin
+    const { data: store, error: storeCheckError } = await supabaseAdmin
       .from('stores')
       .select('user_id')
-      .eq('id', store_id)
+      .eq('id', sId)
       .single();
 
-    if (!store || store.user_id !== (req as any).user.id) {
+    if (storeCheckError || !store) {
+      return res.status(404).json({ error: "Loja não encontrada ou erro na verificação" });
+    }
+
+    if (store.user_id !== (req as any).user.id) {
       return res.status(403).json({ error: "Você não tem permissão para gerenciar esta loja" });
     }
 
-    // Using upsert with conflict on (store_id, product_id)
-    const { data: result, error: upsertError } = await supabaseAdmin
+    // Manually check if the stock record exists to decide between insert and update
+    const { data: existingStock, error: fetchError } = await supabaseAdmin
       .from('store_stock')
-      .upsert({ 
-          store_id, 
-          product_id, 
-          quantity: quantity || 0,
-          store_price: store_price || 0,
-          pre_sale: !!pre_sale,
-          updated_at: new Date().toISOString()
-      }, { onConflict: 'store_id,product_id' })
-      .select();
+      .select('id')
+      .eq('store_id', sId)
+      .eq('product_id', pId)
+      .maybeSingle();
 
-    if (upsertError) {
-        console.error("Upsert error in store_stock:", upsertError);
-        throw upsertError;
+    if (fetchError) throw fetchError;
+
+    let result, error;
+
+    const stockData = {
+      quantity: Number(quantity) || 0,
+      store_price: Number(store_price) || 0,
+      pre_sale: !!pre_sale,
+      updated_at: new Date().toISOString()
+    };
+
+    if (existingStock) {
+      // Update
+      const updateRes = await supabaseAdmin
+        .from('store_stock')
+        .update(stockData)
+        .eq('id', existingStock.id)
+        .select();
+      result = updateRes.data;
+      error = updateRes.error;
+    } else {
+      // Insert
+      const insertRes = await supabaseAdmin
+        .from('store_stock')
+        .insert({
+          ...stockData,
+          store_id: sId,
+          product_id: pId
+        })
+        .select();
+      result = insertRes.data;
+      error = insertRes.error;
+    }
+
+    if (error) {
+        console.error("Error in store_stock operation:", error);
+        throw error;
     }
     
     res.json({ status: "ok", data: result });
   } catch (error: any) {
+    console.error("Final catch in store stock update:", error);
     res.status(500).json({ error: error.message });
   }
 });

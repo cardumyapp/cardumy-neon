@@ -31,12 +31,22 @@ export const Sidebar: React.FC<{ collapsed: boolean }> = ({ collapsed }) => {
   const location = useLocation();
   const isLojista = user?.role_id === 6;
 
-  // common items
+  const lojistaItems = [
+    { to: '/', icon: 'fa-house', label: 'Início', active: location.pathname === '/' },
+    { to: '/minha-loja', icon: 'fa-briefcase', label: 'Minha Loja', active: location.pathname === '/minha-loja' },
+    { to: '/produtos', icon: 'fa-bag-shopping', label: 'Produtos', active: location.pathname === '/produtos' },
+    { to: '/gerenciar-estoque', icon: 'fa-box-archive', label: 'Estoque', active: location.pathname === '/gerenciar-estoque' },
+    { to: '/meus-torneios', icon: 'fa-calendar-check', label: 'Meus Torneios', active: location.pathname === '/meus-torneios' || location.pathname === '/novo-torneio' },
+    { to: '/pedidos-recebidos', icon: 'fa-ticket', label: 'Meus Ingressos', active: location.pathname === '/pedidos-recebidos' },
+    { to: '/suporte', icon: 'fa-circle-question', label: 'Suporte', active: location.pathname === '/suporte' },
+  ];
+
+  // common items for members
   const commonTopItems = [
     { to: '/', icon: 'fa-house', label: 'Início', active: location.pathname === '/' },
     { to: '/lojas', icon: 'fa-store', label: 'Lojas', active: location.pathname === '/lojas' },
     { to: '/torneios', icon: 'fa-trophy', label: 'Torneios', active: location.pathname === '/torneios' || location.pathname.includes('/evento/') },
-    { to: '/mercado', icon: 'fa-bag-shopping', label: 'Mercado', active: location.pathname === '/mercado' || location.pathname === '/produtos' },
+    { to: '/produtos', icon: 'fa-bag-shopping', label: 'Produtos', active: location.pathname === '/produtos' },
   ];
 
   const memberItems = [
@@ -45,15 +55,6 @@ export const Sidebar: React.FC<{ collapsed: boolean }> = ({ collapsed }) => {
     { to: '/decks', icon: 'fa-layer-group', label: 'Meus Decks', active: location.pathname === '/decks' },
     { to: '/pedidos', icon: 'fa-clipboard-list', label: 'Meus Pedidos', active: location.pathname === '/pedidos' },
     { to: '/perfil', icon: 'fa-user-circle', label: 'Meu Perfil', active: location.pathname === '/perfil' },
-  ];
-
-  const lojistaItems = [
-    { type: 'divider', label: 'Gestão da Loja' },
-    { to: '/minha-loja', icon: 'fa-briefcase', label: 'Painel da Loja', active: location.pathname === '/minha-loja' },
-    { to: '/gerenciar-estoque', icon: 'fa-box-archive', label: 'Estoque', active: location.pathname === '/gerenciar-estoque' },
-    { to: '/pedidos-recebidos', icon: 'fa-bell', label: 'Vendas', active: location.pathname === '/pedidos-recebidos' },
-    { to: '/meus-torneios', icon: 'fa-calendar-check', label: 'Torneios Emitidos', active: location.pathname === '/meus-torneios' || location.pathname === '/novo-torneio' },
-    { to: `/loja/${user?.username}`, icon: 'fa-eye', label: 'Ver Página Pública', active: location.pathname === `/loja/${user?.username}` },
   ];
 
   return (
@@ -67,38 +68,60 @@ export const Sidebar: React.FC<{ collapsed: boolean }> = ({ collapsed }) => {
       </div>
 
       <nav className="flex-1 px-3 space-y-2 overflow-y-auto no-scrollbar">
-        {commonTopItems.map((item) => (
-          <NavItem key={item.to} {...item} collapsed={collapsed} />
-        ))}
-
-        <div className="my-6 border-t border-slate-800/50" />
-
         {isLojista ? (
           <>
-            {!collapsed && <p className="px-4 text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] mb-4">Loja</p>}
-            {lojistaItems.filter(i => i.to).map((item: any) => (
-              <NavItem key={item.to} {...item} collapsed={collapsed} />
-            ))}
+            {!collapsed && <p className="px-4 text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] mb-4">Geral</p>}
+            <NavItem 
+              to={lojistaItems[0].to} 
+              icon={lojistaItems[0].icon} 
+              label={lojistaItems[0].label} 
+              active={lojistaItems[0].active} 
+              collapsed={collapsed} 
+            />
+
+            <div className="my-6 border-t border-slate-800/50" />
+            {!collapsed && <p className="px-4 text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] mb-4">Minha Loja</p>}
+            <NavItem {...lojistaItems[1]} collapsed={collapsed} />
+            <NavItem {...lojistaItems[3]} collapsed={collapsed} />
+
+            <div className="my-6 border-t border-slate-800/50" />
+            {!collapsed && <p className="px-4 text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] mb-4">Catálogo</p>}
+            <NavItem {...lojistaItems[2]} collapsed={collapsed} />
+
+            <div className="my-6 border-t border-slate-800/50" />
+            {!collapsed && <p className="px-4 text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] mb-4">Eventos</p>}
+            <NavItem {...lojistaItems[4]} collapsed={collapsed} />
+            <NavItem {...lojistaItems[5]} collapsed={collapsed} />
+
+            <div className="my-6 border-t border-slate-800/50" />
+            {!collapsed && <p className="px-4 text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] mb-4">Suporte</p>}
+            <NavItem {...lojistaItems[6]} collapsed={collapsed} />
           </>
         ) : (
           <>
+            {commonTopItems.map((item) => (
+              <NavItem key={item.to} {...item} collapsed={collapsed} />
+            ))}
+
+            <div className="my-6 border-t border-slate-800/50" />
+            
             {!collapsed && <p className="px-4 text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] mb-4">Membro</p>}
             {memberItems.map((item) => (
               <NavItem key={item.to} {...item} collapsed={collapsed} />
             ))}
+            
+            <div className="px-3 mt-4">
+              <NavItem 
+                  to="/suporte" 
+                  icon="fa-circle-question" 
+                  label="Suporte" 
+                  active={location.pathname === '/suporte'} 
+                  collapsed={collapsed} 
+              />
+            </div>
           </>
         )}
       </nav>
-      
-      <div className="px-3 mt-auto">
-        <NavItem 
-            to="/suporte" 
-            icon="fa-circle-question" 
-            label="Suporte" 
-            active={location.pathname === '/suporte'} 
-            collapsed={collapsed} 
-        />
-      </div>
     </div>
   );
 };

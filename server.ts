@@ -155,6 +155,8 @@ async function startServer() {
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`${new Date().toISOString()} - [SERVER] Started listening on 0.0.0.0:${PORT}`);
     console.log(`Supabase Admin configured: ${!!supabaseAdmin}`);
+    console.log(`Supabase URL presence: ${!!process.env.VITE_SUPABASE_URL}`);
+    console.log(`Supabase Service Role Key presence: ${!!process.env.SUPABASE_SERVICE_ROLE_KEY}`);
   });
   } catch (error) {
     console.error("CRITICAL: Server failed to start:", error);

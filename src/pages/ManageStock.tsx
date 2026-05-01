@@ -130,7 +130,7 @@ export const ManageStock: React.FC = () => {
   };
 
   const filteredStock = stock.filter(item => 
-    item.products.name.toLowerCase().includes(searchTerm.toLowerCase())
+    item.products?.name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   if (loading) return (
@@ -186,8 +186,8 @@ export const ManageStock: React.FC = () => {
               <div key={item.id} className="bg-slate-900/50 backdrop-blur-sm border border-slate-800 p-4 md:p-6 rounded-3xl flex flex-col md:flex-row items-center gap-6 group hover:border-purple-500/50 transition-all duration-500">
                 <div className="relative shrink-0">
                   <img 
-                    src={item.products.image_url || 'https://via.placeholder.com/150'} 
-                    alt={item.products.name}
+                    src={item.products?.image_url || 'https://via.placeholder.com/150'} 
+                    alt={item.products?.name || 'Produto'}
                     className="w-24 h-32 object-cover rounded-xl border border-white/5 shadow-2xl group-hover:scale-105 transition-transform duration-500"
                   />
                   {edit.quantity === 0 && (
@@ -199,16 +199,18 @@ export const ManageStock: React.FC = () => {
 
                 <div className="flex-1 min-w-0 text-center md:text-left">
                   <div className="flex items-center justify-center md:justify-start space-x-2 mb-1">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded-full">
-                      {item.products.cardgames.name}
-                    </span>
+                    {item.products?.cardgames?.name && (
+                      <span className="text-[10px] font-black uppercase tracking-widest text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded-full">
+                        {item.products.cardgames.name}
+                      </span>
+                    )}
                     {edit.preSale && (
                       <span className="text-[10px] font-black uppercase tracking-widest text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full">
                          Pré-Venda
                       </span>
                     )}
                   </div>
-                  <h3 className="text-lg font-bold text-white mb-1 truncate">{item.products.name}</h3>
+                  <h3 className="text-lg font-bold text-white mb-1 truncate">{item.products?.name || 'Sem Nome'}</h3>
                   <p className="text-xs text-slate-500 font-mono">ID: {item.product_id}</p>
                 </div>
 

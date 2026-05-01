@@ -2,24 +2,12 @@
 import React from 'react';
 import { GameType, RankingItem, UserAction, UpdateLog, Card, Store, Product, ProductType, Order, Ticket, Notification, Trade, Tournament } from './types';
 
-export const GAMES = [
-  { type: GameType.VANGUARD, icon: 'fa-sword' },
-  { type: GameType.DIGIMON, icon: 'fa-dragon' },
-  { type: GameType.LORCANA, icon: 'fa-wand-magic-sparkles' },
-  { type: GameType.DRAGON_BALL, icon: 'fa-circle-dot' },
-  { type: GameType.MAGIC, icon: 'fa-wand-sparkles' },
-  { type: GameType.ONE_PIECE, icon: 'fa-anchor' },
-  { type: GameType.POKEMON, icon: 'fa-bolt' },
-  { type: GameType.YU_GI_OH, icon: 'fa-cards' },
-  { type: GameType.GUNDAM, icon: 'fa-robot' },
-];
-
 export const MOCK_CARDS: Card[] = Array.from({ length: 20 }, (_, i) => ({
   id: `op-${i}`,
   code: `EB01-00${i + 5}`,
   name: i % 2 === 0 ? "Just Shut Up and Come with Us!!!!" : "Cavendish",
   imageUrl: `https://images.unsplash.com/photo-1613771404721-1f92d799e49f?auto=format&fit=crop&q=80&w=300`,
-  game: GameType.ONE_PIECE,
+  game: 'One Piece',
   set: "PREMIUM BOOSTER -ONE PIECE CARD THE BEST vol.2-",
   variants: [],
   price: Math.floor(Math.random() * 50) + 10,
@@ -30,74 +18,74 @@ export const MOCK_PRODUCTS: Product[] = [
   {
     id: 't-1', slug: 'regional-op-sp', name: 'Regional One Piece SP - 2026', type: ProductType.TICKET,
     price: 150.00, imageUrl: 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&q=80&w=600',
-    storeName: 'Beco da Capivara', storeId: 's1', isOfficialPartner: true, game: GameType.ONE_PIECE, stock: 32
+    storeName: 'Beco da Capivara', storeId: 's1', isOfficialPartner: true, game: 'One Piece', stock: 32
   },
   {
     id: 't-2', slug: 'store-champ-digi', name: 'Store Championship Digimon - BT17', type: ProductType.TICKET,
     price: 45.00, imageUrl: 'https://images.unsplash.com/photo-1614850523296-d8c1af93d400?auto=format&fit=crop&q=80&w=600',
-    storeName: 'Matrona TCG', storeId: 's2', isOfficialPartner: true, game: GameType.DIGIMON, stock: 16
+    storeName: 'Matrona TCG', storeId: 's2', isOfficialPartner: true, game: 'Digimon', stock: 16
   },
   {
     id: 't-3', slug: 'prerelease-pokemon', name: 'Prerelease Pokémon: Stellar Crown', type: ProductType.TICKET,
     price: 120.00, imageUrl: 'https://images.unsplash.com/photo-1601987077677-5346c0c57d3f?auto=format&fit=crop&q=80&w=600',
-    storeName: 'NewStation Sorocaba', storeId: 's3', isOfficialPartner: true, game: GameType.POKEMON, stock: 24
+    storeName: 'NewStation Sorocaba', storeId: 's3', isOfficialPartner: true, game: 'Pokémon', stock: 24
   },
   {
     id: 't-4', slug: 'fnm-magic-standard', name: 'Friday Night Magic - Standard Showdown', type: ProductType.TICKET,
     price: 35.00, imageUrl: 'https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&q=80&w=600',
-    storeName: 'Matrona TCG', storeId: 's2', isOfficialPartner: true, game: GameType.MAGIC, stock: 40
+    storeName: 'Matrona TCG', storeId: 's2', isOfficialPartner: true, game: 'Magic', stock: 40
   },
   {
     id: 't-5', slug: 'ots-yugioh-championship', name: 'OTS Championship Yu-Gi-Oh! - Qualificatório', type: ProductType.TICKET,
     price: 60.00, imageUrl: 'https://images.unsplash.com/photo-1620332372374-f108c53d2e03?auto=format&fit=crop&q=80&w=600',
-    storeName: 'Loja do Caos', storeId: 's4', isOfficialPartner: false, game: GameType.YU_GI_OH, stock: 20
+    storeName: 'Loja do Caos', storeId: 's4', isOfficialPartner: false, game: 'Yu-Gi-Oh!', stock: 20
   },
   {
     id: 't-6', slug: 'lorcana-intro-event', name: 'Disney Lorcana: Illumineer\'s Quest - Intro', type: ProductType.TICKET,
     price: 80.00, imageUrl: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&q=80&w=600',
-    storeName: 'Beco da Capivara', storeId: 's1', isOfficialPartner: true, game: GameType.LORCANA, stock: 12
+    storeName: 'Beco da Capivara', storeId: 's1', isOfficialPartner: true, game: 'Disney Lorcana', stock: 12
   },
   // PRODUTOS REGULARES
   {
     id: 'p-st1-1', slug: 'st1-gaia-red', name: 'GAIA RED [ST-1]', type: ProductType.STARTER_DECK,
     price: 85.00, imageUrl: 'https://images.unsplash.com/photo-1606167668584-78701c57f13d?auto=format&fit=crop&q=80&w=400',
     storeName: 'Matrona TCG', storeId: 's2', storeHandle: '@matronatcg', storeLogo: 'https://picsum.photos/seed/matrona/50/50',
-    isOfficialPartner: true, game: GameType.DIGIMON, stock: 5
+    isOfficialPartner: true, game: 'Digimon', stock: 5
   },
   {
     id: 'p-st1-2', slug: 'st1-gaia-red', name: 'GAIA RED [ST-1]', type: ProductType.STARTER_DECK,
     price: 89.90, imageUrl: 'https://images.unsplash.com/photo-1614850523296-d8c1af93d400?auto=format&fit=crop&q=80&w=400',
     storeName: 'Beco da Capivara', storeId: 's1', storeHandle: '@becodacapivara', storeLogo: 'https://picsum.photos/seed/beco/50/50',
-    isOfficialPartner: false, game: GameType.DIGIMON, stock: 2
+    isOfficialPartner: false, game: 'Digimon', stock: 2
   },
   {
     id: 'p-st2-1', slug: 'st2-cocytus-blue', name: 'COCYTUS BLUE [ST-2]', type: ProductType.STARTER_DECK,
     price: 82.00, imageUrl: 'https://images.unsplash.com/photo-1544652478-6653e09f18a2?auto=format&fit=crop&q=80&w=400',
     storeName: 'NewStation Sorocaba', storeId: 's3', storeHandle: '@newstationso', storeLogo: 'https://picsum.photos/seed/ns/50/50',
-    isOfficialPartner: true, game: GameType.DIGIMON, stock: 10
+    isOfficialPartner: true, game: 'Digimon', stock: 10
   },
   {
     id: 'p-st3-1', slug: 'st3-heavens-yellow', name: "HEAVEN'S YELLOW [ST-3]", type: ProductType.STARTER_DECK,
     price: 85.00, imageUrl: 'https://images.unsplash.com/photo-1523875194681-bedd468c58bf?auto=format&fit=crop&q=80&w=400',
-    storeName: 'Matrona TCG', storeId: 's2', isOfficialPartner: true, game: GameType.DIGIMON, stock: 4
+    storeName: 'Matrona TCG', storeId: 's2', isOfficialPartner: true, game: 'Digimon', stock: 4
   },
   {
     id: 'p-pb01-1', slug: 'pb01-tamer-box', name: "TAMER'S EVOLUTION BOX [PB-01]", type: ProductType.PREMIUM_BANDAI,
     price: 580.00, imageUrl: 'https://images.unsplash.com/photo-1601987077677-5346c0c57d3f?auto=format&fit=crop&q=80&w=400',
     storeName: 'Loja do Caos', storeId: 's4', storeHandle: '@lojadocaos', storeLogo: 'https://picsum.photos/seed/caos/50/50',
-    isOfficialPartner: false, game: GameType.DIGIMON, stock: 2
+    isOfficialPartner: false, game: 'Digimon', stock: 2
   },
   {
     id: 'p-eb03-1', slug: 'eb03-one-piece', name: 'EXTRA BOOSTER -ONE PIECE HEROINES EDITION- [EB-03]', type: ProductType.BOOSTER,
     price: 1.00, imageUrl: 'https://images.unsplash.com/photo-1620332372374-f108c53d2e03?auto=format&fit=crop&q=80&w=400',
     storeName: 'NewStation Sorocaba', storeId: 's3', storeHandle: '@newstationso', storeLogo: 'https://picsum.photos/seed/ns/50/50',
-    isOfficialPartner: true, game: GameType.ONE_PIECE, stock: 1
+    isOfficialPartner: true, game: 'One Piece', stock: 1
   },
   {
     id: 'p-eb03-2', slug: 'eb03-one-piece', name: 'EXTRA BOOSTER -ONE PIECE HEROINES EDITION- [EB-03]', type: ProductType.BOOSTER,
     price: 580.00, imageUrl: 'https://images.unsplash.com/photo-1563941402622-4e7a488bcc57?auto=format&fit=crop&q=80&w=400',
     storeName: 'Loja do Caos', storeId: 's4', storeHandle: '@lojadocaos', storeLogo: 'https://picsum.photos/seed/caos/50/50',
-    isOfficialPartner: false, game: GameType.ONE_PIECE, stock: 2
+    isOfficialPartner: false, game: 'One Piece', stock: 2
   }
 ];
 
@@ -186,7 +174,7 @@ export const MOCK_TOURNAMENTS: Tournament[] = [
   {
     id: 'tourney-1',
     name: 'Regional One Piece SP',
-    game: GameType.ONE_PIECE,
+    game: 'One Piece',
     date: '15/02/2026',
     location: 'Centro de Convenções SP',
     price: 150,
@@ -198,7 +186,7 @@ export const MOCK_TOURNAMENTS: Tournament[] = [
   {
     id: 'tourney-2',
     name: 'Store Championship Digimon',
-    game: GameType.DIGIMON,
+    game: 'Digimon',
     date: '20/02/2026',
     location: 'Matrona TCG',
     price: 45,
@@ -219,9 +207,9 @@ export const MOCK_STORES: Store[] = [
     whatsapp: '11915121742',
     email: 'becodacapivara@outlook.com',
     schedule: [
-      { game: GameType.POKEMON, day: 'Segunda', time: '20:00' },
-      { game: GameType.GUNDAM, day: 'Terça', time: '20:00' },
-      { game: GameType.ONE_PIECE, day: 'Quinta', time: '20:00' },
+      { game: 'Pokémon', day: 'Segunda', time: '20:00' },
+      { game: 'Gundam', day: 'Terça', time: '20:00' },
+      { game: 'One Piece', day: 'Quinta', time: '20:00' },
     ],
     events: [
       {
@@ -232,7 +220,7 @@ export const MOCK_STORES: Store[] = [
         totalSpots: 32,
         filledSpots: 28,
         type: 'Prerelease',
-        game: GameType.ONE_PIECE,
+        game: 'One Piece',
         description: 'Garanta sua vaga para o evento mais esperado do mês. Brindes exclusivos para os 16 primeiros inscritos!',
         isHighlighted: true,
         imageUrl: 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&q=80&w=300'
@@ -245,7 +233,7 @@ export const MOCK_STORES: Store[] = [
         totalSpots: 32,
         filledSpots: 28,
         type: 'Tournament',
-        game: GameType.ONE_PIECE
+        game: 'One Piece'
       },
       {
         id: 'e1-3',
@@ -255,7 +243,7 @@ export const MOCK_STORES: Store[] = [
         totalSpots: 16,
         filledSpots: 4,
         type: 'Tournament',
-        game: GameType.DIGIMON
+        game: 'Digimon'
       }
     ]
   },
@@ -268,9 +256,9 @@ export const MOCK_STORES: Store[] = [
     whatsapp: '11991689441',
     email: 'contato@matronatcg.com.br',
     schedule: [
-      { game: GameType.RIFTBOUND, day: 'Domingo', time: '19:00', fee: 'R$ 5.00' },
-      { game: GameType.DIGIMON, day: 'Sexta', time: '15:30' },
-      { game: GameType.MAGIC, day: 'Sexta', time: '20:00' },
+      { game: 'Riftbound', day: 'Domingo', time: '19:00', fee: 'R$ 5.00' },
+      { game: 'Digimon', day: 'Sexta', time: '15:30' },
+      { game: 'Magic', day: 'Sexta', time: '20:00' },
     ],
     events: [
       {
@@ -281,7 +269,7 @@ export const MOCK_STORES: Store[] = [
         totalSpots: 50,
         filledSpots: 12,
         type: 'Special',
-        game: GameType.MAGIC,
+        game: 'Magic',
         description: 'Venha aprender a jogar Magic e ganhe um deck de boas-vindas!',
         isHighlighted: true,
         imageUrl: 'https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&q=80&w=300'

@@ -158,12 +158,12 @@ export const StoreProfile: React.FC<StoreProfileProps> = ({ onAddToCart }) => {
           about: 'O Cardumy Game Center é o maior hub de TCG da América Latina. Oferecemos um espaço moderno para jogadores de todos os níveis, com mesas exclusivas, estoque vasto de cartas avulsas e torneios oficiais diários. Nossa missão é fortalecer a comunidade e proporcionar a melhor experiência para colecionadores e duelistas.',
           opening_hours: 'Segunda a Sexta: 10:00 - 22:00\nSábado e Domingo: 09:00 - 20:00',
           schedule: [
-            { day: 'Segunda', game: GameType.MAGIC, time: '19:00', fee: 'Gratuito' },
-            { day: 'Terça', game: GameType.POKEMON, time: '18:30', fee: 'R$ 20,00' },
-            { day: 'Quarta', game: GameType.ONE_PIECE, time: '19:00', fee: 'R$ 25,00' },
-            { day: 'Quinta', game: GameType.YU_GI_OH, time: '18:00', fee: 'R$ 15,00' },
-            { day: 'Sexta', game: GameType.MAGIC, time: '19:30', fee: 'R$ 80,00' },
-            { day: 'Sábado', game: GameType.POKEMON, time: '10:00', fee: 'R$ 50,00' }
+            { day: 'Segunda', game: 'Magic', time: '19:00', fee: 'Gratuito' },
+            { day: 'Terça', game: 'Pokémon', time: '18:30', fee: 'R$ 20,00' },
+            { day: 'Quarta', game: 'One Piece', time: '19:00', fee: 'R$ 25,00' },
+            { day: 'Quinta', game: 'Yu-Gi-Oh!', time: '18:00', fee: 'R$ 15,00' },
+            { day: 'Sexta', game: 'Magic', time: '19:30', fee: 'R$ 80,00' },
+            { day: 'Sábado', game: 'Pokémon', time: '10:00', fee: 'R$ 50,00' }
           ]
         };
         setStore(genericStore);
@@ -175,7 +175,7 @@ export const StoreProfile: React.FC<StoreProfileProps> = ({ onAddToCart }) => {
             name: 'Campeonato Regional One Piece',
             description: 'O maior torneio do mês com premiação em boxes exclusivas e cartas promocionais raras.',
             date: '25 Mai, 10:00',
-            game: GameType.ONE_PIECE,
+            game: 'One Piece',
             price: 50,
             imageUrl: 'https://images.unsplash.com/photo-1614850523296-d8c1af93d400?auto=format&fit=crop&q=80&w=600',
             totalSpots: 64,
@@ -188,7 +188,7 @@ export const StoreProfile: React.FC<StoreProfileProps> = ({ onAddToCart }) => {
             name: 'Pauper Night (Magic)',
             description: 'Venha testar seus decks comuns em um ambiente competitivo e amigável.',
             date: 'Quarta-feira, 19:00',
-            game: GameType.MAGIC,
+            game: 'Magic',
             price: 15,
             imageUrl: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&q=80&w=400',
             totalSpots: 32,
@@ -215,7 +215,7 @@ export const StoreProfile: React.FC<StoreProfileProps> = ({ onAddToCart }) => {
                  imageUrl: 'https://images.unsplash.com/photo-1614850523296-d8c1af93d400?auto=format&fit=crop&q=80&w=300',
                  storeId: 'generic',
                  storeName: 'Cardumy Game Center',
-                 game: GameType.ONE_PIECE
+                 game: 'One Piece'
                },
                {
                  id: 'p-demo-2',
@@ -225,7 +225,7 @@ export const StoreProfile: React.FC<StoreProfileProps> = ({ onAddToCart }) => {
                  imageUrl: 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&q=80&w=300',
                  storeId: 'generic',
                  storeName: 'Cardumy Game Center',
-                 game: GameType.POKEMON
+                 game: 'Pokémon'
                },
                {
                  id: 'p-demo-3',
@@ -235,7 +235,7 @@ export const StoreProfile: React.FC<StoreProfileProps> = ({ onAddToCart }) => {
                  imageUrl: 'https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&q=80&w=300',
                  storeId: 'generic',
                  storeName: 'Cardumy Game Center',
-                 game: GameType.ONE_PIECE
+                 game: 'One Piece'
                }
              ];
              finalProducts = [...data, ...demoProducts];
@@ -253,13 +253,26 @@ export const StoreProfile: React.FC<StoreProfileProps> = ({ onAddToCart }) => {
   const mappedStoreProducts = useMemo(() => {
     if (!store) return [];
     return allProducts
-      .filter(p => p.storeId === store.id || p.storeName === store.name)
-      .map(p => ({
-        ...p,
-        imageUrl: p.image_url || p.imageUrl || 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&q=80&w=400',
-        name: p.beauty_name || p.name,
-        price: p.msrp || p.price || 0
-      }));
+      .filter(p => {
+        const stockItems = Array.isArray(p.store_stock) ? p.store_stock : [];
+        return stockItems.some((si: any) => String(si.stores?.id) === String(store.id) || si.stores?.slug === store.slug);
+      })
+      .map(p => {
+        const stockEntry = p.store_stock.find((si: any) => String(si.stores?.id) === String(store.id) || si.stores?.slug === store.slug);
+        return {
+          ...p,
+          id: p.id,
+          imageUrl: p.image_url || p.imageUrl || 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&q=80&w=400',
+          name: p.beauty_name || p.name,
+          price: stockEntry?.store_price || p.msrp || 0,
+          stock: stockEntry?.quantity || 0,
+          storeId: store.id,
+          storeName: store.name,
+          isOfficialPartner: store.isPartner,
+          game: p.cardgames?.name || (Array.isArray(p.cardgames) ? p.cardgames[0]?.name : 'TCG'),
+          type: p.product_types?.name || (Array.isArray(p.product_types) ? p.product_types[0]?.name : 'Produto')
+        };
+      });
   }, [allProducts, store]);
 
   const totalPages = Math.ceil(mappedStoreProducts.length / itemsPerPage);

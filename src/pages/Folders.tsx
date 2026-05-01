@@ -3,7 +3,6 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../components/AuthProvider';
 import { useNotification } from '../components/NotificationProvider';
 import { getBinders, createBinder, getFoldersStats } from '../services/supabaseService';
-import { GAMES } from '../constants';
 import { useNavigate } from 'react-router-dom';
 import { OfflineWarning } from '../components/OfflineWarning';
 import { supabase } from '../lib/supabase';

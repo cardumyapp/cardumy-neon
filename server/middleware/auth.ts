@@ -75,8 +75,8 @@ export const authenticate = async (req: AuthenticatedRequest, res: Response, nex
 };
 
 export const requireLojista = (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
-  if (req.user?.role_id !== 6) {
-    return res.status(403).json({ error: "Access denied: Lojista role required" });
+  if (req.user?.role_id !== 6 && req.user?.role_id !== 1) {
+    return res.status(403).json({ error: "Access denied: Lojista or Admin role required" });
   }
   next();
 };

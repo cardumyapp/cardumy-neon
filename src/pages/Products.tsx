@@ -102,7 +102,7 @@ export const Products: React.FC<ProductsProps> = ({ onAddToCart, activeGame }) =
       const isTicket = typeData?.name === 'Ingresso';
       
       let stock = 0;
-      let price = p.msrp || p.price || 0;
+      let price = p.msrp || p.mspr || p.price || 0;
 
       if (isTicket) {
         const ticketInfo = Array.isArray(p.tournament_tickets) ? p.tournament_tickets[0] : p.tournament_tickets;
@@ -114,7 +114,7 @@ export const Products: React.FC<ProductsProps> = ({ onAddToCart, activeGame }) =
         stock = stockItems.reduce((acc: number, curr: any) => acc + (curr.quantity || 0), 0);
         // If multiple stores have the item, we show the lowest price if not ticket
         if (stockItems.length > 0) {
-          price = Math.min(...stockItems.map((si: any) => si.store_price || p.msrp || 0));
+          price = Math.min(...stockItems.map((si: any) => si.store_price || p.msrp || p.mspr || 0));
         }
       }
       
@@ -184,14 +184,42 @@ export const Products: React.FC<ProductsProps> = ({ onAddToCart, activeGame }) =
     }
   }, [visibleProductTypes, typeFilterId]);
 
-  const productOffers = useMemo(() => {
-    if (!selectedSlug) return [];
-    return products.filter(p => p.slug === selectedSlug);
+  const selectedProduct = useMemo(() => {
+    if (!selectedSlug) return null;
+    const base = products.find(p => p.slug === selectedSlug);
+    if (!base) return null;
+
+    const gameData = Array.isArray(base.cardgames) ? base.cardgames[0] : base.cardgames;
+    const typeData = Array.isArray(base.product_types) ? base.product_types[0] : base.product_types;
+
+    return {
+      ...base,
+      imageUrl: base.image_url || 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&q=80&w=400',
+      name: base.beauty_name || base.name,
+      game: gameData?.name || 'TCG',
+      type: typeData?.name || 'Produto'
+    };
   }, [selectedSlug, products]);
 
-  const selectedBaseProduct = useMemo(() => productOffers[0] || null, [productOffers]);
+  const offers = useMemo(() => {
+    if (!selectedProduct) return [];
+    const stockItems = Array.isArray(selectedProduct.store_stock) ? selectedProduct.store_stock : [];
+    
+    return stockItems.map((si: any) => ({
+      id: si.id,
+      storeId: si.stores?.id,
+      storeName: si.stores?.name,
+      storeLogo: si.stores?.logo,
+      storeSlug: si.stores?.slug,
+      isOfficialPartner: si.stores?.parceiro,
+      stock: si.quantity,
+      price: si.store_price || selectedProduct.msrp || selectedProduct.mspr || 0,
+      type: selectedProduct.type,
+      product: selectedProduct // Carry the product info for addToCart
+    }));
+  }, [selectedProduct]);
 
-  if (selectedSlug && selectedBaseProduct) {
+  if (selectedSlug && selectedProduct) {
     return (
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
@@ -208,50 +236,38 @@ export const Products: React.FC<ProductsProps> = ({ onAddToCart, activeGame }) =
           <div className="p-8 md:p-12 flex flex-col md:flex-row items-center gap-12 relative z-10">
             <div className="w-full md:w-64 aspect-[3/4] flex-shrink-0">
                <motion.img 
-                layoutId={`img-${selectedBaseProduct.slug}`}
-                src={selectedBaseProduct.imageUrl} 
+                layoutId={`img-${selectedProduct.slug}`}
+                src={selectedProduct.imageUrl} 
                 className="w-full h-full object-contain rounded-2xl drop-shadow-[0_20px_50px_rgba(139,92,246,0.3)]" 
-                alt={selectedBaseProduct.name} 
+                alt={selectedProduct.name} 
                />
             </div>
             <div className="flex-1 text-center md:text-left space-y-4">
               <span className="inline-block px-3 py-1 bg-purple-500/10 border border-purple-500/20 rounded-full text-[10px] font-black text-purple-400 uppercase tracking-widest">
-                {selectedBaseProduct.game || 'TCG'}
+                {selectedProduct.game}
               </span>
-              <h2 className="text-3xl md:text-4xl font-black text-white uppercase leading-tight">{selectedBaseProduct.name}</h2>
+              <h2 className="text-3xl md:text-4xl font-black text-white uppercase leading-tight">{selectedProduct.name}</h2>
               
               <div className="flex flex-wrap gap-2 justify-center md:justify-start">
                 <span className="px-3 py-1 bg-slate-800 rounded-lg text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                  {selectedBaseProduct.type}
+                  {selectedProduct.type}
                 </span>
-                {selectedBaseProduct.release_date && (
+                {selectedProduct.release_date && (
                    <span className="px-3 py-1 bg-slate-800 rounded-lg text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                     Lançamento: {new Date(selectedBaseProduct.release_date).toLocaleDateString('pt-BR')}
+                     Lançamento: {new Date(selectedProduct.release_date).toLocaleDateString('pt-BR')}
                    </span>
                 )}
-                {selectedBaseProduct.msrp && (
+                {selectedProduct.msrp && (
                    <span className="px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-[10px] font-bold text-emerald-400 uppercase tracking-wider">
-                     MSRP: R$ {Number(selectedBaseProduct.msrp).toFixed(2)}
+                     MSRP: R$ {Number(selectedProduct.msrp || selectedProduct.mspr || 0).toFixed(2)}
                    </span>
                 )}
               </div>
 
-              {selectedBaseProduct.description && (
+              {selectedProduct.description && (
                 <p className="text-sm text-slate-400 leading-relaxed max-w-2xl">
-                  {selectedBaseProduct.description}
+                  {selectedProduct.description}
                 </p>
-              )}
-
-              {selectedBaseProduct.ext_link && (
-                <a 
-                  href={selectedBaseProduct.ext_link} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center space-x-2 text-xs font-black text-purple-400 hover:text-purple-300 transition-colors uppercase tracking-widest"
-                >
-                  <i className="fas fa-external-link-alt"></i>
-                  <span>Mais informações oficiais</span>
-                </a>
               )}
             </div>
           </div>
@@ -262,18 +278,25 @@ export const Products: React.FC<ProductsProps> = ({ onAddToCart, activeGame }) =
             <h3 className="text-sm font-black text-slate-500 uppercase tracking-widest">Ofertas Disponíveis</h3>
             {isLojista && (
                 <button 
-                  onClick={() => handleAddToStock(selectedBaseProduct)}
+                  onClick={() => handleAddToStock(selectedProduct)}
                   className="bg-purple-600 hover:bg-purple-500 text-white text-[10px] font-black px-4 py-2 rounded-xl transition-all uppercase tracking-widest shadow-lg shadow-purple-600/20"
                 >
                   Adicionar ao meu estoque
                 </button>
             )}
-            <span className="text-[10px] font-bold text-slate-600 uppercase">{productOffers.length} {productOffers.length === 1 ? 'vendedor' : 'vendedores'}</span>
+            <span className="text-[10px] font-bold text-slate-600 uppercase">{offers.length} {offers.length === 1 ? 'vendedor' : 'vendedores'}</span>
           </div>
           <div className="space-y-3">
-            {productOffers.map((offer) => (
-              <OfferRow key={offer.id} offer={offer} onAddToCart={onAddToCart} isLojista={isLojista} />
-            ))}
+            {offers.length > 0 ? (
+              offers.map((offer: any) => (
+                <OfferRow key={offer.id} offer={offer} onAddToCart={onAddToCart} isLojista={isLojista} />
+              ))
+            ) : (
+                <div className="bg-slate-900/40 border border-slate-800 p-12 rounded-[32px] text-center space-y-3">
+                   <i className="fas fa-store-slash text-slate-700 text-3xl"></i>
+                   <p className="text-xs font-bold text-slate-500 uppercase">Nenhuma loja com estoque disponível no momento.</p>
+                </div>
+            )}
           </div>
         </div>
       </motion.div>
@@ -283,67 +306,6 @@ export const Products: React.FC<ProductsProps> = ({ onAddToCart, activeGame }) =
   return (
     <div className="max-w-7xl mx-auto space-y-12 pb-20 px-4 sm:px-6">
       {isOffline && <OfflineWarning />}
-      
-      {/* SEÇÃO DESTAQUE: INGRESSOS */}
-      <section className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="w-12 h-12 bg-indigo-600/20 rounded-2xl flex items-center justify-center text-indigo-400 border border-indigo-500/20 shadow-inner">
-              <i className="fas fa-ticket-simple text-xl"></i>
-            </div>
-            <div>
-              <h2 className="text-2xl font-black text-white uppercase tracking-tight">Arena Cardumy</h2>
-              <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Ingressos para Torneios e Eventos</p>
-            </div>
-          </div>
-          <div className="hidden sm:block">
-            <div className="px-4 py-1.5 bg-indigo-500/10 border border-indigo-500/20 rounded-full text-[10px] font-black text-indigo-400 uppercase tracking-widest">
-              AO VIVO
-            </div>
-          </div>
-        </div>
-
-        {loading ? (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {[1, 2, 3].map(i => <div key={i} className="h-48 rounded-[32px] bg-slate-900/40 border border-slate-800 animate-pulse"></div>)}
-          </div>
-        ) : tickets.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {tickets.map(ticket => (
-              <motion.div 
-                whileHover={{ scale: 1.02 }}
-                key={ticket.id} 
-                onClick={() => setSelectedSlug(ticket.slug)} 
-                className="group bg-indigo-950/20 border border-indigo-500/20 rounded-[32px] p-8 hover:border-indigo-400 transition-all cursor-pointer shadow-xl overflow-hidden relative"
-              >
-                <div className="absolute top-0 right-0 p-8">
-                  <div className="bg-slate-950/80 px-3 py-2 rounded-2xl border border-white/5 flex flex-col items-center">
-                    <span className="text-xs font-black text-white">{ticket.stock || 0}</span>
-                    <span className="text-[8px] font-black text-slate-500 uppercase">VAGAS</span>
-                  </div>
-                </div>
-                <div className="space-y-4 pt-1">
-                  <div className="space-y-1">
-                    <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">{ticket.game || 'Especial'}</span>
-                    <h3 className="text-xl font-black text-white leading-tight uppercase line-clamp-2 pr-12">{ticket.name}</h3>
-                  </div>
-                  <div className="flex items-center justify-between pt-4">
-                    <span className="text-2xl font-black text-white">R$ {(ticket.price || 0).toFixed(2)}</span>
-                    <div className="w-12 h-12 bg-indigo-600 text-white rounded-2xl flex items-center justify-center shadow-lg group-hover:bg-indigo-500 transition-colors">
-                      <i className="fas fa-arrow-right"></i>
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        ) : !loading && (
-          <div className="py-16 text-center bg-slate-900/10 rounded-[40px] border border-dashed border-slate-800/50">
-             <i className="fas fa-calendar-alt text-slate-800 text-3xl mb-4"></i>
-             <p className="text-slate-600 font-bold uppercase text-[10px] tracking-widest">Nenhum evento agendado para este filtro</p>
-          </div>
-        )}
-      </section>
 
       {/* MARKETPLACE LAYOUT */}
       <div className="flex flex-col lg:flex-row gap-10">
@@ -489,16 +451,6 @@ export const Products: React.FC<ProductsProps> = ({ onAddToCart, activeGame }) =
                           className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-700 ease-out" 
                           alt={product.name} 
                         />
-                        {product.stock <= 5 && product.stock > 0 && (
-                          <div className="absolute top-4 left-4">
-                            <span className="px-2 py-0.5 bg-orange-500 text-white text-[8px] font-black uppercase rounded-lg shadow-lg">Últimas Unid.</span>
-                          </div>
-                        )}
-                        {product.stock === 0 && (
-                          <div className="absolute inset-0 bg-slate-950/80 flex items-center justify-center">
-                            <span className="text-[10px] font-black text-white uppercase tracking-[0.2em] -rotate-12 border-2 border-white px-3 py-1">Esgotado</span>
-                          </div>
-                        )}
                       </div>
                       <div className="p-5 flex-1 flex flex-col justify-between space-y-4">
                         <div className="space-y-1.5">
