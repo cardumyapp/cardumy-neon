@@ -288,8 +288,8 @@ export const Products: React.FC<ProductsProps> = ({ onAddToCart, activeGame }) =
           </div>
           <div className="space-y-3">
             {offers.length > 0 ? (
-              offers.map((offer: any) => (
-                <OfferRow key={offer.id} offer={offer} onAddToCart={onAddToCart} isLojista={isLojista} />
+              offers.map((offer: any, idx: number) => (
+                <OfferRow key={offer.id || `offer-${idx}`} offer={offer} onAddToCart={onAddToCart} isLojista={isLojista} />
               ))
             ) : (
                 <div className="bg-slate-900/40 border border-slate-800 p-12 rounded-[32px] text-center space-y-3">
@@ -341,9 +341,9 @@ export const Products: React.FC<ProductsProps> = ({ onAddToCart, activeGame }) =
                   onClick={() => setTypeFilterId('all')} 
                   label="Todos" 
                 />
-                {visibleProductTypes.map(type => (
+                {visibleProductTypes.map((type, idx) => (
                   <FilterButton 
-                    key={type.id}
+                    key={type.id || `type-${idx}`}
                     isActive={typeFilterId === type.id}
                     onClick={() => setTypeFilterId(type.id)}
                     label={type.name}
@@ -366,9 +366,9 @@ export const Products: React.FC<ProductsProps> = ({ onAddToCart, activeGame }) =
                     label="Todas as Ligas" 
                     colorClass="bg-indigo-600 border-indigo-500"
                   />
-                  {dbGames.map(game => (
+                  {dbGames.map((game, idx) => (
                     <FilterButton 
-                      key={game.id}
+                      key={game.id || `game-${idx}`}
                       isActive={gameFilterId.toString() === game.id.toString()}
                       onClick={() => setGameFilterId(game.id)}
                       label={game.name}
@@ -433,17 +433,17 @@ export const Products: React.FC<ProductsProps> = ({ onAddToCart, activeGame }) =
                   <div key={i} className="aspect-[3/4] bg-slate-900/40 border border-slate-800 rounded-[32px] animate-pulse"></div>
                 ))
               ) : (
-                <AnimatePresence mode="popLayout">
-                  {paginatedItems.map(product => (
-                    <motion.div 
-                      layout
-                      initial={{ opacity: 0, scale: 0.9 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.9 }}
-                      key={product.id} 
-                      onClick={() => setSelectedSlug(product.slug)} 
-                      className="group bg-slate-900/40 border border-slate-800 rounded-[32px] overflow-hidden transition-all duration-500 hover:border-purple-500/50 hover:-translate-y-2 cursor-pointer flex flex-col shadow-lg"
-                    >
+                   <AnimatePresence mode="popLayout">
+                   {paginatedItems.map((product, idx) => (
+                     <motion.div 
+                       layout
+                       initial={{ opacity: 0, scale: 0.9 }}
+                       animate={{ opacity: 1, scale: 1 }}
+                       exit={{ opacity: 0, scale: 0.9 }}
+                       key={product.id || `prod-${idx}`} 
+                       onClick={() => setSelectedSlug(product.slug)} 
+                       className="group bg-slate-900/40 border border-slate-800 rounded-[32px] overflow-hidden transition-all duration-500 hover:border-purple-500/50 hover:-translate-y-2 cursor-pointer flex flex-col shadow-lg"
+                     >
                       <div className="aspect-square p-6 bg-slate-950/20 relative flex items-center justify-center overflow-hidden">
                         <div className="absolute inset-0 bg-gradient-to-t from-slate-950/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
                         <img 

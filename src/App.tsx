@@ -73,7 +73,7 @@ import { Sidebar } from './components/Navigation';
 const AppContent: React.FC = () => {
   const location = useLocation();
   const { user, login, logout, switchUser } = useAuth();
-  const isLojista = useMemo(() => user?.role_id === 6, [user]);
+  const isLojista = useMemo(() => user?.role_id === 6 || user?.role_id === 1, [user]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [activeGame, setActiveGame] = useState<GameType | 'All'>('All');
   const [isGamePickerOpen, setIsGamePickerOpen] = useState(false);
@@ -171,8 +171,12 @@ const AppContent: React.FC = () => {
     setCart(prev => prev.filter(item => item.id !== id));
   };
 
-  const clearCart = () => {
-    setCart([]);
+  const clearCart = (storeId?: string | number) => {
+    if (storeId) {
+      setCart(prev => prev.filter(item => (item.storeId || item.store_id) !== storeId));
+    } else {
+      setCart([]);
+    }
   };
 
   return (
@@ -239,9 +243,9 @@ const AppContent: React.FC = () => {
                         <i className="fas fa-layer-group w-4 text-center"></i>
                         <span>Ver Tudo</span>
                       </button>
-                      {dbGames.map(game => (
+                      {dbGames.map((game, idx) => (
                         <button 
-                          key={game.id}
+                          key={game.id || `game-app-${idx}`}
                           onClick={() => { setActiveGame((game.slug || game.name) as GameType); setIsGamePickerOpen(false); }}
                           className={`w-full text-left px-3 py-2.5 rounded-lg text-xs font-bold transition-colors mb-1 flex items-center space-x-3 ${activeGame === (game.slug || game.name) ? 'bg-purple-600 text-white' : 'text-slate-400 hover:bg-slate-700 hover:text-white'}`}
                         >
@@ -345,7 +349,7 @@ const AppContent: React.FC = () => {
             {user ? (
               <div className="flex items-center space-x-2 md:space-x-3 bg-slate-800/50 pr-2 md:pr-4 pl-1 py-1 rounded-full border border-white/5 cursor-pointer group relative">
                 <img 
-                  src={(isLojista ? user.store_logo : user.avatar) || user.photoURL || "https://i.pravatar.cc/150?u=viped"} 
+                  src={(isLojista && user?.store_logo ? user.store_logo : user?.avatar) || user?.photoURL || "https://i.pravatar.cc/150?u=viped"} 
                   className="w-7 h-7 md:w-8 md:h-8 rounded-full border border-purple-500 object-cover bg-slate-800" 
                   alt="Avatar" 
                 />

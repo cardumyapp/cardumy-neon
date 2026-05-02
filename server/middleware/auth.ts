@@ -44,32 +44,39 @@ export const authenticate = async (req: AuthenticatedRequest, res: Response, nex
 
     const token = authHeader?.split(" ")[1];
 
-    const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
-    if (error || !user) {
-      console.error("Auth error from Supabase:", error?.message || "User not found from token");
-      throw new Error("Invalid token");
+    try {
+      const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
+      if (error || !user) {
+        if (error) console.error("Supabase Auth Error details:", error);
+        console.error("Auth error from Supabase:", error?.message || "User not found from token");
+        throw new Error("Invalid token: " + (error?.message || "User not found"));
+      }
+
+      // Fetch additional user info from our public.users table if needed
+      const { data: dbUser, error: dbError } = await supabaseAdmin
+        .from('users')
+        .select('id, role_id')
+        .eq('email', user.email)
+        .single();
+
+      if (dbError || !dbUser) {
+          console.error(`User found in Auth (${user.email}) but not in public.users table. Error:`, dbError?.message || 'No dbUser returned');
+          return res.status(401).json({ error: "User profile not found in database" });
+      }
+
+      req.user = {
+        id: dbUser.id,           // Integer ID from public.users
+        auth_id: user.id,        // UUID from auth.users
+        email: user.email,
+        role_id: dbUser.role_id
+      };
+      next();
+    } catch (tokenErr: any) {
+      console.error("Token verification failed:", tokenErr.message);
+      return res.status(401).json({ error: "Invalid token: " + tokenErr.message });
     }
-
-    // Fetch additional user info from our public.users table if needed
-    const { data: dbUser, error: dbError } = await supabaseAdmin
-      .from('users')
-      .select('id, role_id')
-      .eq('email', user.email)
-      .single();
-
-    if (dbError || !dbUser) {
-        console.error(`User found in Auth (${user.email}) but not in public.users table. Error:`, dbError?.message || 'No dbUser returned');
-        return res.status(401).json({ error: "User profile not found in database" });
-    }
-
-    req.user = {
-      id: dbUser.id,           // Integer ID from public.users
-      auth_id: user.id,        // UUID from auth.users
-      email: user.email,
-      role_id: dbUser.role_id
-    };
-    next();
-  } catch (error) {
+  } catch (error: any) {
+    console.error("Critical Auth Middleware Error:", error.message);
     return res.status(401).json({ error: "Unauthorized" });
   }
 };

@@ -67,31 +67,50 @@ router.get("/lojas", async (req, res) => {
   }
 });
 
-router.get("/lojas/:username", async (req, res) => {
+router.get("/lojas/:identifier", async (req, res) => {
   if (!supabaseAdmin) return res.status(500).json({ error: "Supabase not configured" });
-  const { username } = req.params;
+  const { identifier } = req.params;
   try {
-    const { data: user, error: userError } = await supabaseAdmin
-      .from('users')
-      .select('id, username, codename, avatar, role_id')
-      .eq('username', username)
-      .maybeSingle();
-    
-    if (userError) throw userError;
-    if (!user) return res.status(404).json({ error: "Usuário não encontrado" });
-
-    const { data: store, error: storeError } = await supabaseAdmin
+    // 1. Try to find store by slug directly
+    let { data: store } = await supabaseAdmin
       .from('stores')
-      .select('id, name, slug')
-      .eq('user_id', user.id)
+      .select('*, users(id, username, codename, avatar, role_id)')
+      .eq('slug', identifier)
       .maybeSingle();
+
+    let user = store?.users;
     
-    if (storeError) throw storeError;
+    // 2. If not found by slug, try by owner's username
+    if (!store) {
+      const { data: userData, error: userError } = await supabaseAdmin
+        .from('users')
+        .select('id, username, codename, avatar, role_id')
+        .eq('username', identifier)
+        .maybeSingle();
+      
+      if (userError) throw userError;
+      user = userData;
+
+      if (user) {
+        const { data: storeData, error: sErr } = await supabaseAdmin
+          .from('stores')
+          .select('*')
+          .eq('user_id', user.id)
+          .maybeSingle();
+        
+        if (sErr) throw sErr;
+        store = storeData;
+      }
+    }
+    
+    if (!user && !store) return res.status(404).json({ error: "Loja ou usuário não encontrado" });
+
+    const userId = user?.id || store?.user_id;
 
     const { count: wishlistCount } = await supabaseAdmin
       .from('wishlist')
       .select('*', { count: 'exact', head: true })
-      .eq('user_id', user.id);
+      .eq('user_id', userId);
     
     let stockCount = 0;
     if (store) {
@@ -104,7 +123,7 @@ router.get("/lojas/:username", async (req, res) => {
     }
 
     res.json({
-      user,
+      user: user || { id: store?.user_id },
       store,
       wishlist_size: wishlistCount || 0,
       stock_size: stockCount,
@@ -134,12 +153,21 @@ router.get("/lojas/:storeId/hours", async (req, res) => {
   }
 });
 
-router.get("/lojas/:username/torneios", async (req, res) => {
+router.get("/lojas/:identifier/torneios", async (req, res) => {
   if (!supabaseAdmin) return res.status(500).json({ error: "Supabase not configured" });
-  const { username } = req.params;
+  const { identifier } = req.params;
   try {
-    const { data: user } = await supabaseAdmin.from('users').select('id').eq('username', username).maybeSingle();
-    if (!user) return res.status(404).json({ error: "Loja não encontrada" });
+    // Try by slug first
+    let { data: store } = await supabaseAdmin.from('stores').select('id, user_id').eq('slug', identifier).maybeSingle();
+    let creatorId = store?.user_id;
+
+    if (!store) {
+      // Try by username
+      const { data: user } = await supabaseAdmin.from('users').select('id').eq('username', identifier).maybeSingle();
+      creatorId = user?.id;
+    }
+
+    if (!creatorId) return res.status(404).json({ error: "Loja não encontrada" });
 
     const { data: tournaments, error } = await supabaseAdmin
       .from('tournaments')
@@ -148,14 +176,14 @@ router.get("/lojas/:username/torneios", async (req, res) => {
         cardgames ( name ),
         tournament_formats ( name )
       `)
-      .eq('created_by', user.id)
+      .eq('created_by', creatorId)
       .order('start_date', { ascending: false });
     
     if (error) {
       const { data: simpleData, error: simpleError } = await supabaseAdmin
         .from('tournaments')
         .select('*')
-        .eq('created_by', user.id)
+        .eq('created_by', creatorId)
         .order('start_date', { ascending: false });
       
       if (simpleError) throw simpleError;
@@ -218,15 +246,22 @@ router.post("/lojas/semanais", async (req, res) => {
   }
 });
 
-router.get("/lojas/:username/estoque", async (req, res) => {
+router.get("/lojas/:identifier/estoque", async (req, res) => {
   if (!supabaseAdmin) return res.status(500).json({ error: "Supabase not configured" });
-  const { username } = req.params;
+  const { identifier } = req.params;
   try {
-    const { data: user } = await supabaseAdmin.from('users').select('id').eq('username', username).maybeSingle();
-    if (!user) return res.status(404).json({ error: "Usuário não encontrado" });
+    // 1. Get store by identifier (slug or username)
+    let { data: store } = await supabaseAdmin.from('stores').select('id').eq('slug', identifier).maybeSingle();
+    
+    if (!store) {
+      const { data: user } = await supabaseAdmin.from('users').select('id').eq('username', identifier).maybeSingle();
+      if (user) {
+        const { data: s } = await supabaseAdmin.from('stores').select('id').eq('user_id', user.id).maybeSingle();
+        store = s;
+      }
+    }
 
-    const { data: store } = await supabaseAdmin.from('stores').select('id').eq('user_id', user.id).maybeSingle();
-    if (!store) return res.json([]); 
+    if (!store) return res.status(404).json({ error: "Loja não encontrada" });
 
     const { data, error } = await supabaseAdmin
       .from('store_stock')
@@ -249,9 +284,9 @@ router.get("/lojas/:username/estoque", async (req, res) => {
   }
 });
 
-router.get("/lojas/:username/produtos_filtrados", async (req, res) => {
+router.get("/lojas/:identifier/produtos_filtrados", async (req, res) => {
   if (!supabaseAdmin) return res.status(500).json({ error: "Supabase not configured" });
-  const { username } = req.params;
+  const { identifier } = req.params;
   const page = parseInt(req.query.page as string) || 1;
   const limit = parseInt(req.query.limit as string) || 25;
   const offset = (page - 1) * limit;
@@ -259,11 +294,17 @@ router.get("/lojas/:username/produtos_filtrados", async (req, res) => {
   const selectedType = req.query.type as string;
 
   try {
-    // 1. Get store by username
-    const { data: user } = await supabaseAdmin.from('users').select('id').eq('username', username).maybeSingle();
-    if (!user) return res.status(404).json({ error: "Loja não encontrada" });
+    // 1. Get store by identifier
+    let { data: store } = await supabaseAdmin.from('stores').select('id, slug').eq('slug', identifier).maybeSingle();
+    
+    if (!store) {
+       const { data: user } = await supabaseAdmin.from('users').select('id, username').eq('username', identifier).maybeSingle();
+       if (user) {
+         const { data: s } = await supabaseAdmin.from('stores').select('id, slug').eq('user_id', user.id).maybeSingle();
+         store = s;
+       }
+    }
 
-    const { data: store } = await supabaseAdmin.from('stores').select('id').eq('user_id', user.id).maybeSingle();
     if (!store) return res.status(404).json({ error: "Loja não encontrada" });
 
     const store_id = store.id;
@@ -272,7 +313,8 @@ router.get("/lojas/:username/produtos_filtrados", async (req, res) => {
     const { data: stockGames } = await supabaseAdmin
       .from('store_stock')
       .select('products(cardgames(name))')
-      .eq('store_id', store_id);
+      .eq('store_id', store_id)
+      .gt('quantity', 0);
 
     const gamesList = Array.from(new Set(
       (stockGames || [])
@@ -292,7 +334,8 @@ router.get("/lojas/:username/produtos_filtrados", async (req, res) => {
           product_types ( name )
         )
       `, { count: 'exact' })
-      .eq('store_id', store_id);
+      .eq('store_id', store_id)
+      .gt('quantity', 0);
 
     if (game) {
       query = query.eq('products.cardgames.name', game);
@@ -346,7 +389,7 @@ router.get("/lojas/:username/produtos_filtrados", async (req, res) => {
       has_next: (page * limit) < (count || 0),
       games: gamesList,
       types: typesList,
-      shopname: username
+      shopname: identifier
     });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -435,6 +478,57 @@ router.post("/lojas/estoque", authenticate, requireLojista, async (req, res) => 
     res.json({ status: "ok", data: result });
   } catch (error: any) {
     console.error("Final catch in store stock update:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.get("/lojas/:storeId/fretes", async (req, res) => {
+  if (!supabaseAdmin) return res.status(500).json({ error: "Supabase not configured" });
+  try {
+    const { storeId } = req.params;
+    const { data, error } = await supabaseAdmin
+      .from('store_shipping_methods')
+      .select('*, shipping_methods(*)')
+      .eq('store_id', storeId)
+      .eq('is_enabled', true);
+    
+    if (error) throw error;
+    
+    const formatted = (data || []).map(item => ({
+      id: item.shipping_methods.id,
+      name: item.shipping_methods.name,
+      description: item.shipping_methods.description,
+      price: item.custom_price || item.shipping_methods.default_price,
+      estimated_days: item.custom_estimated_days || item.shipping_methods.default_estimated_days
+    }));
+
+    res.json(formatted);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.get("/lojas/:storeId/pagamentos", async (req, res) => {
+  if (!supabaseAdmin) return res.status(500).json({ error: "Supabase not configured" });
+  try {
+    const { storeId } = req.params;
+    const { data, error } = await supabaseAdmin
+      .from('store_payment_methods')
+      .select('*, payment_methods(*)')
+      .eq('store_id', storeId)
+      .eq('is_enabled', true);
+    
+    if (error) throw error;
+    
+    const formatted = (data || []).map(item => ({
+      id: item.payment_methods.id,
+      name: item.payment_methods.name,
+      description: item.payment_methods.description,
+      type: item.payment_methods.type
+    }));
+
+    res.json(formatted);
+  } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
 });

@@ -77,7 +77,7 @@ router.get("/users/:username/profile", async (req, res) => {
   if (!supabaseAdmin) return res.status(500).json({ error: "Supabase not configured" });
 
   try {
-    let query = supabaseAdmin.from('users').select('*, cardgames(id, name)');
+    let query = supabaseAdmin.from('users').select('*, cardgames(id, name), stores(id, name, logo, slug)');
     if (!isNaN(Number(username)) && !username.includes('@')) query = query.eq('id', username);
     else if (username.includes('@')) query = query.eq('email', username);
     else query = query.eq('username', username);
@@ -189,20 +189,77 @@ router.post("/sync-user", async (req, res) => {
   try {
     const { userData } = req.body;
     if (!userData?.email) return res.status(400).json({ error: "Invalid user data" });
+    
     const { data: existing } = await supabaseAdmin.from('users').select('*').eq('email', userData.email).maybeSingle();
     const isAdmin = userData.email === 'cardumyapp@gmail.com';
+    
     if (existing) {
-      const { data, error } = await supabaseAdmin.from('users').update({ avatar: userData.photoURL || existing.avatar, codename: userData.displayName || existing.codename, role_id: isAdmin ? 1 : (existing.role_id || 7), updated_at: new Date().toISOString() }).eq('id', existing.id).select().maybeSingle();
+      const updates: any = { 
+        avatar: userData.photoURL || existing.avatar, 
+        role_id: isAdmin ? 1 : (existing.role_id || 7), 
+        updated_at: new Date().toISOString() 
+      };
+      
+      // Update codename if provided and different
+      if (userData.displayName && userData.displayName !== existing.codename) {
+        updates.codename = userData.displayName;
+      }
+
+      let { data, error } = await supabaseAdmin.from('users')
+        .update(updates)
+        .eq('id', existing.id)
+        .select()
+        .maybeSingle();
+      
+      // Handle codename conflict during update
+      if (error && (error.message.includes('users_codename_key') || error.code === '23505')) {
+        console.warn(`Codename conflict for user ${existing.email}. Skipping codename update.`);
+        delete updates.codename;
+        const retry = await supabaseAdmin.from('users').update(updates).eq('id', existing.id).select().maybeSingle();
+        data = retry.data;
+        error = retry.error;
+      }
+      
       if (error) throw error;
       return res.json(data);
     } else {
       const baseUsername = (userData.displayName || 'user').split(' ')[0].toLowerCase().replace(/[^a-z0-9]/g, '');
       const username = `${baseUsername}${Math.floor(Math.random() * 10000)}`;
-      const { data, error } = await supabaseAdmin.from('users').insert({ username, codename: userData.displayName || username, email: userData.email, password: 'social-login', avatar: userData.photoURL || null, vip: false, role_id: isAdmin ? 1 : 7 }).select().maybeSingle();
+      
+      let codename = userData.displayName || username;
+      
+      let { data, error } = await supabaseAdmin.from('users').insert({ 
+        username, 
+        codename, 
+        email: userData.email, 
+        password: 'social-login', 
+        avatar: userData.photoURL || null, 
+        vip: false, 
+        role_id: isAdmin ? 1 : 7 
+      }).select().maybeSingle();
+
+      // Handle codename conflict during insert
+      if (error && (error.message.includes('users_codename_key') || error.code === '23505')) {
+        console.warn(`Codename conflict during new user sync for ${userData.email}. Falling back to username.`);
+        codename = username;
+        const retry = await supabaseAdmin.from('users').insert({ 
+          username, 
+          codename, 
+          email: userData.email, 
+          password: 'social-login', 
+          avatar: userData.photoURL || null, 
+          vip: false, 
+          role_id: isAdmin ? 1 : 7 
+        }).select().maybeSingle();
+        data = retry.data;
+        error = retry.error;
+      }
+
       if (error) throw error;
       return res.json(data);
     }
   } catch (error: any) {
+    console.error('Error in sync-user:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -219,17 +276,27 @@ router.get("/search-users", async (req, res) => {
   }
 });
 
-router.get("/user/address/primary", async (req, res) => {
+router.get("/user/address/primary", authenticate, async (req: any, res) => {
   if (!supabaseAdmin) return res.status(500).json({ error: "Supabase not configured" });
-  const authHeader = req.headers.authorization;
-  if (!authHeader) return res.status(401).json({ error: "No token provided" });
   try {
-    const token = authHeader.split(' ')[1];
-    const { data: { user } } = await supabaseAdmin.auth.getUser(token);
-    if (!user) throw new Error("User not found");
-    const { data, error } = await supabaseAdmin.from('user_addresses').select('*').eq('user_id', user.id).eq('is_primary', true) .maybeSingle();
+    const { data, error } = await supabaseAdmin.from('user_addresses').select('*').eq('user_id', req.user.auth_id).eq('is_primary', true) .maybeSingle();
     if (error) throw error;
     res.json(data);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.get("/user/addresses", authenticate, async (req: any, res) => {
+  if (!supabaseAdmin) return res.status(500).json({ error: "Supabase not configured" });
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('user_addresses')
+      .select('*')
+      .eq('user_id', req.user.auth_id)
+      .order('is_primary', { ascending: false });
+    if (error) throw error;
+    res.json(data || []);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }

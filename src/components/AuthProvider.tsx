@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { syncUser, getRandomUser } from '../services/supabaseService';
+import { syncUser, getUserByAuthId } from '../services/supabaseService';
+import { devLogin } from '../auth/devLogin';
+import { supabase } from '../lib/supabase';
 
 interface AuthContextType {
   user: any;
@@ -31,55 +33,51 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   useEffect(() => {
-    // Para ambiente de teste: Busca um usuário real do banco de dados
-    const setupTestSession = async () => {
+    const initAuth = async () => {
       setLoading(true);
       try {
-        // First check localStorage for impersonated user
-        const savedUser = localStorage.getItem('cardumy_impersonated_user');
-        if (savedUser) {
-          console.log('Ambiente de teste: Carregando usuário salvo no localStorage');
-          setUser(JSON.parse(savedUser));
-          setLoading(false);
-          return;
-        }
-
-        console.log('Ambiente de teste: Buscando usuário real do banco...');
+        // 1. Tenta login automático de dev
+        const session = await devLogin();
         
-        // Tenta buscar um usuário aleatório do banco
-        const dbUser = await getRandomUser();
-        
-        if (dbUser) {
-          console.log(`Usuário real encontrado: ${dbUser.username || dbUser.codename || dbUser.email}`);
-          setUser(dbUser);
-          localStorage.setItem('cardumy_impersonated_user', JSON.stringify(dbUser));
+        if (session) {
+          // 2. Se logado no Supabase, sincroniza os dados do perfil (tabela public.users)
+          const profile = await getUserByAuthId(session.user.id);
+          if (profile) {
+            setUser(profile);
+            localStorage.setItem('cardumy_impersonated_user', JSON.stringify(profile));
+          } else {
+            // Se não tiver perfil, tenta sincronizar
+            const synced = await syncUser({
+              auth_id: session.user.id,
+              email: session.user.email,
+              displayName: session.user.user_metadata?.full_name || session.user.email
+            });
+            setUser(synced);
+          }
         } else {
-          console.warn('Nenhum usuário encontrado no banco. Fallback para mock necessário para inicialização.');
-          // Fallback mínimo se o banco estiver vazio para não quebrar o app
-          const defaultUser = { 
-            id: 1, 
-            displayName: 'Admin User', 
-            email: 'cardumyapp@gmail.com',
-            photoURL: 'https://i.pravatar.cc/150?u=admin'
-          };
-          const synced = await syncUser(defaultUser);
-          setUser(synced || defaultUser);
+          // Fallback para o sistema de impersonation existente se o login dev falhar
+          const savedUser = localStorage.getItem('cardumy_impersonated_user');
+          if (savedUser) {
+            setUser(JSON.parse(savedUser));
+          }
         }
       } catch (error) {
-        console.error('Erro ao configurar sessão de teste:', error);
+        console.error('Erro na inicialização do Auth:', error);
       } finally {
         setLoading(false);
       }
     };
 
-    setupTestSession();
+    initAuth();
   }, []);
 
   const login = async () => {
-    console.log("Manual login disabled. Using auto-pool.");
+    await devLogin();
+    window.location.reload();
   };
 
   const logout = async () => {
+    await supabase.auth.signOut();
     setUser(null);
     localStorage.removeItem('cardumy_impersonated_user');
   };

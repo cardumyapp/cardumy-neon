@@ -223,6 +223,21 @@ export interface RankingItem {
   isTop?: boolean;
 }
 
+export interface ShippingMethod {
+  id: number;
+  name: string;
+  description?: string;
+  price?: number;
+  estimated_days?: number;
+}
+
+export interface PaymentMethod {
+  id: string | number;
+  name: string;
+  description?: string;
+  type?: string;
+}
+
 export interface UserProfile {
   id: string;
   email: string;

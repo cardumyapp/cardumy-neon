@@ -309,4 +309,37 @@ router.post("/checkout", authenticate, async (req: any, res) => {
     }
 });
 
+router.post("/checkout/full", authenticate, async (req: any, res) => {
+    if (!supabaseAdmin) return res.status(500).json({ error: "Supabase not configured" });
+    
+    const { store_id, address_id, shipping_method_id, payment_method_id, items } = req.body;
+    const userId = req.user.id;
+
+    if (!items || !Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({ error: "Carrinho vazio" });
+    }
+
+    try {
+        // Call the database function create_order_full
+        const { data, error } = await supabaseAdmin.rpc('create_order_full', {
+            p_buyer_id: userId,
+            p_store_id: store_id,
+            p_address_id: address_id,
+            p_shipping_method_id: shipping_method_id,
+            p_payment_method_id: payment_method_id,
+            p_items: items
+        });
+
+        if (error) {
+            console.error("Error calling create_order_full:", error);
+            return res.status(400).json({ error: error.message });
+        }
+
+        res.json({ ok: true, order_id: data });
+    } catch (error: any) {
+        console.error("Critical error in /checkout/full:", error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 export default router;

@@ -147,7 +147,7 @@ export const Profile: React.FC = () => {
           <div className="relative group flex-shrink-0">
             <div className="absolute -inset-1 bg-gradient-to-r from-purple-600 to-pink-600 rounded-full blur opacity-75 group-hover:opacity-100 transition duration-1000"></div>
             <img 
-              src={profileUser.avatar || profileUser.photoURL || "https://i.pravatar.cc/300?u=victoria"} 
+              src={(profileUser.role_id === 6 && profileUser.store_logo ? profileUser.store_logo : profileUser.avatar) || profileUser.photoURL || "https://i.pravatar.cc/300?u=victoria"} 
               className="relative w-28 h-28 md:w-40 md:h-40 rounded-full border-4 border-slate-950 shadow-2xl object-cover bg-slate-900" 
               alt="Profile" 
             />

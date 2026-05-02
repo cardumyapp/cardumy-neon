@@ -19,8 +19,8 @@ router.get("/torneios/:id", async (req, res) => {
                 *,
                 cardgames(name),
                 tournament_formats(name),
-                creator:users(id, username, codename, avatar),
-                tickets:tournament_tickets!fk_tickets_product(
+                creator:users!created_by(id, username, codename, avatar),
+                tickets:tournament_tickets(
                     *,
                     product:products(
                         *,
@@ -29,9 +29,10 @@ router.get("/torneios/:id", async (req, res) => {
                 )
             `)
             .eq('id', id)
-            .single();
+            .maybeSingle();
         
         if (error) throw error;
+        if (!data) return res.status(404).json({ error: "Torneio não encontrado" });
         res.json(data);
     } catch (error: any) {
         res.status(500).json({ error: error.message });

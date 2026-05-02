@@ -201,7 +201,7 @@ export const ManageStock: React.FC = () => {
                   <div className="flex items-center justify-center md:justify-start space-x-2 mb-1">
                     {item.products?.cardgames?.name && (
                       <span className="text-[10px] font-black uppercase tracking-widest text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded-full">
-                        {item.products.cardgames.name}
+                        {item.products?.cardgames?.name}
                       </span>
                     )}
                     {edit.preSale && (

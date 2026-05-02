@@ -70,32 +70,9 @@ export const Sidebar: React.FC<{ collapsed: boolean }> = ({ collapsed }) => {
       <nav className="flex-1 px-3 space-y-2 overflow-y-auto no-scrollbar">
         {isLojista ? (
           <>
-            {!collapsed && <p className="px-4 text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] mb-4">Geral</p>}
-            <NavItem 
-              to={lojistaItems[0].to} 
-              icon={lojistaItems[0].icon} 
-              label={lojistaItems[0].label} 
-              active={lojistaItems[0].active} 
-              collapsed={collapsed} 
-            />
-
-            <div className="my-6 border-t border-slate-800/50" />
-            {!collapsed && <p className="px-4 text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] mb-4">Minha Loja</p>}
-            <NavItem {...lojistaItems[1]} collapsed={collapsed} />
-            <NavItem {...lojistaItems[3]} collapsed={collapsed} />
-
-            <div className="my-6 border-t border-slate-800/50" />
-            {!collapsed && <p className="px-4 text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] mb-4">Catálogo</p>}
-            <NavItem {...lojistaItems[2]} collapsed={collapsed} />
-
-            <div className="my-6 border-t border-slate-800/50" />
-            {!collapsed && <p className="px-4 text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] mb-4">Eventos</p>}
-            <NavItem {...lojistaItems[4]} collapsed={collapsed} />
-            <NavItem {...lojistaItems[5]} collapsed={collapsed} />
-
-            <div className="my-6 border-t border-slate-800/50" />
-            {!collapsed && <p className="px-4 text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] mb-4">Suporte</p>}
-            <NavItem {...lojistaItems[6]} collapsed={collapsed} />
+            {lojistaItems.map((item) => (
+              <NavItem key={item.to} {...item} collapsed={collapsed} />
+            ))}
           </>
         ) : (
           <>

@@ -255,10 +255,10 @@ export const StoreProfile: React.FC<StoreProfileProps> = ({ onAddToCart }) => {
     return allProducts
       .filter(p => {
         const stockItems = Array.isArray(p.store_stock) ? p.store_stock : [];
-        return stockItems.some((si: any) => String(si.stores?.id) === String(store.id) || si.stores?.slug === store.slug);
+        return stockItems.some((si: any) => (String(si.stores?.id) === String(store.id) || si.stores?.slug === store.slug) && si.quantity > 0);
       })
       .map(p => {
-        const stockEntry = p.store_stock.find((si: any) => String(si.stores?.id) === String(store.id) || si.stores?.slug === store.slug);
+        const stockEntry = p.store_stock.find((si: any) => (String(si.stores?.id) === String(store.id) || si.stores?.slug === store.slug) && si.quantity > 0);
         return {
           ...p,
           id: p.id,

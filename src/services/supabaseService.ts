@@ -748,6 +748,18 @@ export const getUserProfile = async (userId: string | number) => {
       if (error) throw error;
     }
 
+    // Try finding by auth_id (UUID)
+    if (String(userId).length > 30) {
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('auth_id', userId)
+        .limit(1);
+      
+      if (data && data.length > 0) return data[0];
+      if (error) throw error;
+    }
+
     // Finally try finding by username
     const { data, error } = await supabase
       .from('users')
@@ -764,6 +776,22 @@ export const getUserProfile = async (userId: string | number) => {
     return user;
   } catch (error) {
     console.error('Error fetching user profile:', error);
+    return null;
+  }
+};
+
+export const getUserByAuthId = async (authId: string) => {
+  try {
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('auth_id', authId)
+      .maybeSingle();
+
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error in getUserByAuthId:', error);
     return null;
   }
 };
@@ -1272,6 +1300,63 @@ export const checkout = async (items: any[], addressId?: string | number) => {
   }
 };
 
+export const getAddresses = async () => {
+    try {
+        const headers = await getAuthHeaders();
+        const response = await fetch('/api/user/addresses', { headers });
+        if (!response.ok) return [];
+        return await response.json();
+    } catch (error) {
+        console.error('Error fetching addresses:', error);
+        return [];
+    }
+};
+
+export const getStoreShippingMethods = async (storeId: string | number) => {
+    try {
+        const response = await fetch(`/api/lojas/${storeId}/fretes`);
+        if (!response.ok) return [];
+        return await response.json();
+    } catch (error) {
+        console.error('Error fetching shipping methods:', error);
+        return [];
+    }
+};
+
+export const getStorePaymentMethods = async (storeId: string | number) => {
+    try {
+        const response = await fetch(`/api/lojas/${storeId}/pagamentos`);
+        if (!response.ok) return [];
+        return await response.json();
+    } catch (error) {
+        console.error('Error fetching payment methods:', error);
+        return [];
+    }
+};
+
+export const createOrderFull = async (params: {
+    store_id: number;
+    address_id: number;
+    shipping_method_id: number;
+    payment_method_id: number;
+    items: { product_id: number; quantity: number }[];
+}) => {
+    try {
+        const headers = await getAuthHeaders();
+        const response = await fetch('/api/checkout/full', {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(params)
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Erro ao criar pedido');
+        return data; // { order_id }
+    } catch (error: any) {
+        console.error('Error in createOrderFull:', error);
+        throw error;
+    }
+};
+
 export const startTournament = async (id: number | string) => {
   try {
     const { data: { session } } = await supabase.auth.getSession();
@@ -1440,7 +1525,15 @@ export const getFullUserProfile = async (username: string, followerId?: string) 
       console.error(`Profile fetch error: ${response.status} for ${url}`);
       throw new Error('Failed to fetch full user profile');
     }
-    return await response.json();
+    const data = await response.json();
+    if (data && data.user) {
+      const u = data.user;
+      data.user = {
+        ...u,
+        store_logo: u.stores?.[0]?.logo || u.stores?.logo
+      };
+    }
+    return data;
   } catch (error) {
     console.error('Error fetching full user profile:', error);
     return null;
@@ -1641,7 +1734,11 @@ export const getProductsByFilters = async (filters: { game_id?: string | number,
 export const getTournamentDetails = async (id: number | string) => {
   try {
     const response = await fetch(`/api/torneios/${id}`);
-    if (!response.ok) throw new Error('Failed to fetch tournament details');
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      console.error(`[API] Error ${response.status} fetching tournament ${id}:`, errorData);
+      throw new Error(errorData.error || 'Failed to fetch tournament details');
+    }
     return await response.json();
   } catch (error) {
     console.error('Error fetching tournament details:', error);

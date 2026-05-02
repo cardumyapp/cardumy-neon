@@ -16,7 +16,7 @@ interface DashboardProps {
 
 export const Dashboard: React.FC<DashboardProps> = ({ activeGame }) => {
   const { user, login, isOffline } = useAuth();
-  const isLojista = user?.role_id === 6;
+  const isLojista = user?.role_id === 6 || user?.role_id === 1;
 
   if (isLojista) {
       return <LojistaDashboard />;
