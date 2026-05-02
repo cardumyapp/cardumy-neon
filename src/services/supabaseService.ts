@@ -679,13 +679,16 @@ export const getNotifications = async () => {
     try {
         const headers = await getAuthHeaders();
         if (!headers['Authorization']) return [];
-        const response = await fetch('/api/notifications', {
+        const response = await fetch('/api/user-notifs', {
             headers
         });
         if (!response.ok) return [];
         return await response.json();
-    } catch (error) {
+    } catch (error: any) {
         console.error('Error fetching notifications:', error);
+        if (error.name === 'TypeError' && error.message === 'Failed to fetch') {
+            console.error('Network error or server unreachable at /api/user-notifs');
+        }
         return [];
     }
 };
@@ -694,7 +697,7 @@ export const markNotificationAsRead = async (id: number | string) => {
     try {
         const headers = await getAuthHeaders();
         if (!headers['Authorization']) return false;
-        const response = await fetch(`/api/notifications/${id}/read`, {
+        const response = await fetch(`/api/user-notifs/${id}/read`, {
             method: 'POST',
             headers
         });
@@ -709,7 +712,7 @@ export const markAllNotificationsAsRead = async () => {
     try {
         const headers = await getAuthHeaders();
         if (!headers['Authorization']) return false;
-        const response = await fetch('/api/notifications/read-all', {
+        const response = await fetch('/api/user-notifs/read-all', {
             method: 'POST',
             headers
         });

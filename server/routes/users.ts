@@ -302,32 +302,59 @@ router.get("/user/addresses", authenticate, async (req: any, res) => {
   }
 });
 
-router.get("/notifications", authenticate, async (req: any, res) => {
-  if (!supabaseAdmin) return res.status(500).json({ error: "Supabase not configured" });
+router.get("/user-notifs", authenticate, async (req: any, res) => {
+  console.log(`[ROUTE] GET /user-notifs - User ID (Int): ${req.user?.id}, Auth ID (UUID): ${req.user?.auth_id}`);
+  if (!supabaseAdmin) {
+    console.error("[ERROR] Supabase not configured in /user-notifs");
+    return res.status(500).json({ error: "Supabase not configured" });
+  }
   try {
-    const { data, error } = await supabaseAdmin
-      .from('notifications')
-      .select('*')
-      .eq('user_id', req.user.id)
-      .order('created_at', { ascending: false });
+    // Determine which ID to use based on what's more likely or safer
+    // In this app, many tables use the integer ID as user_id.
     
-    if (error) throw error;
-    res.json(data);
+    let query = supabaseAdmin.from('notifications').select('*').order('created_at', { ascending: false });
+    
+    // Attempt with UUID (auth_id)
+    const { data: dataUUID, error: errorUUID } = await query.eq('user_id', req.user.auth_id);
+    
+    if (!errorUUID && dataUUID && dataUUID.length > 0) {
+        return res.json(dataUUID);
+    }
+
+    // If UUID attempt failed with type error or returned nothing, try Integer ID
+    if (errorUUID?.code === '22P02' || (!dataUUID || dataUUID.length === 0)) {
+        const { data: dataInt, error: errorInt } = await supabaseAdmin
+          .from('notifications')
+          .select('*')
+          .eq('user_id', req.user.id)
+          .order('created_at', { ascending: false });
+        
+        if (!errorInt) {
+            return res.json(dataInt || []);
+        }
+        
+        // If both failed and we have an error, throw the more relevant one
+        if (errorInt) throw errorInt;
+    }
+
+    if (errorUUID) throw errorUUID;
+    res.json([]);
   } catch (error: any) {
+    console.error("[CRITICAL] Error in /user-notifs route:", error);
     res.status(500).json({ error: error.message });
   }
 });
 
-router.post("/notifications/:id/read", authenticate, async (req: any, res) => {
+router.post("/user-notifs/:id/read", authenticate, async (req: any, res) => {
   if (!supabaseAdmin) return res.status(500).json({ error: "Supabase not configured" });
   try {
     const { data, error } = await supabaseAdmin
       .from('notifications')
       .update({ is_read: true })
       .eq('id', req.params.id)
-      .eq('user_id', req.user.id)
+      .or(`user_id.eq.${req.user.id},user_id.eq.${req.user.auth_id}`)
       .select()
-      .single();
+      .maybeSingle();
     
     if (error) throw error;
     res.json(data);
@@ -336,16 +363,22 @@ router.post("/notifications/:id/read", authenticate, async (req: any, res) => {
   }
 });
 
-router.post("/notifications/read-all", authenticate, async (req: any, res) => {
+router.post("/user-notifs/read-all", authenticate, async (req: any, res) => {
   if (!supabaseAdmin) return res.status(500).json({ error: "Supabase not configured" });
   try {
-    const { error } = await supabaseAdmin
+    // Try BOTH integer and UUID to be safe during migration/transition
+    await supabaseAdmin
       .from('notifications')
       .update({ is_read: true })
       .eq('user_id', req.user.id)
       .eq('is_read', false);
+
+    await supabaseAdmin
+      .from('notifications')
+      .update({ is_read: true })
+      .eq('user_id', req.user.auth_id)
+      .eq('is_read', false);
     
-    if (error) throw error;
     res.json({ ok: true });
   } catch (error: any) {
     res.status(500).json({ error: error.message });

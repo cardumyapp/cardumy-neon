@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { syncUser, getUserByAuthId } from '../services/supabaseService';
-import { devLogin } from '../auth/devLogin';
+import { devAutoLogin } from '../auth/devAutoLogin';
 import { supabase } from '../lib/supabase';
 
 interface AuthContextType {
@@ -37,7 +37,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLoading(true);
       try {
         // 1. Tenta login automático de dev
-        const session = await devLogin();
+        const session = await devAutoLogin();
         
         if (session) {
           // 2. Se logado no Supabase, sincroniza os dados do perfil (tabela public.users)
@@ -72,7 +72,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const login = async () => {
-    await devLogin();
+    await devAutoLogin();
     window.location.reload();
   };
 
