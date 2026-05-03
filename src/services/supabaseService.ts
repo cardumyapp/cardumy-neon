@@ -1173,7 +1173,7 @@ export const getAllTournaments = async () => {
         creator:users!created_by(id, username, codename, avatar),
         tickets:tournament_tickets!fk_tickets_tournament(
           *,
-          product:products(*)
+          product:products!fk_tickets_product(*)
         )
       `)
       .order('start_date', { ascending: false });
@@ -1285,7 +1285,7 @@ export const getMyTournaments = async () => {
         *,
         cardgames(name),
         tournament_formats(name),
-        tickets:tournament_tickets!fk_tickets_tournament(*, product:products(*))
+        tickets:tournament_tickets!fk_tickets_tournament(*, product:products!fk_tickets_product(*))
       `)
       .eq('created_by', profile.id);
 
@@ -1659,13 +1659,13 @@ export const getFullUserProfile = async (username: string, followerId?: string) 
       supabase.from('user_cards').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
       supabase.from('wishlist').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
       supabase.from('offerlist').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
-      supabase.from('user_followers').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
+      supabase.from('user_followers').select('*', { count: 'exact', head: true }).eq('followed_id', user.id),
       supabase.from('user_followers').select('*', { count: 'exact', head: true }).eq('follower_id', user.id)
     ]);
 
     let isFollowing = false;
     if (followerId) {
-       const { data: followData } = await supabase.from('user_followers').select('*').eq('user_id', user.id).eq('follower_id', followerId).maybeSingle();
+       const { data: followData } = await supabase.from('user_followers').select('*').eq('followed_id', user.id).eq('follower_id', followerId).maybeSingle();
        isFollowing = !!followData;
     }
 
@@ -1695,7 +1695,7 @@ export const followUser = async (username: string, followerId: string) => {
     if (!user) throw new Error('User not found');
 
     const { error } = await supabase.from('user_followers').insert({
-        user_id: user.id,
+        followed_id: user.id,
         follower_id: followerId
     });
 
@@ -1712,7 +1712,7 @@ export const unfollowUser = async (username: string, followerId: string) => {
     const { data: user } = await supabase.from('users').select('id').eq('username', username).maybeSingle();
     if (!user) throw new Error('User not found');
 
-    const { error } = await supabase.from('user_followers').delete().eq('user_id', user.id).eq('follower_id', followerId);
+    const { error } = await supabase.from('user_followers').delete().eq('followed_id', user.id).eq('follower_id', followerId);
 
     if (error) throw error;
     return { success: true };
@@ -1902,7 +1902,7 @@ export const getTournamentDetails = async (id: number | string) => {
         stores!inner(id, name, logo, slug),
         tickets:tournament_tickets!fk_tickets_tournament(
           *,
-          product:products(
+          product:products!fk_tickets_product(
             *,
             stores(store_id)
           )
