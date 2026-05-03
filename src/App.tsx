@@ -239,18 +239,16 @@ const AppContent: React.FC = () => {
                     <div className="p-2 max-h-64 overflow-y-auto scrollbar-hide">
                       <button 
                         onClick={() => { setActiveGame('All'); setIsGamePickerOpen(false); }}
-                        className={`w-full text-left px-3 py-2.5 rounded-lg text-xs font-bold transition-colors mb-1 flex items-center space-x-3 ${activeGame === 'All' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:bg-slate-700 hover:text-white'}`}
+                        className={`w-full text-left px-3 py-2.5 rounded-lg text-xs font-bold transition-colors mb-1 flex items-center ${activeGame === 'All' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:bg-slate-700 hover:text-white'}`}
                       >
-                        <i className="fas fa-layer-group w-4 text-center"></i>
                         <span>Ver Tudo</span>
                       </button>
                       {dbGames.map((game, idx) => (
                         <button 
                           key={game.id || `game-app-${idx}`}
                           onClick={() => { setActiveGame((game.slug || game.name) as GameType); setIsGamePickerOpen(false); }}
-                          className={`w-full text-left px-3 py-2.5 rounded-lg text-xs font-bold transition-colors mb-1 flex items-center space-x-3 ${activeGame === (game.slug || game.name) ? 'bg-purple-600 text-white' : 'text-slate-400 hover:bg-slate-700 hover:text-white'}`}
+                          className={`w-full text-left px-3 py-2.5 rounded-lg text-xs font-bold transition-colors mb-1 flex items-center ${activeGame === (game.slug || game.name) ? 'bg-purple-600 text-white' : 'text-slate-400 hover:bg-slate-700 hover:text-white'}`}
                         >
-                          <i className={`fas ${getGameIcon(game.name)} w-4 text-center`}></i>
                           <span>{game.name}</span>
                         </button>
                       ))}

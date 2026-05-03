@@ -22,56 +22,69 @@ export async function devAutoLogin() {
   const password = '12345678';
 
   try {
-    // 4. tentativa de login
-    const { data: loginData, error: loginError } =
-      await supabase.auth.signInWithPassword({ email, password });
+    // 4. Nova estratégia: Login Anônimo -> Upgrade (Link) para Conta Dev
+    // Isso garante que SEMPRE tenhamos uma sessão logo de cara
+    const { data: anonData, error: anonError } = await supabase.auth.signInAnonymously();
+
+    if (!anonError && anonData.session) {
+      const user = anonData.session.user;
+
+      // 5. Tenta linkar com email/senha para tornar a conta permanente
+      const { data: updateData, error: updateError } = await supabase.auth.updateUser({
+        email,
+        password
+      });
+
+      // Se linkou com sucesso ou se o erro for apenas de verificação Pendente
+      if (!updateError || updateError.message.includes('check your email')) {
+        const finalUser = updateData.user || user;
+        await ensureUserProfile(finalUser);
+        return anonData.session;
+      }
+
+      // 6. Se o erro for "email already registered", significa que a conta de dev já existe.
+      // Nesse caso, fazemos o login tradicional para essa conta.
+      if (updateError.message.toLowerCase().includes('already registered') || 
+          updateError.message.toLowerCase().includes('already exists') ||
+          updateError.status === 422) {
+        
+        const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
+          email,
+          password
+        });
+
+        if (!loginError && loginData.session) {
+          await ensureUserProfile(loginData.session.user);
+          return loginData.session;
+        }
+      }
+
+      // Se nada deu certo mas temos a sessão anônima, ficamos com ela por enquanto
+      await ensureUserProfile(user);
+      return anonData.session;
+    }
+
+    // Fallback para login tradicional se anônimo falhar
+    const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
+      email,
+      password
+    });
 
     if (!loginError && loginData.session) {
       await ensureUserProfile(loginData.session.user);
       return loginData.session;
     }
 
-    // 5. signup permitido apenas UMA VEZ
-    const alreadyTriedSignup = localStorage.getItem('dev_signup_done');
-
-    if (
-      loginError?.code === 'invalid_credentials' &&
-      !alreadyTriedSignup
-    ) {
+    // Se falhar e não tentamos signup ainda
+    if (loginError?.code === 'invalid_credentials' && !localStorage.getItem('dev_signup_done')) {
       localStorage.setItem('dev_signup_done', 'true');
-
-      const { error: signUpError } = await supabase.auth.signUp({
-        email,
-        password
-      });
-
-      if (signUpError) {
-        console.error('Signup failed:', signUpError);
-
-        // se for rate limit → desativa auth
-        if (signUpError.message.includes('rate limit')) {
-          localStorage.setItem('dev_auth_disabled', 'true');
-        }
-
-        return null;
-      }
-
-      // 6. login final (uma única vez)
-      const { data: retryData, error: retryError } =
-        await supabase.auth.signInWithPassword({ email, password });
-
-      if (retryError) {
-        console.error('Retry login failed:', retryError);
-        return null;
-      }
-
-      if (retryData.session) {
-        await ensureUserProfile(retryData.session.user);
-        return retryData.session;
+      const { data: signData, error: signUpError } = await supabase.auth.signUp({ email, password });
+      if (!signUpError && signData.session) {
+        await ensureUserProfile(signData.session.user);
+        return signData.session;
       }
     }
 
-    console.error('Login failed:', loginError);
     return null;
 
   } catch (err) {

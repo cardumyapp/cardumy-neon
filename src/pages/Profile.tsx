@@ -159,7 +159,7 @@ export const Profile: React.FC = () => {
               <h1 className="text-2xl md:text-4xl font-black tracking-tight text-white leading-tight truncate">{profileUser.codename || profileUser.displayName}</h1>
               <i className="fas fa-circle-check text-blue-400 text-sm md:text-xl" title="Verificada"></i>
             </div>
-            <p className="text-slate-400 text-xs md:text-sm font-medium mb-2">@{profileUser.username} • {profileUser.role === 'admin' ? 'Administrador' : (profileUser.cardgames?.name || profileUser.favorite_game || 'Colecionador Lendário')}</p>
+            <p className="text-slate-400 text-xs md:text-sm font-medium mb-2">@{profileUser.username} • {profileUser.role === 'admin' ? 'Administrador' : (profileUser.cardgames?.name || profileUser.favorite_game)}</p>
             
             <div className="flex items-center space-x-4 mb-3">
               <button className="flex items-center space-x-1 group">
