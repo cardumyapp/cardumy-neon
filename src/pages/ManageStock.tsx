@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../components/AuthProvider';
 import { useNotification } from '../components/NotificationProvider';
 import { updateStoreStock } from '../services/supabaseService';
+import { supabase } from '../lib/supabase';
 
 interface StockItem {
   id: number;
@@ -36,20 +37,36 @@ export const ManageStock: React.FC = () => {
       try {
         setLoading(true);
         // 1. Get Store Info
-        const storeRes = await fetch(`/api/lojas/${user.username}`);
-        const storeData = await storeRes.json();
+        const { data: storeData, error: storeError } = await supabase
+          .from('stores')
+          .select('*')
+          .eq('owner_id', user.id)
+          .maybeSingle();
         
-        if (storeData.error) throw new Error(storeData.error);
-        if (!storeData.store) throw new Error("Loja não encontrada para este usuário.");
+        if (storeError) throw storeError;
+        if (!storeData) throw new Error("Loja não encontrada para este usuário.");
         
-        setStore(storeData.store);
+        setStore(storeData);
 
         // 2. Get Stock
-        const stockRes = await fetch(`/api/lojas/${user.username}/estoque`);
-        const stockData = await stockRes.json();
+        const { data: stockData, error: stockError } = await supabase
+          .from('store_stock')
+          .select(`
+            *,
+            products:products(
+              id,
+              name,
+              slug,
+              image_url,
+              cardgames:cardgames(name)
+            )
+          `)
+          .eq('store_id', storeData.id);
+        
+        if (stockError) throw stockError;
         
         if (Array.isArray(stockData)) {
-          setStock(stockData);
+          setStock(stockData as any);
           // Initialize editing state
           const initialEditingState: Record<number, { quantity: number, price: number, preSale: boolean }> = {};
           stockData.forEach(item => {
@@ -91,7 +108,7 @@ export const ManageStock: React.FC = () => {
     try {
       const result = await updateStoreStock(store.id, productId, editData.quantity, editData.price, editData.preSale);
       
-      if (!result || result.error) throw new Error(result?.error || "Falha ao atualizar estoque");
+      if (!result) throw new Error("Falha ao atualizar estoque");
 
       showNotification("Estoque atualizado!", "success");
 
@@ -110,7 +127,7 @@ export const ManageStock: React.FC = () => {
     
     try {
       const result = await updateStoreStock(store.id, productId, 0, 0, false);
-      if (!result || result.error) throw new Error(result?.error || "Falha ao remover item");
+      if (!result) throw new Error("Falha ao remover item");
       
       showNotification("Item zerado no estoque!", "success");
       

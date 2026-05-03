@@ -103,13 +103,17 @@ export const CartPage: React.FC<CartPageProps> = ({ cart, updateQuantity, remove
         address_id: Number(selectedAddressId),
         shipping_method_id: selectedShippingId,
         payment_method_id: Number(selectedPaymentId),
-        items: storeItems.map(i => ({ product_id: Number(i.id), quantity: i.quantity }))
+        items: storeItems.map(i => ({ 
+          product_id: Number(i.id), 
+          quantity: i.quantity,
+          price: Number(i.price) || 0
+        }))
       });
 
       showNotification("Pedido criado! Redirecionando para pagamento...", "success");
       clearCart(selectedStoreId);
       setIsModalOpen(false);
-      navigate(`/pedido/${res.order_id}`);
+      navigate(`/pedido/${res.id}`);
     } catch (e: any) {
       showNotification(e.message || "Erro ao processar pedido", "error");
     } finally {

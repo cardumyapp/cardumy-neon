@@ -47,14 +47,15 @@ export const StoreProfile: React.FC<StoreProfileProps> = ({ onAddToCart }) => {
       if (id) {
         storeData = await getStoreBySlug(id);
         
-        // Fetch stats if possible using slug as username
+        // Fetch stats if possible using slug
         const profileStats = await getStoreProfileInfo(id);
-        if (profileStats) {
+        if (profileStats && 'store' in profileStats) {
+          const store = profileStats.store;
           setStats({
-            wishlist_size: profileStats.wishlist_size,
-            stock_size: profileStats.stock_size,
-            offers_size: profileStats.offers_size,
-            is_open: profileStats.is_open
+            wishlist_size: 0, // Not available directly in profile info anymore
+            stock_size: 0,
+            offers_size: 0,
+            is_open: true
           });
         }
       }
@@ -125,13 +126,12 @@ export const StoreProfile: React.FC<StoreProfileProps> = ({ onAddToCart }) => {
 
         // Fetch real tournaments/events for this store
         const tournamentData = await getStoreTournaments(id || mappedStore.id);
-        if (tournamentData) {
-          const allTournaments = [...tournamentData.torneios, ...tournamentData.torneios_agendados];
-          const mappedEvents: StoreEvent[] = allTournaments.map((e: any, idx: number) => ({
+        if (tournamentData && Array.isArray(tournamentData)) {
+          const mappedEvents: StoreEvent[] = tournamentData.map((e: any, idx: number) => ({
             id: String(e.id),
             name: e.name,
             date: e.start_date ? new Date(e.start_date).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'A combinar',
-            game: e.cardgame_name as GameType,
+            game: (e.cardgames?.name || 'TCG') as GameType,
             price: e.price || 0,
             totalSpots: e.max_players || 0,
             filledSpots: 0,

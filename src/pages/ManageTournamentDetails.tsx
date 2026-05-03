@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useNotification } from '../components/NotificationProvider';
+import { supabase } from '../lib/supabase';
 import { 
     getTournamentEntries, 
     updateEntryStatus, 
@@ -33,8 +34,13 @@ export const ManageTournamentDetails: React.FC = () => {
         if (!id) return;
         setLoading(true);
         try {
-            const tourneyRes = await fetch(`/api/torneios/${id}`);
-            const tourneyData = await tourneyRes.json();
+            const { data: tourneyData, error } = await supabase
+              .from('tournaments')
+              .select('*, cardgames(name), tournament_formats(name)')
+              .eq('id', id)
+              .maybeSingle();
+
+            if (error) throw error;
             setTournament(tourneyData);
 
             const entriesData = await getTournamentEntries(id);
@@ -73,7 +79,7 @@ export const ManageTournamentDetails: React.FC = () => {
         if (!id) return;
         try {
             const res = await startTournament(id);
-            if (res.status === 'ok') {
+            if (res && 'success' in res && res.success) {
                 showNotification("Torneio iniciado!", "success");
                 fetchData();
             }
@@ -88,7 +94,7 @@ export const ManageTournamentDetails: React.FC = () => {
         setSubmitting(true);
         try {
             const res = await finalizeTournament(id, winners);
-            if (res.ok) {
+            if (res && 'success' in res && res.success) {
                 showNotification("Torneio finalizado e vencedores notificados!", "success");
                 fetchData();
             }

@@ -5,6 +5,7 @@ import { useAuth } from '../components/AuthProvider';
 import { useNotification } from '../components/NotificationProvider';
 import { OfflineWarning } from '../components/OfflineWarning';
 import { motion, AnimatePresence } from 'motion/react';
+import { supabase } from '../lib/supabase';
 
 interface ProductsProps {
   onAddToCart: (product: Product) => void;
@@ -32,13 +33,22 @@ export const Products: React.FC<ProductsProps> = ({ onAddToCart, activeGame }) =
   const itemsPerPage = 12;
 
   useEffect(() => {
-    if (isLojista && user?.username) {
-        fetch(`/api/lojas/${user.username}`)
-            .then(r => r.json())
-            .then(d => setStore(d.store))
-            .catch(e => console.error("Error fetching store:", e));
+    async function fetchStore() {
+        if (isLojista && user?.id) {
+            try {
+                const { data } = await supabase
+                    .from('stores')
+                    .select('*')
+                    .eq('owner_id', user.id)
+                    .maybeSingle();
+                setStore(data);
+            } catch (e) {
+                console.error("Error fetching store:", e);
+            }
+        }
     }
-  }, [isLojista, user?.username]);
+    fetchStore();
+  }, [isLojista, user?.id]);
 
   const handleAddToStock = async (product: any) => {
     if (!store?.id) {
@@ -48,7 +58,7 @@ export const Products: React.FC<ProductsProps> = ({ onAddToCart, activeGame }) =
 
     try {
         const res = await updateStoreStock(store.id, product.id, 1, product.price || 0, false);
-        if (res && res.status === 'ok') {
+        if (res) {
             showNotification(`${product.name} adicionado ao seu estoque!`, "success");
         } else {
             throw new Error("Falha ao atualizar estoque");

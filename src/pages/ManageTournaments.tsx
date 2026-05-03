@@ -31,11 +31,11 @@ export const ManageTournaments: React.FC = () => {
     const handleStartTournament = async (id: number) => {
         try {
             const res = await startTournament(id);
-            if (res.status === 'ok') {
+            if (res && 'success' in res && res.success) {
                 showNotification("Torneio iniciado com sucesso!", "success");
                 fetchTournaments();
             } else {
-                showNotification(res.error || "Erro ao iniciar torneio", "error");
+                showNotification((res as any)?.error || "Erro ao iniciar torneio", "error");
             }
         } catch (error) {
             showNotification("Erro ao iniciar torneio", "error");

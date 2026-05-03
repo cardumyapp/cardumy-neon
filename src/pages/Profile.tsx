@@ -46,7 +46,7 @@ export const Profile: React.FC = () => {
       const data = await getFullUserProfile(idToFetch, currentUser?.id);
       if (data) {
         setProfileData(data);
-        setIsFollowing(data.is_following);
+        setIsFollowing(data.isFollowing);
       } else if (!userId && currentUser) {
         // Fallback for current user if backend fail
         setProfileData({

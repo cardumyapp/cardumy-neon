@@ -303,17 +303,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ activeGame }) => {
             ))
           ) : blogPosts.length > 0 ? (
             blogPosts.map((post) => {
-              const featuredImage = post._embedded?.['wp:featuredmedia']?.[0]?.source_url || 'https://images.unsplash.com/photo-1614850523296-d8c1af93d400?auto=format&fit=crop&q=80&w=800';
-              const categories = post._embedded?.['wp:term']?.[0] || [];
-              const categoryName = categories.length > 0 ? categories[0].name : 'Post';
-              const formattedDate = new Date(post.date).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
+              const featuredImage = post.image_url || 'https://images.unsplash.com/photo-1614850523296-d8c1af93d400?auto=format&fit=crop&q=80&w=800';
+              const categoryName = post.category || 'Post';
+              const formattedDate = new Date(post.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
 
               return (
-                <a 
+                <div 
                   key={post.id} 
-                  href={post.link} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
                   className="group bg-slate-900/40 border border-slate-800 rounded-[32px] overflow-hidden hover:border-purple-500/30 transition-all flex flex-col h-full shadow-lg"
                   id={`blog-post-${post.id}`}
                 >
@@ -321,7 +317,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ activeGame }) => {
                     <img 
                       src={featuredImage} 
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" 
-                      alt={post.title.rendered} 
+                      alt={post.title} 
                     />
                     <div className="absolute top-4 left-4">
                       <span className="bg-purple-600 text-white text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-lg shadow-lg">
@@ -333,8 +329,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ activeGame }) => {
                     <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{formattedDate}</span>
                     <h4 
                       className="text-lg font-black text-white leading-tight group-hover:text-purple-400 transition-colors line-clamp-2"
-                      dangerouslySetInnerHTML={{ __html: post.title.rendered }}
-                    />
+                    >
+                      {post.title}
+                    </h4>
                     <div className="pt-2 mt-auto">
                       <span className="text-[10px] font-black text-purple-500 uppercase tracking-widest flex items-center space-x-2">
                         <span>Ler mais</span>
@@ -342,7 +339,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ activeGame }) => {
                       </span>
                     </div>
                   </div>
-                </a>
+                </div>
               );
             })
           ) : (

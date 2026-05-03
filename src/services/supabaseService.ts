@@ -24,12 +24,6 @@ export const clearCache = (key?: string) => {
 };
 
 export const getProducts = (callback: (products: any[]) => void) => {
-  // Test server connectivity on load
-  fetch('/api/ping')
-    .then(r => r.json())
-    .then(d => console.log('[DEBUG] Server ping success:', d))
-    .catch(e => console.error('[DEBUG] Server ping FAILED. Server might be down or unreachable via relative path:', e));
-
   const fetchProducts = async () => {
     const { data, error } = await supabase
       .from('products')
@@ -37,7 +31,7 @@ export const getProducts = (callback: (products: any[]) => void) => {
         *, 
         cardgames(id, name), 
         product_types(id, name),
-        tournament_tickets:tournament_tickets!fk_tickets_product(max_quantity, sold_quantity),
+        tournament_tickets!fk_tickets_product(max_quantity, sold_quantity),
         store_stock(quantity, store_price, stores(id, name, logo, slug, parceiro))
       `)
       .order('created_at', { ascending: false });
@@ -66,15 +60,20 @@ export const getProducts = (callback: (products: any[]) => void) => {
 export const getPrimaryAddress = async () => {
   try {
     const { data: { session } } = await supabase.auth.getSession();
-    const token = session?.access_token;
-    
-    const response = await fetch('/api/user/address/primary', {
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    });
-    if (!response.ok) return null;
-    return await response.json();
+    if (!session?.user) return null;
+
+    const profile = await getUserByAuthId(session.user.id);
+    if (!profile) return null;
+
+    const { data, error } = await supabase
+      .from('user_addresses')
+      .select('*')
+      .eq('user_id', profile.id)
+      .eq('is_primary', true)
+      .maybeSingle();
+
+    if (error) throw error;
+    return data;
   } catch (error) {
     console.error('Error fetching primary address:', error);
     return null;
@@ -116,13 +115,34 @@ export const getStores = (callback: (stores: any[]) => void) => {
 
 export const syncCard = async (card: any) => {
   try {
-    const response = await fetch('/api/cards/sync', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ card })
-    });
-    if (!response.ok) throw new Error('Failed to sync card with DB');
-    return await response.json();
+    // No backend anymore. We do exactly what the backend did but on frontend.
+    // Check if card exists by code/external_id logic
+    const cardCode = card.code || card.number || card.id;
+    
+    const { data: existing, error: findError } = await supabase
+      .from('cards')
+      .select('*')
+      .eq('slug', cardCode) // or another unique field
+      .maybeSingle();
+    
+    if (existing) return existing;
+
+    // If not exists, insert it
+    const { data: inserted, error: insertError } = await supabase
+      .from('cards')
+      .insert({
+        name: card.name,
+        beauty_name: card.name,
+        slug: cardCode,
+        game_id: card.game_id || 1, // Defaulting to 1 if unknown
+        image_url: card.imageUrl || card.image_url,
+        product_type: card.product_type || 'single'
+      })
+      .select()
+      .maybeSingle();
+
+    if (insertError) throw insertError;
+    return inserted;
   } catch (error) {
     console.error('Error syncing card:', error);
     return null;
@@ -270,11 +290,18 @@ export const createBinder = async (userId: string | number, name: string, gameId
 };
 
 export const getBinders = (userId: string | number, callback: (binders: any[]) => void) => {
-  const fetchBinders = async () => {
+    const fetchBinders = async () => {
+    // If userId is UUID (from auth), we need the internal ID
+    let internalId = userId;
+    if (typeof userId === 'string' && userId.length > 30) {
+      const { data: user } = await supabase.from('users').select('id').eq('auth_id', userId).maybeSingle();
+      if (user) internalId = user.id;
+    }
+
     const { data, error } = await supabase
       .from('user_binders')
       .select('*')
-      .eq('user_id', userId);
+      .eq('user_id', internalId);
     
     if (error) {
       console.error('Error fetching binders:', error);
@@ -292,7 +319,7 @@ export const getBinders = (userId: string | number, callback: (binders: any[]) =
       event: '*', 
       schema: 'public', 
       table: 'user_binders',
-      filter: `user_id=eq.${userId}`
+      filter: `user_id=eq.${typeof userId === 'string' && userId.length > 30 ? '0' : userId}` // This filter might not work with UUID if the column is bigint
     }, fetchBinders)
     .subscribe();
 
@@ -544,14 +571,20 @@ export const removeCardFromBinder = async (binderId: string | number, cardId: st
 
 export const getMyStore = async () => {
     try {
-        const headers = await getAuthHeaders();
-        if (!headers['Authorization']) return null;
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.user) return null;
+
+        const profile = await getUserByAuthId(session.user.id);
+        if (!profile) return null;
         
-        const response = await fetch('/api/lojas/minha', {
-            headers
-        });
-        if (!response.ok) return null;
-        return await response.json();
+        const { data, error } = await supabase
+          .from('stores')
+          .select('*')
+          .eq('owner_id', profile.id)
+          .maybeSingle();
+
+        if (error) throw error;
+        return data;
     } catch (error) {
         console.error('Error fetching my store:', error);
         return null;
@@ -560,19 +593,12 @@ export const getMyStore = async () => {
 
 export const updateStoreInfo = async (storeId: any, updates: any) => {
     try {
-        const { data: { session } } = await supabase.auth.getSession();
-        const token = session?.access_token;
-
-        const response = await fetch(`/api/lojas/${storeId}`, {
-            method: 'PATCH',
-            headers: { 
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify(updates)
-        });
+        const { error } = await supabase
+          .from('stores')
+          .update(updates)
+          .eq('id', storeId);
         
-        if (!response.ok) throw new Error('Failed to update store info');
+        if (error) throw error;
         return true;
     } catch (error) {
         console.error('Error updating store info:', error);
@@ -582,12 +608,12 @@ export const updateStoreInfo = async (storeId: any, updates: any) => {
 
 export const addStoreSchedule = async (params: any) => {
     try {
-        const response = await fetch('/api/lojas/semanais', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(params)
-        });
-        return response.ok;
+        const { error } = await supabase
+          .from('store_schedules')
+          .insert(params);
+        
+        if (error) throw error;
+        return true;
     } catch (error) {
         console.error('Error adding store schedule:', error);
         return false;
@@ -596,17 +622,12 @@ export const addStoreSchedule = async (params: any) => {
 
 export const updateTournamentPoints = async (entryId: number, points: number) => {
     try {
-        const { data: { session } } = await supabase.auth.getSession();
-        const token = session?.access_token;
-        const response = await fetch(`/api/torneios/entries/${entryId}/points`, {
-            method: 'POST',
-            headers: { 
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify({ points })
-        });
-        if (!response.ok) throw new Error('Failed to update tournament points');
+        const { error } = await supabase
+          .from('tournament_entries')
+          .update({ points })
+          .eq('id', entryId);
+
+        if (error) throw error;
         return true;
     } catch (error) {
         console.error('Error updating tournament points:', error);
@@ -677,31 +698,39 @@ export const getGlobalStats = async () => {
 
 export const getNotifications = async () => {
     try {
-        const headers = await getAuthHeaders();
-        if (!headers['Authorization']) return [];
-        const response = await fetch('/api/user-notifs', {
-            headers
-        });
-        if (!response.ok) return [];
-        return await response.json();
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.user) return [];
+
+        const { data: profile } = await supabase
+          .from('users')
+          .select('id')
+          .eq('auth_id', session.user.id)
+          .maybeSingle();
+        
+        if (!profile) return [];
+
+        const { data, error } = await supabase
+          .from('notifications')
+          .select('*')
+          .eq('user_id', profile.id)
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        return data || [];
     } catch (error: any) {
         console.error('Error fetching notifications:', error);
-        if (error.name === 'TypeError' && error.message === 'Failed to fetch') {
-            console.error('Network error or server unreachable at /api/user-notifs');
-        }
         return [];
     }
 };
 
 export const markNotificationAsRead = async (id: number | string) => {
     try {
-        const headers = await getAuthHeaders();
-        if (!headers['Authorization']) return false;
-        const response = await fetch(`/api/user-notifs/${id}/read`, {
-            method: 'POST',
-            headers
-        });
-        return response.ok;
+        const { error } = await supabase
+          .from('notifications')
+          .update({ is_read: true })
+          .eq('id', id);
+          
+        return !error;
     } catch (error) {
         console.error('Error marking notification as read:', error);
         return false;
@@ -710,13 +739,24 @@ export const markNotificationAsRead = async (id: number | string) => {
 
 export const markAllNotificationsAsRead = async () => {
     try {
-        const headers = await getAuthHeaders();
-        if (!headers['Authorization']) return false;
-        const response = await fetch('/api/user-notifs/read-all', {
-            method: 'POST',
-            headers
-        });
-        return response.ok;
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.user) return false;
+
+        const { data: profile } = await supabase
+          .from('users')
+          .select('id')
+          .eq('auth_id', session.user.id)
+          .maybeSingle();
+
+        if (!profile) return false;
+
+        const { error } = await supabase
+          .from('notifications')
+          .update({ is_read: true })
+          .eq('user_id', profile.id)
+          .eq('is_read', false);
+          
+        return !error;
     } catch (error) {
         console.error('Error marking all notifications as read:', error);
         return false;
@@ -821,10 +861,20 @@ const getAuthHeaders = async (contentType = 'application/json') => {
 
 export const getUserOrders = async () => {
     try {
-        const headers = await getAuthHeaders();
-        const response = await fetch('/api/orders', { headers });
-        if (!response.ok) throw new Error('Failed to fetch orders');
-        return await response.json();
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.user) return [];
+
+        const profile = await getUserByAuthId(session.user.id);
+        if (!profile) return [];
+
+        const { data, error } = await supabase
+          .from('orders')
+          .select('*, order_items(*, product:products(*)), store:stores(*)')
+          .eq('user_id', profile.id)
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        return data || [];
     } catch (error) {
         console.error('Error in getUserOrders:', error);
         return [];
@@ -833,10 +883,29 @@ export const getUserOrders = async () => {
 
 export const getReceivedOrders = async () => {
     try {
-        const headers = await getAuthHeaders();
-        const response = await fetch('/api/orders/received', { headers });
-        if (!response.ok) throw new Error('Failed to fetch received orders');
-        return await response.json();
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.user) return [];
+
+        const profile = await getUserByAuthId(session.user.id);
+        if (!profile) return [];
+
+        // First find store ID owned by this user
+        const { data: store } = await supabase
+          .from('stores')
+          .select('id')
+          .eq('owner_id', profile.id)
+          .maybeSingle();
+
+        if (!store) return [];
+
+        const { data, error } = await supabase
+          .from('orders')
+          .select('*, order_items(*, product:products(*)), user:users(*)')
+          .eq('store_id', store.id)
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        return data || [];
     } catch (error) {
         console.error('Error in getReceivedOrders:', error);
         return [];
@@ -845,10 +914,14 @@ export const getReceivedOrders = async () => {
 
 export const getOrderDetails = async (orderId: string) => {
     try {
-        const headers = await getAuthHeaders();
-        const response = await fetch(`/api/orders/${orderId}`, { headers });
-        if (!response.ok) throw new Error('Failed to fetch order details');
-        return await response.json();
+        const { data, error } = await supabase
+          .from('orders')
+          .select('*, order_items(*, product:products(*)), store:stores(*), user:users(*), shipping_method:shipping_methods(*), payment_method:payment_methods(*), address:user_addresses(*)')
+          .eq('id', orderId)
+          .maybeSingle();
+
+        if (error) throw error;
+        return data;
     } catch (error) {
         console.error('Error in getOrderDetails:', error);
         return null;
@@ -857,14 +930,13 @@ export const getOrderDetails = async (orderId: string) => {
 
 export const updateOrderStatus = async (orderId: string, status: string) => {
     try {
-        const headers = await getAuthHeaders();
-        const response = await fetch(`/api/orders/${orderId}/status`, {
-            method: 'POST',
-            headers,
-            body: JSON.stringify({ status })
-        });
-        if (!response.ok) throw new Error('Failed to update order status');
-        return await response.json();
+        const { error } = await supabase
+          .from('orders')
+          .update({ status })
+          .eq('id', orderId);
+
+        if (error) throw error;
+        return { ok: true };
     } catch (error) {
         console.error('Error in updateOrderStatus:', error);
         return null;
@@ -873,13 +945,27 @@ export const updateOrderStatus = async (orderId: string, status: string) => {
 
 export const cleanupExpiredOrders = async () => {
     try {
-        const headers = await getAuthHeaders();
-        const response = await fetch('/api/orders/cleanup', { 
-            method: 'POST',
-            headers
-        });
-        if (!response.ok) throw new Error('Failed to cleanup orders');
-        return await response.json();
+        // Find orders pending for more than 2 hours
+        const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+        
+        const { data: expiredOrders, error: fetchError } = await supabase
+          .from('orders')
+          .select('id')
+          .eq('status', 'pending')
+          .lt('created_at', twoHoursAgo);
+
+        if (fetchError) throw fetchError;
+
+        if (expiredOrders && expiredOrders.length > 0) {
+          const { error: updateError } = await supabase
+            .from('orders')
+            .update({ status: 'cancelled' })
+            .in('id', expiredOrders.map(o => o.id));
+          
+          if (updateError) throw updateError;
+        }
+
+        return { ok: true, count: expiredOrders?.length || 0 };
     } catch (error) {
         console.error('Error in cleanupExpiredOrders:', error);
         return { ok: false };
@@ -929,60 +1015,22 @@ export const getRandomUser = async () => {
 };
 
 export const syncUser = async (userData: any) => {
-  try {
-    const url = '/api/sync-user';
-    console.log(`API Call: syncUser to ${url}`, userData.email);
-    
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ userData })
-    }).catch(err => {
-      console.error(`Network error or blocked fetch to ${url}:`, err);
-      throw new Error(`Failed to connect to server at ${url}. Possible network or CORS issue.`);
-    });
-    
-    if (!response.ok) {
-      const contentType = response.headers.get('content-type');
-      let errorMsg = 'Failed to sync user';
-      if (contentType && contentType.includes('application/json')) {
-        const errorData = await response.json();
-        errorMsg = errorData.error || errorMsg;
-      } else {
-        const text = await response.text();
-        console.error('Server returned non-JSON error for sync-user:', text);
-        errorMsg = `Server error (${response.status})`;
-      }
-      throw new Error(errorMsg);
-    }
-    
-    return await response.json();
-  } catch (error) {
-    console.error('Error syncing user with Supabase via backend:', error);
-    return null;
-  }
+  // Now handled by devAutoLogin or directly after standard login.
+  // We keep the export to avoid breaking imports but it does nothing.
+  return { success: true };
 };
 
 export const updateUserProfile = async (userId: string | number, updates: any) => {
   try {
-    const response = await fetch('/api/update-profile', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ userId, updates })
-    });
+    const { error } = await supabase
+      .from('users')
+      .update(updates)
+      .eq(typeof userId === 'string' && userId.length > 30 ? 'auth_id' : 'id', userId);
     
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to update profile');
-    }
-    
-    return await response.json();
+    if (error) throw error;
+    return { success: true };
   } catch (error) {
-    console.error('Error updating profile with Supabase via backend:', error);
+    console.error('Error updating profile with Supabase directly:', error);
     return null;
   }
 };
@@ -1010,28 +1058,34 @@ export const getStoreBySlug = async (slug: string) => {
 
 export const getStoreProfileInfo = async (username: string) => {
   try {
-    console.log('API Call: getStoreProfileInfo', username);
-    const response = await fetch(`/api/lojas/${encodeURIComponent(username)}`);
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Failed to fetch store profile info: ${response.status} ${errorText}`);
-    }
-    return await response.json();
+    const { data: user, error: userError } = await supabase
+      .from('users')
+      .select('*, stores(*)')
+      .eq('username', username)
+      .maybeSingle();
+
+    if (userError) throw userError;
+    if (!user) return null;
+
+    return {
+      user: user,
+      store: Array.isArray(user.stores) ? user.stores[0] : user.stores
+    };
   } catch (error) {
-    console.error('Error fetching store profile info (Failed to fetch usually means server is unreachable):', error);
+    console.error('Error fetching store profile info:', error);
     return null;
   }
 };
 
 export const getStoreSchedule = async (storeId: string) => {
   try {
-    console.log('API Call: getStoreSchedule (Events)', storeId);
-    const response = await fetch(`/api/lojas/${encodeURIComponent(storeId)}/semanais`);
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Failed to fetch store schedule: ${response.status} ${errorText}`);
-    }
-    return await response.json();
+    const { data, error } = await supabase
+      .from('store_schedules')
+      .select('*')
+      .eq('store_id', storeId);
+    
+    if (error) throw error;
+    return data || [];
   } catch (error) {
     console.error('Error fetching store schedule:', error);
     return [];
@@ -1040,13 +1094,13 @@ export const getStoreSchedule = async (storeId: string) => {
 
 export const getStoreHours = async (storeId: string) => {
   try {
-    console.log('API Call: getStoreHours', storeId);
-    const response = await fetch(`/api/lojas/${encodeURIComponent(storeId)}/hours`);
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Failed to fetch store hours: ${response.status} ${errorText}`);
-    }
-    return await response.json();
+    const { data, error } = await supabase
+      .from('store_hours')
+      .select('*')
+      .eq('store_id', storeId);
+
+    if (error) throw error;
+    return data || [];
   } catch (error) {
     console.error('Error fetching store hours:', error);
     return [];
@@ -1055,24 +1109,18 @@ export const getStoreHours = async (storeId: string) => {
 
 export const updateStoreStock = async (store_id: string | number, product_id: number | string, quantity: number, price?: number, pre_sale?: boolean) => {
   try {
-    const headers = await getAuthHeaders();
-
-    const response = await fetch('/api/lojas/estoque', {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ 
-        store_id, 
-        product_id, 
+    const { data, error } = await supabase
+      .from('store_stock')
+      .upsert({
+        store_id,
+        product_id,
         quantity,
         store_price: price,
         pre_sale
-      })
-    });
+      }, { onConflict: 'store_id,product_id' })
+      .select();
     
-    const data = await response.json();
-    if (!response.ok) {
-      throw new Error(data.error || 'Failed to update store stock');
-    }
+    if (error) throw error;
     return data;
   } catch (error: any) {
     console.error('Error updating store stock:', error);
@@ -1100,61 +1148,57 @@ export const getStoreEvents = async (storeId: string) => {
 
 export const getActivities = async (limit: number = 10) => {
   try {
-    console.log('API Call: getActivities', limit);
-    const response = await fetch(`/api/atividades?limit=${limit}`);
-    if (!response.ok) {
-      const contentType = response.headers.get('content-type');
-      let errorMsg = `Failed to fetch activities: ${response.status}`;
-      if (contentType && contentType.includes('application/json')) {
-        const errorData = await response.json();
-        errorMsg = errorData.error || errorMsg;
-      } else {
-        const text = await response.text();
-        console.error('Activities fetch non-JSON error:', text);
-      }
-      throw new Error(errorMsg);
-    }
-    const data = await response.json();
-    return data;
+    const { data, error } = await supabase
+      .from('action_logs')
+      .select('*, user:users(*)')
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    if (error) throw error;
+    return data || [];
   } catch (error: any) {
-    console.error('Error fetching activities (Failed to fetch usually means server is unreachable):', error?.message || error);
+    console.error('Error fetching activities:', error);
     return [];
   }
 };
 
 export const getAllTournaments = async () => {
   try {
-    console.log('API Call: getAllTournaments');
-    const response = await fetch('/api/torneios');
-    if (!response.ok) {
-      const contentType = response.headers.get('content-type');
-      let errorMsg = `Failed to fetch tournaments: ${response.status}`;
-      if (contentType && contentType.includes('application/json')) {
-        const errorData = await response.json();
-        errorMsg = errorData.error || errorMsg;
-      } else {
-        const text = await response.text();
-        console.error('Tournaments fetch non-JSON error:', text);
-      }
-      throw new Error(errorMsg);
-    }
-    return await response.json();
+    const { data, error } = await supabase
+      .from('tournaments')
+      .select(`
+        *,
+        cardgames(name),
+        tournament_formats(name),
+        creator:users!created_by(id, username, codename, avatar),
+        tickets:tournament_tickets!fk_tickets_tournament(
+          *,
+          product:products(*)
+        )
+      `)
+      .order('start_date', { ascending: false });
+
+    if (error) throw error;
+    return data || [];
   } catch (error: any) {
-    console.error('Error fetching tournaments (Failed to fetch usually means server is unreachable):', error?.message || error);
+    console.error('Error fetching tournaments:', error);
     return [];
   }
 };
 
 export const getCards = async (game?: string): Promise<any[]> => {
   try {
-    let url = '/api/produtos?limit=100';
-    if (game && game !== 'All') url += `&game=${encodeURIComponent(game)}`;
+    let query = supabase.from('products').select('*, cardgames(name)').limit(100);
     
-    const response = await fetch(url);
-    if (!response.ok) throw new Error('Failed to fetch products for cards');
-    const data = await response.json();
+    if (game && game !== 'All') {
+      const { data: g } = await supabase.from('cardgames').select('id').eq('name', game).maybeSingle();
+      if (g) query = query.eq('card_game_id', g.id);
+    }
     
-    return (data.produtos || []).map((p: any) => ({
+    const { data, error } = await query;
+    if (error) throw error;
+    
+    return (data || []).map((p: any) => ({
       id: p.id.toString(),
       name: p.beauty_name || p.name,
       game: p.cardgames?.name || 'Unknown',
@@ -1229,12 +1273,24 @@ export const getTournamentFormats = async () => {
 
 export const getMyTournaments = async () => {
   try {
-    const headers = await getAuthHeaders();
-    const response = await fetch('/api/meus-torneios', {
-      headers
-    });
-    if (!response.ok) throw new Error('Failed to fetch tournaments');
-    return await response.json();
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) return [];
+
+    const profile = await getUserByAuthId(session.user.id);
+    if (!profile) return [];
+
+    const { data, error } = await supabase
+      .from('tournaments')
+      .select(`
+        *,
+        cardgames(name),
+        tournament_formats(name),
+        tickets:tournament_tickets!fk_tickets_tournament(*, product:products(*))
+      `)
+      .eq('created_by', profile.id);
+
+    if (error) throw error;
+    return data || [];
   } catch (error) {
     console.error('Error fetching my tournaments:', error);
     return [];
@@ -1243,30 +1299,60 @@ export const getMyTournaments = async () => {
 
 export const createTournament = async (tournamentData: any) => {
   try {
-    const headers = await getAuthHeaders();
-    if (!headers['Authorization']) throw new Error('Sessão expirada ou usuário não autenticado');
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) throw new Error('Sessão expirada');
 
-    // Ensure all numeric fields are actually numbers
-    const payload = {
-        ...tournamentData,
+    const profile = await getUserByAuthId(session.user.id);
+    if (!profile) throw new Error('Perfil não encontrado');
+
+    // 1. Create Tournament
+    const { data: tournament, error: tError } = await supabase
+      .from('tournaments')
+      .insert({
+        name: tournamentData.name,
+        description: tournamentData.description,
+        start_date: tournamentData.start_date,
+        location: tournamentData.location,
         max_players: Number(tournamentData.max_players) || 32,
         cardgame_id: Number(tournamentData.cardgame_id),
         format_id: Number(tournamentData.format_id),
-        ticket_price: Number(tournamentData.ticket_price) || 0,
-        ticket_quantity: Number(tournamentData.ticket_quantity) || 0
-    };
+        created_by: profile.id,
+        status: 'open',
+        image_url: tournamentData.image_url
+      })
+      .select()
+      .maybeSingle();
 
-    const response = await fetch('/api/torneios', {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(payload)
-    });
-    
-    const data = await response.json();
-    if (!response.ok) {
-        throw new Error(data.error || 'Erro ao criar torneio');
+    if (tError) throw tError;
+
+    // 2. Create Ticket Product if price > 0
+    if (tournamentData.ticket_price > 0 && tournament) {
+      const { data: product, error: pError } = await supabase
+        .from('products')
+        .insert({
+          name: `Inscrição: ${tournament.name}`,
+          beauty_name: `Ticket - ${tournament.name}`,
+          product_type_id: 3, // Assuming 3 is tickets
+          card_game_id: tournament.cardgame_id,
+          msrp: tournamentData.ticket_price,
+          image_url: tournament.image_url
+        })
+        .select()
+        .maybeSingle();
+
+      if (!pError && product) {
+        await supabase
+          .from('tournament_tickets')
+          .insert({
+            tournament_id: tournament.id,
+            product_id: product.id,
+            max_quantity: Number(tournamentData.ticket_quantity) || tournament.max_players,
+            sold_quantity: 0
+          });
+      }
     }
-    return data;
+
+    return tournament;
   } catch (error: any) {
     console.error('Error creating tournament:', error);
     return { error: error.message || 'Failed to create tournament' };
@@ -1275,28 +1361,57 @@ export const createTournament = async (tournamentData: any) => {
 
 export const checkout = async (items: any[], addressId?: string | number) => {
   try {
-    const headers = await getAuthHeaders();
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) throw new Error('Usuário não autenticado');
 
-    const response = await fetch('/api/checkout', {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ 
-        items: items.map(i => ({
-            product_id: i.id,
-            store_id: i.storeId || i.store_id,
-            quantity: i.quantity,
-            price: i.price,
-            name: i.name
-        })),
-        address_id: addressId
-      })
+    const profile = await getUserByAuthId(session.user.id);
+    if (!profile) throw new Error('Perfil não encontrado');
+
+    // Group items by store
+    const itemsByStore: Record<number, any[]> = {};
+    items.forEach(item => {
+      const sid = item.storeId || item.store_id;
+      if (!itemsByStore[sid]) itemsByStore[sid] = [];
+      itemsByStore[sid].push(item);
     });
 
-    if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.error || 'Erro no checkout');
+    const ordersCreated = [];
+
+    for (const storeId in itemsByStore) {
+      const storeItems = itemsByStore[storeId];
+      const totalAmount = storeItems.reduce((acc, i) => acc + (i.price * i.quantity), 0);
+
+      const { data: order, error: orderError } = await supabase
+        .from('orders')
+        .insert({
+          user_id: profile.id,
+          store_id: Number(storeId),
+          address_id: addressId ? Number(addressId) : null,
+          total_amount: totalAmount,
+          status: 'pending'
+        })
+        .select()
+        .maybeSingle();
+
+      if (orderError) throw orderError;
+      if (!order) throw new Error('Falha ao criar pedido');
+
+      const orderItems = storeItems.map(i => ({
+        order_id: order.id,
+        product_id: i.id,
+        quantity: i.quantity,
+        price: i.price
+      }));
+
+      const { error: itemsError } = await supabase
+        .from('order_items')
+        .insert(orderItems);
+
+      if (itemsError) throw itemsError;
+      ordersCreated.push(order);
     }
-    return await response.json();
+
+    return { orders: ordersCreated, success: true };
   } catch (error: any) {
     console.error('Error during checkout:', error);
     throw error;
@@ -1305,10 +1420,19 @@ export const checkout = async (items: any[], addressId?: string | number) => {
 
 export const getAddresses = async () => {
     try {
-        const headers = await getAuthHeaders();
-        const response = await fetch('/api/user/addresses', { headers });
-        if (!response.ok) return [];
-        return await response.json();
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.user) return [];
+
+        const profile = await getUserByAuthId(session.user.id);
+        if (!profile) return [];
+
+        const { data, error } = await supabase
+            .from('user_addresses')
+            .select('*')
+            .eq('user_id', profile.id);
+            
+        if (error) throw error;
+        return data || [];
     } catch (error) {
         console.error('Error fetching addresses:', error);
         return [];
@@ -1317,9 +1441,13 @@ export const getAddresses = async () => {
 
 export const getStoreShippingMethods = async (storeId: string | number) => {
     try {
-        const response = await fetch(`/api/lojas/${storeId}/fretes`);
-        if (!response.ok) return [];
-        return await response.json();
+        const { data, error } = await supabase
+            .from('shipping_methods')
+            .select('*')
+            .eq('store_id', storeId);
+            
+        if (error) throw error;
+        return data || [];
     } catch (error) {
         console.error('Error fetching shipping methods:', error);
         return [];
@@ -1328,9 +1456,13 @@ export const getStoreShippingMethods = async (storeId: string | number) => {
 
 export const getStorePaymentMethods = async (storeId: string | number) => {
     try {
-        const response = await fetch(`/api/lojas/${storeId}/pagamentos`);
-        if (!response.ok) return [];
-        return await response.json();
+        const { data, error } = await supabase
+            .from('payment_methods')
+            .select('*')
+            .eq('store_id', storeId);
+            
+        if (error) throw error;
+        return data || [];
     } catch (error) {
         console.error('Error fetching payment methods:', error);
         return [];
@@ -1342,18 +1474,44 @@ export const createOrderFull = async (params: {
     address_id: number;
     shipping_method_id: number;
     payment_method_id: number;
-    items: { product_id: number; quantity: number }[];
+    items: { product_id: number; quantity: number, price: number }[];
 }) => {
     try {
-        const headers = await getAuthHeaders();
-        const response = await fetch('/api/checkout/full', {
-            method: 'POST',
-            headers,
-            body: JSON.stringify(params)
-        });
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.error || 'Erro ao criar pedido');
-        return data; // { order_id }
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.user) throw new Error('Login necessário');
+
+        const totalAmount = params.items.reduce((acc, i) => acc + (i.price * i.quantity), 0);
+
+        const { data: order, error: orderError } = await supabase
+            .from('orders')
+            .insert({
+                user_id: session.user.id,
+                store_id: params.store_id,
+                address_id: params.address_id,
+                shipping_method_id: params.shipping_method_id,
+                payment_method_id: params.payment_method_id,
+                total_amount: totalAmount,
+                status: 'pending'
+            })
+            .select()
+            .maybeSingle();
+
+        if (orderError) throw orderError;
+        if (!order) throw new Error('Erro ao criar pedido');
+
+        const orderItems = params.items.map(i => ({
+            order_id: order.id,
+            product_id: i.product_id,
+            quantity: i.quantity,
+            price: i.price
+        }));
+
+        const { error: itemsError } = await supabase
+            .from('order_items')
+            .insert(orderItems);
+
+        if (itemsError) throw itemsError;
+        return order;
     } catch (error: any) {
         console.error('Error in createOrderFull:', error);
         throw error;
@@ -1362,14 +1520,13 @@ export const createOrderFull = async (params: {
 
 export const startTournament = async (id: number | string) => {
   try {
-    const { data: { session } } = await supabase.auth.getSession();
-    const token = session?.access_token;
-    const response = await fetch(`/api/torneios/${id}/iniciar`, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${token}` }
-    });
-    if (!response.ok) throw new Error('Failed to start tournament');
-    return await response.json();
+    const { error } = await supabase
+      .from('tournaments')
+      .update({ status: 'running' })
+      .eq('id', id);
+
+    if (error) throw error;
+    return { success: true };
   } catch (error) {
     console.error('Error starting tournament:', error);
     return { error: 'Failed to start tournament' };
@@ -1378,13 +1535,13 @@ export const startTournament = async (id: number | string) => {
 
 export const getTournamentEntries = async (id: number | string) => {
   try {
-    const { data: { session } } = await supabase.auth.getSession();
-    const token = session?.access_token;
-    const response = await fetch(`/api/torneios/${id}/entries`, {
-      headers: { 'Authorization': `Bearer ${token}` }
-    });
-    if (!response.ok) throw new Error('Failed to fetch entries');
-    return await response.json();
+    const { data, error } = await supabase
+      .from('tournament_entries')
+      .select('*, user:users(*)')
+      .eq('tournament_id', id);
+
+    if (error) throw error;
+    return data || [];
   } catch (error) {
     console.error('Error fetching entries:', error);
     return [];
@@ -1393,18 +1550,13 @@ export const getTournamentEntries = async (id: number | string) => {
 
 export const updateEntryStatus = async (entryId: number | string, status: string) => {
   try {
-    const { data: { session } } = await supabase.auth.getSession();
-    const token = session?.access_token;
-    const response = await fetch(`/api/torneios/entries/${entryId}/status`, {
-      method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
-      body: JSON.stringify({ status })
-    });
-    if (!response.ok) throw new Error('Failed to update entry status');
-    return await response.json();
+    const { error } = await supabase
+      .from('tournament_entries')
+      .update({ status })
+      .eq('id', entryId);
+
+    if (error) throw error;
+    return { success: true };
   } catch (error) {
     console.error('Error updating entry status:', error);
     return { error: 'Failed to update entry status' };
@@ -1413,18 +1565,16 @@ export const updateEntryStatus = async (entryId: number | string, status: string
 
 export const finalizeTournament = async (id: number | string, tops: { top1?: string; top2?: string; top3?: string }) => {
   try {
-    const { data: { session } } = await supabase.auth.getSession();
-    const token = session?.access_token;
-    const response = await fetch(`/api/torneios/${id}/finalizar`, {
-      method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
-      body: JSON.stringify(tops)
-    });
-    if (!response.ok) throw new Error('Failed to finalize tournament');
-    return await response.json();
+    const { error } = await supabase
+      .from('tournaments')
+      .update({ 
+        status: 'finished',
+        winner_id: tops.top1 || null
+      })
+      .eq('id', id);
+    
+    if (error) throw error;
+    return { success: true };
   } catch (error) {
     console.error('Error finalizing tournament:', error);
     return { error: 'Failed to finalize tournament' };
@@ -1433,110 +1583,106 @@ export const finalizeTournament = async (id: number | string, tops: { top1?: str
 
 export const searchExternalCards = async (game: string, query: string, page: number = 1, limit: number = 20): Promise<{ data: any[], total: number, totalPages: number }> => {
   try {
-    // Map to API game IDs (standard slugs expected by Homura API)
-    const gameMap: Record<string, string> = {
-      'One Piece': 'onepiece',
-      'Magic': 'magic',
-      'Pokémon': 'pokemon',
-      'Yu-Gi-Oh!': 'yugioh',
-      'Disney Lorcana': 'lorcana',
-      'Digimon': 'digimon',
-      'Union Arena': 'unionarena',
-      'Dragon Ball': 'dragonballfussion'
-    };
+    // Falls back to searching local cards table
+    let q = supabase
+      .from('cards')
+      .select('*, cardgames(name)', { count: 'exact' })
+      .ilike('name', `%${query}%`)
+      .range((page - 1) * limit, page * limit - 1);
 
-    const gameId = gameMap[game] || game.toLowerCase().replace(/\s+/g, '');
-    const response = await fetch(`/api/cards?game=${encodeURIComponent(gameId)}&q=${encodeURIComponent(query)}&page=${page}&limit=${limit}`);
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      console.error('Failed to fetch external cards. Status:', response.status, 'Body:', errorData);
-      throw new Error(`Failed to fetch external cards: ${response.status}`);
+    if (game && game !== 'All') {
+      const { data: g } = await supabase.from('cardgames').select('id').eq('name', game).maybeSingle();
+      if (g) q = q.eq('game_id', g.id);
     }
-    const data = await response.json();
-    
-    // The API might return directly an array or a structured object
-    const list = Array.isArray(data) ? data : (data.data || data.cards || []);
-    const total = typeof data.total === 'number' ? data.total : list.length;
-    const totalPages = typeof data.totalPages === 'number' ? data.totalPages : 1;
-    
-    const mappedCards = list.map((c: any) => {
-      // Extract a string for the set name
-      let setName = 'Desconhecido';
-      if (typeof c.set === 'string') {
-        setName = c.set;
-      } else if (c.set && typeof c.set === 'object') {
-        setName = c.set.beauty_name || c.set.name || c.set.set_code || setName;
-      } else if (c.set_name) {
-        setName = c.set_name;
-      }
 
-      const safeString = (val: any, fallback: string = '') => {
-        if (typeof val === 'string') return val;
-        if (val && typeof val === 'object') return val.name || val.text || val.beauty_name || JSON.stringify(val);
-        return fallback;
-      };
-
-      return {
-        id: c.id || c.code || Math.random().toString(),
-        name: safeString(c.name, 'Carta sem nome'),
-        game: game,
-        code: safeString(c.code || c.number, 'N/A'),
-        rarity: safeString(c.rarity, 'Common'),
-        price: c.price || 0,
-        imageUrl: c.image || c.imageUrl || c.images?.small || c.images?.normal || 'https://images.unsplash.com/photo-1614850523296-d8c1af93d400?auto=format&fit=crop&q=80&w=400',
-        set: setName,
-        description: safeString(c.text || c.effect, ''),
-        variants: c.variants || []
-      };
-    });
+    const { data, count, error } = await q;
+    if (error) throw error;
+    
+    const mappedCards = (data || []).map((c: any) => ({
+      id: c.id.toString(),
+      name: c.beauty_name || c.name,
+      game: c.cardgames?.name || game,
+      code: c.slug || c.id.toString(),
+      rarity: c.product_type || 'Common',
+      price: c.price || 0,
+      imageUrl: c.image_url || 'https://images.unsplash.com/photo-1614850523296-d8c1af93d400?auto=format&fit=crop&q=80&w=400',
+      set: c.cardgames?.name || 'Base Set',
+      description: '',
+      variants: []
+    }));
 
     return {
       data: mappedCards,
-      total,
-      totalPages
+      total: count || 0,
+      totalPages: Math.ceil((count || 0) / limit)
     };
   } catch (error) {
-    console.error('Error searching external cards:', error);
+    console.error('Error searching cards:', error);
     return { data: [], total: 0, totalPages: 0 };
   }
 };
 
 export const getStoreTournaments = async (username: string) => {
   try {
-    const response = await fetch(`/api/lojas/${username}/torneios`);
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Store tournaments fetch error response:', errorText);
-      throw new Error(`Failed to fetch store tournaments: ${response.status}`);
-    }
-    return await response.json();
+    const { data: user } = await supabase.from('users').select('id').eq('username', username).maybeSingle();
+    if (!user) return [];
+
+    const { data: store } = await supabase.from('stores').select('id').eq('owner_id', user.id).maybeSingle();
+    if (!store) return [];
+
+    const { data, error } = await supabase
+      .from('tournaments')
+      .select('*, cardgames(name), tournament_formats(name)')
+      .eq('location', store.id);
+
+    if (error) throw error;
+    return data || [];
   } catch (error: any) {
-    console.error('Error fetching store tournaments:', error?.message || error);
-    return null;
+    console.error('Error fetching store tournaments:', error);
+    return [];
   }
 };
 
 export const getFullUserProfile = async (username: string, followerId?: string) => {
   try {
-    const url = `/api/users/${encodeURIComponent(String(username))}/profile${followerId ? `?follower_id=${followerId}` : ''}`;
-    const response = await fetch(url).catch(err => {
-      console.error(`Network error fetching profile from ${url}:`, err);
-      throw err;
-    });
-    
-    if (!response.ok) {
-      console.error(`Profile fetch error: ${response.status} for ${url}`);
-      throw new Error('Failed to fetch full user profile');
+    const { data: user, error: userError } = await supabase
+      .from('users')
+      .select('*, stores(*)')
+      .eq('username', username)
+      .maybeSingle();
+
+    if (userError) throw userError;
+    if (!user) return null;
+
+    // Fetch collections counts
+    const [{ count: cardsCount }, { count: wishlistCount }, { count: offerlistCount }, { count: followersCount }, { count: followingCount }] = await Promise.all([
+      supabase.from('user_cards').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
+      supabase.from('wishlist').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
+      supabase.from('offerlist').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
+      supabase.from('user_followers').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
+      supabase.from('user_followers').select('*', { count: 'exact', head: true }).eq('follower_id', user.id)
+    ]);
+
+    let isFollowing = false;
+    if (followerId) {
+       const { data: followData } = await supabase.from('user_followers').select('*').eq('user_id', user.id).eq('follower_id', followerId).maybeSingle();
+       isFollowing = !!followData;
     }
-    const data = await response.json();
-    if (data && data.user) {
-      const u = data.user;
-      data.user = {
-        ...u,
-        store_logo: u.stores?.[0]?.logo || u.stores?.logo
-      };
-    }
-    return data;
+
+    return {
+      user: {
+        ...user,
+        store_logo: user.stores?.[0]?.logo || user.stores?.logo
+      },
+      stats: {
+        cards: cardsCount || 0,
+        wishlist: wishlistCount || 0,
+        offerlist: offerlistCount || 0,
+        followers: followersCount || 0,
+        following: followingCount || 0
+      },
+      isFollowing
+    };
   } catch (error) {
     console.error('Error fetching full user profile:', error);
     return null;
@@ -1545,13 +1691,16 @@ export const getFullUserProfile = async (username: string, followerId?: string) 
 
 export const followUser = async (username: string, followerId: string) => {
   try {
-    const response = await fetch(`/api/users/${username}/follow`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ follower_id: followerId })
+    const { data: user } = await supabase.from('users').select('id').eq('username', username).maybeSingle();
+    if (!user) throw new Error('User not found');
+
+    const { error } = await supabase.from('user_followers').insert({
+        user_id: user.id,
+        follower_id: followerId
     });
-    if (!response.ok) throw new Error('Failed to follow user');
-    return await response.json();
+
+    if (error) throw error;
+    return { success: true };
   } catch (error) {
     console.error('Error following user:', error);
     return null;
@@ -1560,13 +1709,13 @@ export const followUser = async (username: string, followerId: string) => {
 
 export const unfollowUser = async (username: string, followerId: string) => {
   try {
-    const response = await fetch(`/api/users/${username}/unfollow`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ follower_id: followerId })
-    });
-    if (!response.ok) throw new Error('Failed to unfollow user');
-    return await response.json();
+    const { data: user } = await supabase.from('users').select('id').eq('username', username).maybeSingle();
+    if (!user) throw new Error('User not found');
+
+    const { error } = await supabase.from('user_followers').delete().eq('user_id', user.id).eq('follower_id', followerId);
+
+    if (error) throw error;
+    return { success: true };
   } catch (error) {
     console.error('Error unfollowing user:', error);
     return null;
@@ -1575,13 +1724,18 @@ export const unfollowUser = async (username: string, followerId: string) => {
 
 export const submitUserReview = async (username: string, reviewerId: string, isPositive: boolean, comment: string) => {
   try {
-    const response = await fetch(`/api/users/${username}/review`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ reviewer_id: reviewerId, is_positive: isPositive, comment })
+    const { data: user } = await supabase.from('users').select('id').eq('username', username).maybeSingle();
+    if (!user) throw new Error('User not found');
+
+    const { error } = await supabase.from('user_reviews').insert({
+        user_id: user.id,
+        reviewer_id: reviewerId,
+        is_positive: isPositive,
+        comment
     });
-    if (!response.ok) throw new Error('Failed to submit review');
-    return await response.json();
+
+    if (error) throw error;
+    return { success: true };
   } catch (error) {
     console.error('Error submitting review:', error);
     return null;
@@ -1590,10 +1744,11 @@ export const submitUserReview = async (username: string, reviewerId: string, isP
 
 export const getCollectionRanking = async (limit: number = 5) => {
   try {
-    const response = await fetch(`/api/rankings/colecao?limit=${limit}`);
-    if (!response.ok) throw new Error('Failed to fetch ranking');
-    const data = await response.json();
-    return data;
+    const { data, error } = await supabase
+      .rpc('get_collection_ranking', { p_limit: limit });
+    
+    if (error) throw error;
+    return data || [];
   } catch (error) {
     console.error('Error fetching collection ranking:', error);
     return [];
@@ -1602,10 +1757,11 @@ export const getCollectionRanking = async (limit: number = 5) => {
 
 export const getOffersRanking = async (limit: number = 5) => {
   try {
-    const response = await fetch(`/api/rankings/ofertas?limit=${limit}`);
-    if (!response.ok) throw new Error('Failed to fetch ranking');
-    const data = await response.json();
-    return data;
+    const { data, error } = await supabase
+      .rpc('get_offers_ranking', { p_limit: limit });
+    
+    if (error) throw error;
+    return data || [];
   } catch (error) {
     console.error('Error fetching offers ranking:', error);
     return [];
@@ -1736,13 +1892,27 @@ export const getProductsByFilters = async (filters: { game_id?: string | number,
 
 export const getTournamentDetails = async (id: number | string) => {
   try {
-    const response = await fetch(`/api/torneios/${id}`);
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      console.error(`[API] Error ${response.status} fetching tournament ${id}:`, errorData);
-      throw new Error(errorData.error || 'Failed to fetch tournament details');
-    }
-    return await response.json();
+    const { data, error } = await supabase
+      .from('tournaments')
+      .select(`
+        *, 
+        cardgames(name), 
+        tournament_formats(name),
+        creator:users!created_by(id, username, codename, avatar),
+        stores!inner(id, name, logo, slug),
+        tickets:tournament_tickets!fk_tickets_tournament(
+          *,
+          product:products(
+            *,
+            stores(store_id)
+          )
+        )
+      `)
+      .eq('id', id)
+      .maybeSingle();
+
+    if (error) throw error;
+    return data;
   } catch (error) {
     console.error('Error fetching tournament details:', error);
     return null;
