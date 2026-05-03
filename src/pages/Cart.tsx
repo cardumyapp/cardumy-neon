@@ -104,7 +104,7 @@ export const CartPage: React.FC<CartPageProps> = ({ cart, updateQuantity, remove
         shipping_method_id: selectedShippingId,
         payment_method_id: Number(selectedPaymentId),
         items: storeItems.map(i => ({ 
-          product_id: Number(i.id), 
+          product_id: Number(i.productId || i.id), 
           quantity: i.quantity,
           price: Number(i.price) || 0
         }))

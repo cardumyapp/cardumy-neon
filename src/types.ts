@@ -26,8 +26,8 @@ export interface Product {
   imageUrl?: string;
   image_url?: string;
   storeName?: string;
-  storeId?: string;
-  store_id?: string;
+  storeId?: string | number;
+  store_id?: string | number;
   storeHandle?: string;
   storeLogo?: string;
   isOfficialPartner?: boolean;
@@ -57,6 +57,7 @@ export interface UserAddress {
 
 export interface CartItem extends Product {
   quantity: number;
+  productId?: string | number;
 }
 
 export interface OrderComment {

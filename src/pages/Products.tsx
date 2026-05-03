@@ -216,16 +216,17 @@ export const Products: React.FC<ProductsProps> = ({ onAddToCart, activeGame }) =
     const stockItems = Array.isArray(selectedProduct.store_stock) ? selectedProduct.store_stock : [];
     
     return stockItems.map((si: any) => ({
-      id: si.id,
-      storeId: si.stores?.id,
-      storeName: si.stores?.name,
-      storeLogo: si.stores?.logo,
-      storeSlug: si.stores?.slug,
-      isOfficialPartner: si.stores?.parceiro,
+      ...selectedProduct, // spread product info first
+      id: `${selectedProduct.id}-${si.store?.id}`, // unique id for cart
+      productId: selectedProduct.id,
+      storeId: si.store?.id,
+      storeName: si.store?.name,
+      storeLogo: si.store?.logo,
+      storeSlug: si.store?.slug,
+      isOfficialPartner: si.store?.parceiro,
       stock: si.quantity,
       price: si.store_price || selectedProduct.msrp || selectedProduct.mspr || 0,
       type: selectedProduct.type,
-      product: selectedProduct // Carry the product info for addToCart
     }));
   }, [selectedProduct]);
 

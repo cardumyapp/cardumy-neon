@@ -18,7 +18,8 @@ export async function devAutoLogin() {
     localStorage.setItem('dev_device_id', deviceId);
   }
 
-  const email = `dev_${deviceId}@cardumy.app`;
+  // const email = `dev_${deviceId}@cardumy.app`;
+  const email = `dev@cardumy.app`;
   const password = '12345678';
 
   try {
