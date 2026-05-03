@@ -81,9 +81,9 @@ export const FoldersPage: React.FC = () => {
       showNotification(`Pasta "${newFolderName}" criada com sucesso!`, 'success');
       setIsModalOpen(false);
       setNewFolderName('');
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error creating binder:', err);
-      showNotification('Erro ao criar pasta', 'error');
+      showNotification(err.message || 'Erro ao criar pasta', 'error');
     }
   };
 

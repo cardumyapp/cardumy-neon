@@ -125,9 +125,9 @@ export const FolderDetails: React.FC = () => {
       }
       showNotification(`${card.name} removido de ${folder.name}`, 'info');
       setCards(prev => prev.filter(c => c.dbId !== card.dbId));
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error removing card:', error);
-      showNotification('Erro ao remover carta', 'error');
+      showNotification(error.message || 'Erro ao remover carta', 'error');
     }
   };
 
@@ -154,9 +154,9 @@ export const FolderDetails: React.FC = () => {
         c.dbId === card.dbId ? { ...c, quantity: newQuantity } : c
       ));
       showNotification(`Quantidade de ${card.name} atualizada para ${newQuantity}`, 'success');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error updating quantity:', error);
-      showNotification('Erro ao atualizar quantidade', 'error');
+      showNotification(error.message || 'Erro ao atualizar quantidade', 'error');
     }
   };
 
@@ -169,9 +169,9 @@ export const FolderDetails: React.FC = () => {
       await deleteBinder(currentUser.id, folderId);
       showNotification(`Pasta "${folder.name}" excluída com sucesso`, 'info');
       navigate('/pastas');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error deleting binder:', error);
-      showNotification('Erro ao excluir pasta', 'error');
+      showNotification(error.message || 'Erro ao excluir pasta', 'error');
       setIsDeletingBinder(false);
     }
   };

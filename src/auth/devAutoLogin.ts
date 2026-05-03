@@ -1,14 +1,17 @@
 import { supabase } from '../lib/supabase';
 
 export async function devAutoLogin() {
-  // 1. Check for existing session first
+  // 1. sessão existente
   const { data: { session } } = await supabase.auth.getSession();
   if (session) return session;
 
-  // 2. Guard to prevent multiple attempts in the same component lifecycle/session if it already failed
-  if (sessionStorage.getItem('dev_login_in_progress')) return null;
-  
-  // 3. Persistent Device ID
+  // 2. trava global (evita loop infinito)
+  if (localStorage.getItem('dev_auth_disabled') === 'true') {
+    console.warn('Dev auth disabled due to previous failures');
+    return null;
+  }
+
+  // 3. device persistente
   let deviceId = localStorage.getItem('dev_device_id');
   if (!deviceId) {
     deviceId = crypto.randomUUID();
@@ -18,79 +21,86 @@ export async function devAutoLogin() {
   const email = `dev_${deviceId}@cardumy.app`;
   const password = '12345678';
 
-  sessionStorage.setItem('dev_login_in_progress', 'true');
-
   try {
-    // 4. Try Login
-    const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
-      email,
-      password
-    });
+    // 4. tentativa de login
+    const { data: loginData, error: loginError } =
+      await supabase.auth.signInWithPassword({ email, password });
 
     if (!loginError && loginData.session) {
       await ensureUserProfile(loginData.session.user);
-      sessionStorage.removeItem('dev_login_in_progress');
       return loginData.session;
     }
 
-    // 5. If "Invalid login credentials", try Signup
-    if (loginError?.message.includes('Invalid login credentials')) {
+    // 5. signup permitido apenas UMA VEZ
+    const alreadyTriedSignup = localStorage.getItem('dev_signup_done');
+
+    if (
+      loginError?.code === 'invalid_credentials' &&
+      !alreadyTriedSignup
+    ) {
+      localStorage.setItem('dev_signup_done', 'true');
+
       const { error: signUpError } = await supabase.auth.signUp({
         email,
         password
       });
 
       if (signUpError) {
-        console.error('Auto-signup failed:', signUpError.message);
-        throw signUpError;
+        console.error('Signup failed:', signUpError);
+
+        // se for rate limit → desativa auth
+        if (signUpError.message.includes('rate limit')) {
+          localStorage.setItem('dev_auth_disabled', 'true');
+        }
+
+        return null;
       }
 
-      // 6. Final Login attempt after signup
-      const { data: retryData, error: retryError } = await supabase.auth.signInWithPassword({
-        email,
-        password
-      });
+      // 6. login final (uma única vez)
+      const { data: retryData, error: retryError } =
+        await supabase.auth.signInWithPassword({ email, password });
 
-      if (retryError) throw retryError;
+      if (retryError) {
+        console.error('Retry login failed:', retryError);
+        return null;
+      }
 
       if (retryData.session) {
         await ensureUserProfile(retryData.session.user);
-        sessionStorage.removeItem('dev_login_in_progress');
         return retryData.session;
       }
     }
 
-    console.error('Auto-login failed after all attempts:', loginError?.message);
+    console.error('Login failed:', loginError);
     return null;
 
   } catch (err) {
     console.error('Fatal devAutoLogin error:', err);
+    localStorage.setItem('dev_auth_disabled', 'true');
     return null;
-  } finally {
-    sessionStorage.removeItem('dev_login_in_progress');
   }
 }
 
 async function ensureUserProfile(authUser: any) {
   try {
-    // 1. Tenta achar pelo auth_id
-    let { data: existing, error } = await supabase
+    // buscar pelo auth_id
+    let { data: existing } = await supabase
       .from('users')
       .select('id, auth_id, email')
       .eq('auth_id', authUser.id)
       .maybeSingle();
 
-    // 2. Se não achar pelo auth_id, tenta pelo email
-    if (!existing && !error) {
+    // fallback por email
+    if (!existing) {
       const { data: byEmail } = await supabase
         .from('users')
         .select('id, auth_id, email')
         .eq('email', authUser.email)
         .maybeSingle();
-      
+
       if (byEmail) {
         existing = byEmail;
-        // Se achou pelo email mas o auth_id tá errado ou nulo, atualiza
+
         if (byEmail.auth_id !== authUser.id) {
           await supabase
             .from('users')
@@ -100,33 +110,23 @@ async function ensureUserProfile(authUser: any) {
       }
     }
 
-    if (error) {
-      console.error('Error checking user profile:', error);
-      return;
-    }
-
+    // criar se não existir
     if (!existing) {
-      console.log('Profile not found, creating one for authUser:', authUser.id);
       const baseUsername = authUser.email.split('@')[0];
       const username = `${baseUsername}_${Math.floor(Math.random() * 10000)}`;
-      
-      const { error: insertError } = await supabase
-        .from('users')
-        .insert({
-          auth_id: authUser.id,
-          username: username,
-          codename: username,
-          email: authUser.email,
-          password: 'provided-by-auth',
-          role_id: 7, // Default role
-          vip: false
-        });
 
-      if (insertError) {
-        console.error('Error creating user profile:', insertError);
-      }
+      await supabase.from('users').insert({
+        auth_id: authUser.id,
+        username,
+        codename: username,
+        email: authUser.email,
+        password: 'provided-by-auth',
+        role_id: 7,
+        vip: false
+      });
     }
+
   } catch (err) {
-    console.error('Unexpected error in ensureUserProfile:', err);
+    console.error('ensureUserProfile error:', err);
   }
 }

@@ -105,9 +105,10 @@ export const Search: React.FC<SearchProps> = ({ activeGame }) => {
       showNotification(`${card.name} adicionado à ${folder.name}`, 'success');
       setLastAdded({ cardId: card.id, folderName: folder.name });
       setTimeout(() => setLastAdded(null), 3000);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error adding card:', err);
-      showNotification('Erro ao adicionar carta', 'error');
+      const errorMessage = err.message || 'Erro ao adicionar carta';
+      showNotification(errorMessage, 'error');
     }
   };
 

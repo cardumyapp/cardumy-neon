@@ -177,6 +177,21 @@ export const addCardToList = async (userId: any, listType: 'cards' | 'wishlist' 
 
     if (fetchError && fetchError.code !== 'PGRST116') throw fetchError;
 
+    // BUSINESS RULE: For 'offerlist', card must exist in 'user_cards' (principal collection)
+    if (listType === 'offerlist') {
+      const { data: userCard, error: userCardCheckError } = await supabase
+        .from('user_cards')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('card_id', dbCardId)
+        .maybeSingle();
+      
+      if (userCardCheckError) throw userCardCheckError;
+      if (!userCard) {
+        throw new Error('Esta carta deve ser adicionada à sua coleção principal primeiro.');
+      }
+    }
+
     if (existing) {
       const { error: updateError } = await supabase
         .from(table)
@@ -211,7 +226,7 @@ export const addCardToList = async (userId: any, listType: 'cards' | 'wishlist' 
       details: { destino: listType, name: card.name, quantidade: quantity }
     });
 
-  } catch (error) {
+  } catch (error: any) {
     console.error(`Error adding card to ${listType}:`, error);
     throw error;
   }
@@ -365,7 +380,7 @@ export const addCardToBinder = async (userId: any, binderId: any, card: any) => 
       }
       throw insertError;
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error adding card to binder:', error);
     throw error;
   }
@@ -1681,38 +1696,106 @@ export const finalizeTournament = async (id: number | string, tops: { top1?: str
 
 export const searchExternalCards = async (game: string, query: string, page: number = 1, limit: number = 20): Promise<{ data: any[], total: number, totalPages: number }> => {
   try {
-    // Falls back to searching local cards table
-    let q = supabase
-      .from('cards')
-      .select('*, cardgames(name)', { count: 'exact' })
-      .ilike('name', `%${query}%`)
-      .range((page - 1) * limit, page * limit - 1);
+    const cardGames = await getCardgames();
+    const gameData = (cardGames as any[]).find((g: any) => g.name.toLowerCase() === game.toLowerCase());
+    const gameId = gameData?.id || 1;
 
-    if (game && game !== 'All') {
-      const { data: g } = await supabase.from('cardgames').select('id').eq('name', game).maybeSingle();
-      if (g) q = q.eq('game_id', g.id);
+    let externalData: any[] = [];
+    let total = 0;
+
+    // Search external APIs based on game
+    if (game.toLowerCase() === 'magic' || game.toLowerCase() === 'magic the gathering' || game.toLowerCase() === 'mtg') {
+      const response = await fetch(`https://api.scryfall.com/cards/search?q=${encodeURIComponent(query)}&page=${page}`);
+      const result = await response.json();
+      if (result.data) {
+        externalData = result.data.map((c: any) => ({
+          id: c.id,
+          name: c.name,
+          game: 'Magic',
+          game_id: gameId,
+          code: c.collector_number,
+          rarity: c.rarity?.charAt(0).toUpperCase() + c.rarity?.slice(1) || 'Common',
+          price: parseFloat(c.prices?.usd || 0),
+          imageUrl: c.image_uris?.normal || c.image_uris?.small || (c.card_faces && c.card_faces[0].image_uris?.normal),
+          set: c.set_name,
+          description: c.oracle_text || '',
+          variants: []
+        }));
+        total = result.total_cards || externalData.length;
+      }
+    } else if (game.toLowerCase() === 'pokemon' || game.toLowerCase() === 'pokémon') {
+      const response = await fetch(`https://api.pokemontcg.io/v2/cards?q=name:"*${query}*"&page=${page}&pageSize=${limit}`);
+      const result = await response.json();
+      if (result.data) {
+        externalData = result.data.map((c: any) => ({
+          id: c.id,
+          name: c.name,
+          game: 'Pokémon',
+          game_id: gameId,
+          code: c.number,
+          rarity: c.rarity || 'Common',
+          price: c.tcgplayer?.prices?.holofoil?.market || c.tcgplayer?.prices?.normal?.market || 0,
+          imageUrl: c.images.small || c.images.large,
+          set: c.set.name,
+          description: '',
+          variants: []
+        }));
+        total = result.totalCount || externalData.length;
+      }
+    } else if (game.toLowerCase() === 'yu-gi-oh!' || game.toLowerCase() === 'yugioh' || game.toLowerCase() === 'yu-gi-oh') {
+      const response = await fetch(`https://db.ygoprodeck.com/api/v7/cardinfo.php?fname=${encodeURIComponent(query)}&offset=${(page - 1) * limit}&num=${limit}`);
+      const result = await response.json();
+      if (result.data) {
+        externalData = result.data.map((c: any) => ({
+          id: c.id.toString(),
+          name: c.name,
+          game: 'Yu-Gi-Oh!',
+          game_id: gameId,
+          code: c.card_sets?.[0]?.set_code || c.id.toString(),
+          rarity: c.card_sets?.[0]?.set_rarity || 'Common',
+          price: parseFloat(c.card_prices?.[0]?.tcgplayer_price || 0),
+          imageUrl: c.card_images?.[0]?.image_url || c.card_images?.[0]?.image_url_small,
+          set: c.card_sets?.[0]?.set_name || 'Original',
+          description: c.desc || '',
+          variants: []
+        }));
+        total = result.meta?.total_rows || externalData.length;
+      }
+    } else {
+      // Fallback to local search for other games
+      let q = supabase
+        .from('cards')
+        .select('*, cardgames(name)', { count: 'exact' })
+        .ilike('name', `%${query}%`)
+        .range((page - 1) * limit, page * limit - 1);
+
+      if (game && game !== 'All') {
+        q = q.eq('game_id', gameId);
+      }
+
+      const { data, count, error } = await q;
+      if (error) throw error;
+      
+      externalData = (data || []).map((c: any) => ({
+        id: c.id.toString(),
+        name: c.beauty_name || c.name,
+        game: c.cardgames?.name || game,
+        game_id: c.game_id,
+        code: c.slug || c.id.toString(),
+        rarity: c.product_type || 'Common',
+        price: c.price || 0,
+        imageUrl: c.image_url || 'https://images.unsplash.com/photo-1614850523296-d8c1af93d400?auto=format&fit=crop&q=80&w=400',
+        set: c.cardgames?.name || 'Base Set',
+        description: '',
+        variants: []
+      }));
+      total = count || 0;
     }
 
-    const { data, count, error } = await q;
-    if (error) throw error;
-    
-    const mappedCards = (data || []).map((c: any) => ({
-      id: c.id.toString(),
-      name: c.beauty_name || c.name,
-      game: c.cardgames?.name || game,
-      code: c.slug || c.id.toString(),
-      rarity: c.product_type || 'Common',
-      price: c.price || 0,
-      imageUrl: c.image_url || 'https://images.unsplash.com/photo-1614850523296-d8c1af93d400?auto=format&fit=crop&q=80&w=400',
-      set: c.cardgames?.name || 'Base Set',
-      description: '',
-      variants: []
-    }));
-
     return {
-      data: mappedCards,
-      total: count || 0,
-      totalPages: Math.ceil((count || 0) / limit)
+      data: externalData,
+      total: total,
+      totalPages: Math.ceil(total / limit)
     };
   } catch (error) {
     console.error('Error searching cards:', error);
@@ -1752,18 +1835,23 @@ export const getFullUserProfile = async (username: string, followerId?: string) 
     if (userError) throw userError;
     if (!user) return null;
 
-    // Fetch collections counts
-    const [{ count: cardsCount }, { count: wishlistCount }, { count: offerlistCount }, { count: followersCount }, { count: followingCount }] = await Promise.all([
-      supabase.from('user_cards').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
-      supabase.from('wishlist').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
-      supabase.from('offerlist').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
+    // Fetch collections counts (sum of quantities)
+    const [colecaoRes, wishlistRes, offerlistRes, { count: followersCount }, { count: followingCount }] = await Promise.all([
+      supabase.from('user_cards').select('quantidade').eq('user_id', user.id),
+      supabase.from('wishlist').select('quantidade').eq('user_id', user.id),
+      supabase.from('offerlist').select('quantidade').eq('user_id', user.id),
       supabase.from('user_followers').select('*', { count: 'exact', head: true }).eq('following_id', user.id),
       supabase.from('user_followers').select('*', { count: 'exact', head: true }).eq('follower_id', user.id)
     ]);
 
+    const collection_size = colecaoRes.data?.reduce((acc, curr) => acc + (curr.quantidade || 0), 0) || 0;
+    const wishlist_size = wishlistRes.data?.reduce((acc, curr) => acc + (curr.quantidade || 0), 0) || 0;
+    const offers_size = offerlistRes.data?.reduce((acc, curr) => acc + (curr.quantidade || 0), 0) || 0;
+
     let isFollowing = false;
     if (followerId) {
-       const { data: followData } = await supabase.from('user_followers').select('*').eq('following_id', user.id).eq('follower_id', followerId).maybeSingle();
+       // ... existing follow check code ...
+       const { data: followData } = await supabase.from('user_followers').select('*').eq('following_id', user.id).eq('follower_id', followerId || '').maybeSingle();
        isFollowing = !!followData;
     }
 
@@ -1773,11 +1861,13 @@ export const getFullUserProfile = async (username: string, followerId?: string) 
         store_logo: user.stores?.[0]?.logo || user.stores?.logo
       },
       stats: {
-        cards: cardsCount || 0,
-        wishlist: wishlistCount || 0,
-        offerlist: offerlistCount || 0,
+        collection_size,
+        wishlist_size,
+        offers_size,
         followers: followersCount || 0,
-        following: followingCount || 0
+        following: followingCount || 0,
+        approval_rate: 100, // Placeholder or fetch from reviews table
+        total_reviews: 0
       },
       isFollowing
     };
@@ -1884,6 +1974,12 @@ export const searchUsers = async (searchTerm: string) => {
 
 export const getFoldersStats = async (userId: string | number) => {
   try {
+    let resolvedUserId = userId;
+    if (typeof userId === 'string' && userId.includes('-')) {
+        const u = await getUserByAuthId(userId);
+        if (u) resolvedUserId = u.id;
+    }
+
     const stats: Record<string, number> = {
       colecao: 0,
       wishlist: 0,
@@ -1891,31 +1987,36 @@ export const getFoldersStats = async (userId: string | number) => {
     };
 
     // System counts (sum of quantidade)
-    const { data: collecaoData } = await supabase.from('user_cards').select('quantidade').eq('user_id', userId);
+    const { data: collecaoData } = await supabase.from('user_cards').select('quantidade').eq('user_id', resolvedUserId);
     stats.colecao = collecaoData?.reduce((acc, curr) => acc + (curr.quantidade || 0), 0) || 0;
 
-    const { data: wishlistData } = await supabase.from('wishlist').select('quantidade').eq('user_id', userId);
+    const { data: wishlistData } = await supabase.from('wishlist').select('quantidade').eq('user_id', resolvedUserId);
     stats.wishlist = wishlistData?.reduce((acc, curr) => acc + (curr.quantidade || 0), 0) || 0;
 
-    const { data: offerlistData } = await supabase.from('offerlist').select('quantidade').eq('user_id', userId);
+    const { data: offerlistData } = await supabase.from('offerlist').select('quantidade').eq('user_id', resolvedUserId);
     stats.offerlist = offerlistData?.reduce((acc, curr) => acc + (curr.quantidade || 0), 0) || 0;
 
     // Binder counts
-    const { data: binders } = await supabase.from('user_binders').select('id').eq('user_id', userId);
+    const { data: binders } = await supabase.from('user_binders').select('id').eq('user_id', resolvedUserId);
     
     if (binders && binders.length > 0) {
       const binderIds = binders.map(b => b.id);
       const { data: binderCards } = await supabase
         .from('binder_cards')
-        .select('binder_id, card:user_cards(quantidade)')
+        .select(`
+          binder_id,
+          user_cards!user_card_id (
+            quantidade
+          )
+        `)
         .in('binder_id', binderIds);
       
       const binderStatsMap: Record<string, number> = {};
       binderIds.forEach(id => binderStatsMap[id] = 0);
 
       binderCards?.forEach((bc: any) => {
-        if (bc.binder_id && bc.card) {
-          binderStatsMap[bc.binder_id] += (bc.card.quantidade || 0);
+        if (bc.binder_id && bc.user_cards) {
+          binderStatsMap[bc.binder_id] += (bc.user_cards.quantidade || 0);
         }
       });
 
