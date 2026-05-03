@@ -609,7 +609,7 @@ export const updateStoreInfo = async (storeId: any, updates: any) => {
 export const addStoreSchedule = async (params: any) => {
     try {
         const { error } = await supabase
-          .from('store_schedules')
+          .from('store_schedule')
           .insert(params);
         
         if (error) throw error;
@@ -870,7 +870,7 @@ export const getUserOrders = async () => {
         const { data, error } = await supabase
           .from('orders')
           .select('*, order_items(*, product:products(*)), store:stores(*)')
-          .eq('user_id', profile.id)
+          .eq('buyer_id', profile.id)
           .order('created_at', { ascending: false });
 
         if (error) throw error;
@@ -916,7 +916,7 @@ export const getOrderDetails = async (orderId: string) => {
     try {
         const { data, error } = await supabase
           .from('orders')
-          .select('*, order_items(*, product:products(*)), store:stores(*), user:users(*), shipping_method:shipping_methods(*), payment_method:payment_methods(*), address:user_addresses(*)')
+          .select('*, order_items(*, product:products(*)), store:stores(*), buyer:users!buyer_id(*), shipping_method:shipping_methods(*), payment_method:payment_methods(*), address:user_addresses(*)')
           .eq('id', orderId)
           .maybeSingle();
 
@@ -959,7 +959,7 @@ export const cleanupExpiredOrders = async () => {
         if (expiredOrders && expiredOrders.length > 0) {
           const { error: updateError } = await supabase
             .from('orders')
-            .update({ status: 'cancelled' })
+            .update({ status: 'expired' })
             .in('id', expiredOrders.map(o => o.id));
           
           if (updateError) throw updateError;
@@ -1080,7 +1080,7 @@ export const getStoreProfileInfo = async (username: string) => {
 export const getStoreSchedule = async (storeId: string) => {
   try {
     const { data, error } = await supabase
-      .from('store_schedules')
+      .from('store_schedule')
       .select('*')
       .eq('store_id', storeId);
     
@@ -1384,7 +1384,7 @@ export const checkout = async (items: any[], addressId?: string | number) => {
       const { data: order, error: orderError } = await supabase
         .from('orders')
         .insert({
-          user_id: profile.id,
+          buyer_id: profile.id,
           store_id: Number(storeId),
           address_id: addressId ? Number(addressId) : null,
           total_amount: totalAmount,
@@ -1480,12 +1480,15 @@ export const createOrderFull = async (params: {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session?.user) throw new Error('Login necessário');
 
+        const profile = await getUserByAuthId(session.user.id);
+        if (!profile) throw new Error('Perfil não encontrado');
+
         const totalAmount = params.items.reduce((acc, i) => acc + (i.price * i.quantity), 0);
 
         const { data: order, error: orderError } = await supabase
             .from('orders')
             .insert({
-                user_id: session.user.id,
+                buyer_id: profile.id,
                 store_id: params.store_id,
                 address_id: params.address_id,
                 shipping_method_id: params.shipping_method_id,
@@ -1728,7 +1731,7 @@ export const submitUserReview = async (username: string, reviewerId: string, isP
     if (!user) throw new Error('User not found');
 
     const { error } = await supabase.from('user_reviews').insert({
-        user_id: user.id,
+        followed_id: user.id,
         reviewer_id: reviewerId,
         is_positive: isPositive,
         comment
@@ -1899,13 +1902,9 @@ export const getTournamentDetails = async (id: number | string) => {
         cardgames(name), 
         tournament_formats(name),
         creator:users!created_by(id, username, codename, avatar),
-        stores!inner(id, name, logo, slug),
         tickets:tournament_tickets!fk_tickets_tournament(
           *,
-          product:products!fk_tickets_product(
-            *,
-            stores(store_id)
-          )
+          product:products!fk_tickets_product(*)
         )
       `)
       .eq('id', id)

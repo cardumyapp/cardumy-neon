@@ -129,7 +129,6 @@ export const Orders: React.FC = () => {
                             <option value="shipped">Enviado</option>
                             <option value="delivered">Entregue</option>
                             <option value="expired">Expirado</option>
-                            <option value="cancelled">Cancelado</option>
                         </select>
                     ) : (
                         <span className={`text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest ${getStatusColor(order.status)}`}>

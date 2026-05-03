@@ -1,17 +1,14 @@
 import { supabase } from '../lib/supabase';
 
 export async function devAutoLogin() {
-  // Guard to prevent infinite retry loops in a single session
-  if (sessionStorage.getItem('dev_login_attempted')) {
-    const { data: { session } } = await supabase.auth.getSession();
-    return session;
-  }
-
+  // 1. Check for existing session first
   const { data: { session } } = await supabase.auth.getSession();
-
   if (session) return session;
 
-  // identifica o device
+  // 2. Guard to prevent multiple attempts in the same component lifecycle/session if it already failed
+  if (sessionStorage.getItem('dev_login_in_progress')) return null;
+  
+  // 3. Persistent Device ID
   let deviceId = localStorage.getItem('dev_device_id');
   if (!deviceId) {
     deviceId = crypto.randomUUID();
@@ -21,44 +18,56 @@ export async function devAutoLogin() {
   const email = `dev_${deviceId}@cardumy.app`;
   const password = '12345678';
 
+  sessionStorage.setItem('dev_login_in_progress', 'true');
+
   try {
-    // 1. tenta login
-    let { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    // 4. Try Login
+    const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
+      email,
+      password
+    });
 
-    // 2. se o erro for explicitamente de credenciais, tenta signup
-    if (error && error.message.includes('Invalid login credentials')) {
-      console.log('Dev user not found, signing up...', email);
-      const { error: signUpError } = await supabase.auth.signUp({ email, password });
-      
-      if (signUpError) {
-        console.error('Sign up failed:', signUpError);
-        return null;
-      }
-
-      // 3. tenta login final após signup
-      const { data: retryData, error: retryError } = await supabase.auth.signInWithPassword({ email, password });
-      if (retryError) {
-        console.error('Retry login failed:', retryError);
-        return null;
-      }
-      
-      sessionStorage.setItem('dev_login_attempted', 'true');
-      if (retryData.session) await ensureUserProfile(retryData.session.user);
-      return retryData.session;
-    } 
-    
-    if (error) {
-      console.error('Auth error:', error);
-      return null;
+    if (!loginError && loginData.session) {
+      await ensureUserProfile(loginData.session.user);
+      sessionStorage.removeItem('dev_login_in_progress');
+      return loginData.session;
     }
 
-    sessionStorage.setItem('dev_login_attempted', 'true');
-    if (data.session) await ensureUserProfile(data.session.user);
-    return data.session;
+    // 5. If "Invalid login credentials", try Signup
+    if (loginError?.message.includes('Invalid login credentials')) {
+      const { error: signUpError } = await supabase.auth.signUp({
+        email,
+        password
+      });
+
+      if (signUpError) {
+        console.error('Auto-signup failed:', signUpError.message);
+        throw signUpError;
+      }
+
+      // 6. Final Login attempt after signup
+      const { data: retryData, error: retryError } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
+
+      if (retryError) throw retryError;
+
+      if (retryData.session) {
+        await ensureUserProfile(retryData.session.user);
+        sessionStorage.removeItem('dev_login_in_progress');
+        return retryData.session;
+      }
+    }
+
+    console.error('Auto-login failed after all attempts:', loginError?.message);
+    return null;
 
   } catch (err) {
-    console.error('Unexpected auth system error:', err);
+    console.error('Fatal devAutoLogin error:', err);
     return null;
+  } finally {
+    sessionStorage.removeItem('dev_login_in_progress');
   }
 }
 

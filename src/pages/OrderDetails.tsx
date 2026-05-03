@@ -69,7 +69,6 @@ export const OrderDetails: React.FC = () => {
                     <option value="shipped">Enviado</option>
                     <option value="delivered">Entregue</option>
                     <option value="expired">Expirado</option>
-                    <option value="cancelled">Cancelado</option>
                 </select>
             </div>
         )}
