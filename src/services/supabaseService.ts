@@ -1627,12 +1627,19 @@ export const deleteAddress = async (addressId: number) => {
 export const getStoreShippingMethods = async (storeId: string | number) => {
     try {
         const { data, error } = await supabase
-            .from('shipping_methods')
-            .select('*')
-            .eq('store_id', storeId);
+            .from('store_shipping_methods')
+            .select('*, shipping_methods(*)')
+            .eq('store_id', storeId)
+            .eq('is_active', true);
             
         if (error) throw error;
-        return data || [];
+        // Flatten the response to maintain compatibility
+        return (data || []).map(item => ({
+            ...item.shipping_methods,
+            ...item,
+            id: item.shipping_method_id, // Ensure ID is the method ID for order context
+            original_id: item.id
+        }));
     } catch (error) {
         console.error('Error fetching shipping methods:', error);
         return [];
@@ -1642,12 +1649,19 @@ export const getStoreShippingMethods = async (storeId: string | number) => {
 export const getStorePaymentMethods = async (storeId: string | number) => {
     try {
         const { data, error } = await supabase
-            .from('payment_methods')
-            .select('*')
-            .eq('store_id', storeId);
+            .from('store_payment_methods')
+            .select('*, payment_methods(*)')
+            .eq('store_id', storeId)
+            .eq('enabled', true);
             
         if (error) throw error;
-        return data || [];
+        // Flatten the response
+        return (data || []).map(item => ({
+            ...item.payment_methods,
+            ...item,
+            id: item.payment_method_id,
+            original_id: item.id
+        }));
     } catch (error) {
         console.error('Error fetching payment methods:', error);
         return [];
@@ -1658,7 +1672,8 @@ export const createOrderFull = async (params: {
     store_id: number;
     address_id: number;
     shipping_method_id: number;
-    payment_method_id: number;
+    payment_method_id: number | string;
+    shipping_cost?: number;
     items: { product_id: number; quantity: number, price: number }[];
 }) => {
     try {
@@ -1668,17 +1683,23 @@ export const createOrderFull = async (params: {
         const profile = await getUserByAuthId(session.user.id);
         if (!profile) throw new Error('Perfil não encontrado');
 
-        const totalAmount = params.items.reduce((acc, i) => acc + (i.price * i.quantity), 0);
+        const productsTotal = params.items.reduce((acc, i) => acc + (i.price * i.quantity), 0);
+        const shippingCost = params.shipping_cost || 0;
+        const totalAmount = productsTotal + shippingCost;
+
+        const externalRef = `ORD-${Date.now()}-${Math.random().toString(36).substring(2, 9).toUpperCase()}`;
 
         const { data: order, error: orderError } = await supabase
             .from('orders')
             .insert({
+                external_reference: externalRef,
                 buyer_id: profile.id,
                 store_id: params.store_id,
                 shipping_address_id: params.address_id,
                 shipping_method_id: params.shipping_method_id,
-                payment_method_id: params.payment_method_id,
-                products_total: totalAmount,
+                payment_method_id: Number(params.payment_method_id),
+                products_total: productsTotal,
+                shipping_cost: shippingCost,
                 amount: totalAmount,
                 status: 'pending'
             })
@@ -1692,7 +1713,7 @@ export const createOrderFull = async (params: {
             order_id: order.id,
             product_id: i.product_id,
             quantity: i.quantity,
-            price: i.price
+            unit_price: i.price
         }));
 
         const { error: itemsError } = await supabase

@@ -237,6 +237,7 @@ export interface PaymentMethod {
   name: string;
   description?: string;
   type?: string;
+  slug?: string;
 }
 
 export interface UserProfile {

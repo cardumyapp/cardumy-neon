@@ -103,6 +103,7 @@ export const CartPage: React.FC<CartPageProps> = ({ cart, updateQuantity, remove
         address_id: Number(selectedAddressId),
         shipping_method_id: selectedShippingId,
         payment_method_id: Number(selectedPaymentId),
+        shipping_cost: shippingMethods.find(m => m.id === selectedShippingId)?.price || 0,
         items: storeItems.map(i => ({ 
           product_id: Number(i.productId || i.id), 
           quantity: i.quantity,
@@ -464,9 +465,9 @@ export const CartPage: React.FC<CartPageProps> = ({ cart, updateQuantity, remove
                                 </div>
                                 <div className="flex-1">
                                   <p className="text-xs font-bold uppercase tracking-widest">{method.name}</p>
-                                  <p className="text-[10px] opacity-60">{method.description}</p>
+                                  {method.description && <p className="text-[10px] opacity-60 normal-case tracking-normal">{method.description}</p>}
                                 </div>
-                                <i className={`fas ${method.type === 'pix' ? 'fa-pix' : 'fa-credit-card'} text-slate-600 group-hover:text-purple-400 transition-colors`}></i>
+                                <i className={`fas ${method.type === 'pix' || method.slug === 'pix' ? 'fa-pix' : 'fa-credit-card'} text-slate-600 group-hover:text-purple-400 transition-colors`}></i>
                               </button>
                             ))
                           ) : (
@@ -481,7 +482,7 @@ export const CartPage: React.FC<CartPageProps> = ({ cart, updateQuantity, remove
                       <div className="bg-slate-950 p-6 rounded-2xl border border-slate-800 space-y-3">
                         <div className="flex justify-between text-xs text-slate-400">
                           <span>Subtotal</span>
-                          <span>R$ {selectedStoreId ? cartByStore[selectedStoreId.toString()].total.toFixed(2) : '0.00'}</span>
+                          <span>R$ {selectedStoreId ? cartByStore[selectedStoreId.toString()]?.total.toFixed(2) : '0.00'}</span>
                         </div>
                         <div className="flex justify-between text-xs text-slate-400">
                           <span>Frete</span>
@@ -491,7 +492,7 @@ export const CartPage: React.FC<CartPageProps> = ({ cart, updateQuantity, remove
                           <span>Total a pagar</span>
                           <span className="text-purple-400">
                             R$ {(
-                              (selectedStoreId ? cartByStore[selectedStoreId.toString()].total : 0) + 
+                              (selectedStoreId ? (cartByStore[selectedStoreId.toString()]?.total || 0) : 0) + 
                               (shippingMethods.find(m => m.id === selectedShippingId)?.price || 0)
                             ).toFixed(2)}
                           </span>
