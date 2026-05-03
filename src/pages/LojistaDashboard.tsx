@@ -84,7 +84,7 @@ export const LojistaDashboard: React.FC = () => {
                                         </div>
                                     </div>
                                     <span className={`text-[9px] font-black uppercase px-3 py-1 rounded-full ${
-                                        order.status === 'completed' ? 'bg-emerald-500/10 text-emerald-500' :
+                                        order.status === 'paid' ? 'bg-emerald-500/10 text-emerald-500' :
                                         order.status === 'pending' ? 'bg-yellow-500/10 text-yellow-500' :
                                         'bg-slate-800 text-slate-400'
                                     }`}>

@@ -198,12 +198,20 @@ export const Profile: React.FC = () => {
 
           <div className="flex md:ml-auto md:pb-4 space-x-2 w-full md:w-auto justify-center md:justify-start px-4 md:px-0">
              {isOwnProfile ? (
-               <button 
-                 onClick={() => navigate('/perfil/editar')}
-                 className="flex-1 md:flex-none bg-purple-600 hover:bg-purple-700 text-white font-bold px-6 py-2.5 rounded-xl transition-all shadow-lg text-xs md:text-sm active:scale-95"
-               >
-                 Editar Perfil
-               </button>
+               <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+                 <button 
+                   onClick={() => navigate('/perfil/editar')}
+                   className="flex-1 md:flex-none bg-purple-600 hover:bg-purple-700 text-white font-bold px-6 py-2.5 rounded-xl transition-all shadow-lg text-xs md:text-sm active:scale-95"
+                 >
+                   Editar Perfil
+                 </button>
+                 <button 
+                   onClick={() => navigate('/perfil/enderecos')}
+                   className="flex-1 md:flex-none bg-slate-800 hover:bg-slate-700 text-white font-bold px-6 py-2.5 rounded-xl transition-all border border-slate-700 shadow-lg text-xs md:text-sm active:scale-95"
+                 >
+                   Meus Endereços
+                 </button>
+               </div>
              ) : (
                <button 
                  onClick={handleFollowToggle}

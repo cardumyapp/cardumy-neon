@@ -40,7 +40,7 @@ export const EventDetails: React.FC<EventDetailsProps> = ({ onAddToCart }) => {
     
     const ticketInfo = event.tickets[0];
     const product = ticketInfo.product;
-    const storeId = product.stores?.[0]?.store_id;
+    const storeId = product.store_id || product.stores?.[0]?.store_id;
 
     if (!storeId) {
         showNotification("Erro ao localizar loja de venda.", "error");
@@ -50,7 +50,7 @@ export const EventDetails: React.FC<EventDetailsProps> = ({ onAddToCart }) => {
     onAddToCart({
         id: product.id,
         name: product.name,
-        price: product.msrp || product.mspr || product.price,
+        price: product.mspr || product.msrp || product.price,
         image_url: product.image_url,
         storeId: storeId,
         quantity: 1,
@@ -146,7 +146,7 @@ export const EventDetails: React.FC<EventDetailsProps> = ({ onAddToCart }) => {
                     <div>
                     <p className="text-xs text-slate-500 uppercase font-black tracking-widest mb-1">Valor da Inscrição</p>
                     <div className="flex items-end space-x-2">
-                        <span className="text-4xl font-black text-emerald-400">R$ {(mainTicket.product?.msrp || mainTicket.product?.mspr || 0).toFixed(2)}</span>
+                        <span className="text-4xl font-black text-emerald-400">R$ {(mainTicket.product?.mspr || mainTicket.product?.msrp || 0).toFixed(2)}</span>
                         <span className="text-slate-500 text-xs font-bold mb-1.5">/ ingresso</span>
                     </div>
                     </div>

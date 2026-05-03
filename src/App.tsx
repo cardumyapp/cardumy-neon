@@ -26,6 +26,7 @@ import { ManageStore } from './pages/ManageStore';
 import { ManageTournaments } from './pages/ManageTournaments';
 import { ManageTournamentDetails } from './pages/ManageTournamentDetails';
 import { CreateTournament } from './pages/CreateTournament';
+import { ManageAddresses } from './pages/ManageAddresses';
 import { Product, CartItem, GameType } from './types';
 import { AuthProvider, useAuth } from './components/AuthProvider';
 import { NotificationProvider } from './components/NotificationProvider';
@@ -372,6 +373,9 @@ const AppContent: React.FC = () => {
                       <i className="fas fa-gear mr-2"></i> Ajustes da Loja
                     </Link>
                   )}
+                  <Link to="/perfil/enderecos" className="block w-full text-left px-4 py-2 text-xs font-bold text-slate-300 hover:bg-slate-800 rounded-lg transition-colors mb-1">
+                    <i className="fas fa-map-location-dot mr-2"></i> Meus Endereços
+                  </Link>
                   <button 
                     onClick={() => setIsUserPickerOpen(true)} 
                     className="w-full text-left px-4 py-2 text-xs font-bold text-slate-300 hover:bg-slate-800 rounded-lg transition-colors mb-1"
@@ -408,6 +412,7 @@ const AppContent: React.FC = () => {
             <Route path="/perfil" element={<Profile />} />
             <Route path="/perfil/:userId" element={<Profile />} />
             <Route path="/perfil/editar" element={<EditProfile />} />
+            <Route path="/perfil/enderecos" element={<ManageAddresses />} />
             <Route path="/notificacoes" element={<Notifications />} />
             <Route path="/trocas" element={<Trades />} />
             <Route path="/torneios" element={<Tournaments />} />

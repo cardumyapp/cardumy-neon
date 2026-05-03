@@ -264,7 +264,7 @@ export const StoreProfile: React.FC<StoreProfileProps> = ({ onAddToCart }) => {
           id: p.id,
           imageUrl: p.image_url || p.imageUrl || 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&q=80&w=400',
           name: p.beauty_name || p.name,
-          price: stockEntry?.store_price || p.msrp || 0,
+          price: stockEntry?.store_price || p.mspr || p.msrp || 0,
           stock: stockEntry?.quantity || 0,
           storeId: store.id,
           storeName: store.name,

@@ -126,8 +126,7 @@ export const Orders: React.FC = () => {
                         >
                             <option value="pending">Pendente</option>
                             <option value="paid">Pago</option>
-                            <option value="shipped">Enviado</option>
-                            <option value="delivered">Entregue</option>
+                            <option value="canceled">Cancelado</option>
                             <option value="expired">Expirado</option>
                         </select>
                     ) : (
@@ -135,8 +134,7 @@ export const Orders: React.FC = () => {
                             {order.status === 'paid' ? 'Pago' : 
                              order.status === 'pending' ? 'Pendente' : 
                              order.status === 'expired' ? 'Expirado' : 
-                             order.status === 'shipped' ? 'Enviado' :
-                             order.status === 'delivered' ? 'Entregue' : order.status}
+                             order.status === 'canceled' ? 'Cancelado' : order.status}
                         </span>
                     )}
                   </div>
