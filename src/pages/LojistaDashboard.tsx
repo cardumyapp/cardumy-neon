@@ -79,7 +79,7 @@ export const LojistaDashboard: React.FC = () => {
                                             #{order.id.toString().slice(-3)}
                                         </div>
                                         <div>
-                                            <p className="text-sm font-bold text-white">R$ {order.total_amount?.toFixed(2)}</p>
+                                            <p className="text-sm font-bold text-white">R$ {order.amount?.toFixed(2)}</p>
                                             <p className="text-[10px] text-slate-500 font-bold uppercase tracking-tight">{new Date(order.created_at).toLocaleDateString()}</p>
                                         </div>
                                     </div>

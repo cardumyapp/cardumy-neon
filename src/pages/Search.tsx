@@ -108,7 +108,10 @@ export const Search: React.FC<SearchProps> = ({ activeGame }) => {
     } catch (err: any) {
       console.error('Error adding card:', err);
       const errorMessage = err.message || 'Erro ao adicionar carta';
-      showNotification(errorMessage, 'error');
+      
+      // Clear business rules should be shown as info/warning, not necessarily as a system error
+      const isBusinessRule = errorMessage.includes('coleção principal') || errorMessage.includes('já está nesta pasta');
+      showNotification(errorMessage, isBusinessRule ? 'info' : 'error');
     }
   };
 

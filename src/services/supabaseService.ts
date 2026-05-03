@@ -29,10 +29,10 @@ export const getProducts = (callback: (products: any[]) => void) => {
       .from('products')
       .select(`
         *, 
-        cardgames(id, name), 
-        product_types(id, name),
-        tournament_tickets!fk_tickets_product(max_quantity, sold_quantity),
-        store_stock(quantity, store_price, stores(id, name, logo, slug, parceiro))
+        cardgames:cardgames!products_game_id_fkey(id, name), 
+        product_types:product_types!fk_products_type(id, name),
+        tournament_tickets:tournament_tickets!fk_tickets_product(max_quantity, sold_quantity),
+        store_stock:store_stock!fk_stock_product(quantity, store_price, store:stores!fk_store_stock_store(id, name, logo, slug, parceiro))
       `)
       .order('created_at', { ascending: false });
     
@@ -40,7 +40,14 @@ export const getProducts = (callback: (products: any[]) => void) => {
       console.error('Error fetching products:', error);
       return;
     }
-    callback(data || []);
+
+    const mappedData = (data || []).map(p => ({
+      ...p,
+      game_name: p.cardgames?.name || (Array.isArray(p.cardgames) ? p.cardgames[0]?.name : 'TCG'),
+      product_type_name: p.product_types?.name || (Array.isArray(p.product_types) ? p.product_types[0]?.name : 'Produto')
+    }));
+
+    callback(mappedData);
   };
 
   fetchProducts();
@@ -122,7 +129,7 @@ export const syncCard = async (card: any) => {
     const { data: existing, error: findError } = await supabase
       .from('cards')
       .select('*')
-      .eq('slug', cardCode) // or another unique field
+      .eq('external_id', cardCode)
       .maybeSingle();
     
     if (existing) return existing;
@@ -132,11 +139,9 @@ export const syncCard = async (card: any) => {
       .from('cards')
       .insert({
         name: card.name,
-        beauty_name: card.name,
-        slug: cardCode,
+        external_id: cardCode,
         game_id: card.game_id || 1, // Defaulting to 1 if unknown
-        image_url: card.imageUrl || card.image_url,
-        product_type: card.product_type || 'single'
+        image_url: card.imageUrl || card.image_url
       })
       .select()
       .maybeSingle();
@@ -242,7 +247,7 @@ export const getListCards = (userId: string | number, listType: 'cards' | 'wishl
         *,
         card:cards (
           *,
-          cardgame:cardgames (name)
+          cardgame:cardgames!cards_game_id_fkey (name)
         )
       `)
       .eq('user_id', userId);
@@ -518,7 +523,7 @@ export const getBinderWithCards = async (userId: string | number, binderId: stri
         id, 
         name, 
         game_id,
-        cardgames (name)
+        cardgames!user_binders_game_id_fkey (name)
       `)
       .eq('id', binderId)
       .eq('user_id', userId)
@@ -535,7 +540,7 @@ export const getBinderWithCards = async (userId: string | number, binderId: stri
           *,
           card_info:cards (
              *,
-             cardgame:cardgames (name)
+             cardgame:cardgames!cards_game_id_fkey (name)
           )
         )
       `)
@@ -595,7 +600,7 @@ export const getMyStore = async () => {
         const { data, error } = await supabase
           .from('stores')
           .select('*')
-          .eq('owner_id', profile.id)
+          .eq('user_id', profile.id)
           .maybeSingle();
 
         if (error) throw error;
@@ -783,55 +788,60 @@ export const getUserProfile = async (userId: string | number) => {
     // Determine if we should search by ID, Email, or Username
     const isNumeric = !isNaN(Number(userId)) && !String(userId).includes('@') && !String(userId).includes('-');
     
+    let query = supabase.from('users').select('*, role:roles(name)');
+    
     if (isNumeric) {
-      const { data, error } = await supabase
-        .from('users')
-        .select('*')
+      const { data, error } = await query
         .eq('id', userId)
         .limit(1);
       
-      if (data && data.length > 0) return data[0];
+      if (data && data.length > 0) {
+        const u = data[0];
+        return { ...u, role: (u.role as any)?.name || 'user' };
+      }
       if (error) throw error;
     }
 
     // Try finding by email
     if (String(userId).includes('@')) {
-      const { data, error } = await supabase
-        .from('users')
-        .select('*')
+      const { data, error } = await query
         .eq('email', userId)
         .limit(1);
       
-      if (data && data.length > 0) return data[0];
+      if (data && data.length > 0) {
+        const u = data[0];
+        return { ...u, role: (u.role as any)?.name || 'user' };
+      }
       if (error) throw error;
     }
 
     // Try finding by auth_id (UUID)
     if (String(userId).length > 30) {
-      const { data, error } = await supabase
-        .from('users')
-        .select('*')
+      const { data, error } = await query
         .eq('auth_id', userId)
         .limit(1);
       
-      if (data && data.length > 0) return data[0];
+      if (data && data.length > 0) {
+        const u = data[0];
+        return { ...u, role: (u.role as any)?.name || 'user' };
+      }
       if (error) throw error;
     }
 
     // Finally try finding by username
-    const { data, error } = await supabase
-      .from('users')
-      .select('*')
+    const { data, error } = await query
       .eq('username', userId)
       .limit(1);
     
     if (error) throw error;
     
     const user = (data && data.length > 0) ? data[0] : null;
-    if (!user) {
-      console.warn(`User profile not found for identifier: ${userId}`);
+    if (user) {
+      return { ...user, role: (user.role as any)?.name || 'user' };
     }
-    return user;
+    
+    console.warn(`User profile not found for identifier: ${userId}`);
+    return null;
   } catch (error) {
     console.error('Error fetching user profile:', error);
     return null;
@@ -842,11 +852,14 @@ export const getUserByAuthId = async (authId: string) => {
   try {
     const { data, error } = await supabase
       .from('users')
-      .select('*')
+      .select('*, role:roles(name)')
       .eq('auth_id', authId)
       .maybeSingle();
 
     if (error) throw error;
+    if (data) {
+      return { ...data, role: (data.role as any)?.name || 'user' };
+    }
     return data;
   } catch (error) {
     console.error('Error in getUserByAuthId:', error);
@@ -908,7 +921,7 @@ export const getReceivedOrders = async () => {
         const { data: store } = await supabase
           .from('stores')
           .select('id')
-          .eq('owner_id', profile.id)
+          .eq('user_id', profile.id)
           .maybeSingle();
 
         if (!store) return [];
@@ -931,7 +944,7 @@ export const getOrderDetails = async (orderId: string) => {
     try {
         const { data, error } = await supabase
           .from('orders')
-          .select('*, order_items(*, product:products(*)), store:stores(*), buyer:users!buyer_id(*), shipping_method:shipping_methods(*), payment_method:payment_methods(*), address:user_addresses(*)')
+          .select('*, order_items(*, product:products(*)), store:stores!fk_orders_store(*), buyer:users!fk_order_buyer(*), shipping_method:shipping_methods!fk_order_shipping_method(*), address:user_addresses!fk_order_address(*)')
           .eq('id', orderId)
           .maybeSingle();
 
@@ -1096,11 +1109,14 @@ export const getStoreSchedule = async (storeId: string) => {
   try {
     const { data, error } = await supabase
       .from('store_schedule')
-      .select('*')
+      .select('*, cardgames!fk_store_schedule_game(name)')
       .eq('store_id', storeId);
     
     if (error) throw error;
-    return data || [];
+    return (data || []).map(item => ({
+      ...item,
+      game_name: item.cardgames?.name || item.jogo
+    }));
   } catch (error) {
     console.error('Error fetching store schedule:', error);
     return [];
@@ -1147,7 +1163,7 @@ export const getStoreEvents = async (storeId: string) => {
   try {
     const { data, error } = await supabase
       .from('tournaments')
-      .select('id, name, max_players, start_date, status, description, image_url')
+      .select('id, name, max_players, start_date, status, description, image_url, cardgames:cardgames!tournaments_cardgame_id_fkey(name)')
       .eq('location', storeId);
     
     if (error) {
@@ -1165,12 +1181,19 @@ export const getActivities = async (limit: number = 10) => {
   try {
     const { data, error } = await supabase
       .from('action_logs')
-      .select('*, user:users(*)')
+      .select('*, user:users(id, username, codename, avatar)')
       .order('created_at', { ascending: false })
       .limit(limit);
 
     if (error) throw error;
-    return data || [];
+    
+    // Flatten and safe-guard the data
+    return (data || []).map(log => ({
+      ...log,
+      user_display_name: log.user?.username || log.user?.codename || log.username || 'Usuário',
+      user_avatar: log.user?.avatar || log.avatar,
+      user_id_safe: log.user?.id || log.user_id
+    }));
   } catch (error: any) {
     console.error('Error fetching activities:', error);
     return [];
@@ -1183,9 +1206,9 @@ export const getAllTournaments = async () => {
       .from('tournaments')
       .select(`
         *,
-        cardgames:cardgames!fk_tournament_cardgame(name),
-        tournament_formats:tournament_formats!fk_tournament_format(name),
-        creator:users!created_by(id, username, codename, avatar),
+        cardgames:cardgames!tournaments_cardgame_id_fkey(name),
+        tournament_formats:tournament_formats!tournaments_format_id_fkey(name),
+        creator:users!tournaments_created_by_fkey(id, username, codename, avatar),
         tickets:tournament_tickets!fk_tickets_tournament(
           *,
           product:products!fk_tickets_product(*)
@@ -1298,8 +1321,8 @@ export const getMyTournaments = async () => {
       .from('tournaments')
       .select(`
         *,
-        cardgames:cardgames!fk_tournament_cardgame(name),
-        tournament_formats:tournament_formats!fk_tournament_format(name),
+        cardgames:cardgames!tournaments_cardgame_id_fkey(name),
+        tournament_formats:tournament_formats!tournaments_format_id_fkey(name),
         tickets:tournament_tickets!fk_tickets_tournament(*, product:products!fk_tickets_product(*))
       `)
       .eq('created_by', profile.id);
@@ -1346,16 +1369,15 @@ export const createTournament = async (tournamentData: any) => {
       const { data: store } = await supabase
         .from('stores')
         .select('id')
-        .eq('owner_id', profile.id)
+        .eq('user_id', profile.id)
         .maybeSingle();
 
       const { data: product, error: pError } = await supabase
         .from('products')
         .insert({
           name: `Inscrição: ${tournament.name}`,
-          beauty_name: `Ticket - ${tournament.name}`,
           product_type_id: 3, // Assuming 3 is tickets
-          card_game_id: tournament.cardgame_id,
+          game_id: tournament.cardgame_id,
           mspr: tournamentData.ticket_price,
           image_url: tournament.image_url,
           store_id: store?.id
@@ -1409,8 +1431,9 @@ export const checkout = async (items: any[], addressId?: string | number) => {
         .insert({
           buyer_id: profile.id,
           store_id: Number(storeId),
-          address_id: addressId ? Number(addressId) : null,
-          total_amount: totalAmount,
+          shipping_address_id: addressId ? Number(addressId) : null,
+          products_total: totalAmount,
+          amount: totalAmount,
           status: 'pending'
         })
         .select()
@@ -1600,10 +1623,11 @@ export const createOrderFull = async (params: {
             .insert({
                 buyer_id: profile.id,
                 store_id: params.store_id,
-                address_id: params.address_id,
+                shipping_address_id: params.address_id,
                 shipping_method_id: params.shipping_method_id,
                 payment_method_id: params.payment_method_id,
-                total_amount: totalAmount,
+                products_total: totalAmount,
+                amount: totalAmount,
                 status: 'pending'
             })
             .select()
@@ -1703,66 +1727,34 @@ export const searchExternalCards = async (game: string, query: string, page: num
     let externalData: any[] = [];
     let total = 0;
 
-    // Search external APIs based on game
-    if (game.toLowerCase() === 'magic' || game.toLowerCase() === 'magic the gathering' || game.toLowerCase() === 'mtg') {
-      const response = await fetch(`https://api.scryfall.com/cards/search?q=${encodeURIComponent(query)}&page=${page}`);
-      const result = await response.json();
-      if (result.data) {
-        externalData = result.data.map((c: any) => ({
-          id: c.id,
-          name: c.name,
-          game: 'Magic',
-          game_id: gameId,
-          code: c.collector_number,
-          rarity: c.rarity?.charAt(0).toUpperCase() + c.rarity?.slice(1) || 'Common',
-          price: parseFloat(c.prices?.usd || 0),
-          imageUrl: c.image_uris?.normal || c.image_uris?.small || (c.card_faces && c.card_faces[0].image_uris?.normal),
-          set: c.set_name,
-          description: c.oracle_text || '',
-          variants: []
-        }));
-        total = result.total_cards || externalData.length;
-      }
-    } else if (game.toLowerCase() === 'pokemon' || game.toLowerCase() === 'pokémon') {
-      const response = await fetch(`https://api.pokemontcg.io/v2/cards?q=name:"*${query}*"&page=${page}&pageSize=${limit}`);
-      const result = await response.json();
-      if (result.data) {
-        externalData = result.data.map((c: any) => ({
-          id: c.id,
-          name: c.name,
-          game: 'Pokémon',
-          game_id: gameId,
-          code: c.number,
-          rarity: c.rarity || 'Common',
-          price: c.tcgplayer?.prices?.holofoil?.market || c.tcgplayer?.prices?.normal?.market || 0,
-          imageUrl: c.images.small || c.images.large,
-          set: c.set.name,
-          description: '',
-          variants: []
-        }));
-        total = result.totalCount || externalData.length;
-      }
-    } else if (game.toLowerCase() === 'yu-gi-oh!' || game.toLowerCase() === 'yugioh' || game.toLowerCase() === 'yu-gi-oh') {
-      const response = await fetch(`https://db.ygoprodeck.com/api/v7/cardinfo.php?fname=${encodeURIComponent(query)}&offset=${(page - 1) * limit}&num=${limit}`);
-      const result = await response.json();
-      if (result.data) {
-        externalData = result.data.map((c: any) => ({
-          id: c.id.toString(),
-          name: c.name,
-          game: 'Yu-Gi-Oh!',
-          game_id: gameId,
-          code: c.card_sets?.[0]?.set_code || c.id.toString(),
-          rarity: c.card_sets?.[0]?.set_rarity || 'Common',
-          price: parseFloat(c.card_prices?.[0]?.tcgplayer_price || 0),
-          imageUrl: c.card_images?.[0]?.image_url || c.card_images?.[0]?.image_url_small,
-          set: c.card_sets?.[0]?.set_name || 'Original',
-          description: c.desc || '',
-          variants: []
-        }));
-        total = result.meta?.total_rows || externalData.length;
-      }
+    // Search using our internal proxy that points to Homura API
+    const params = new URLSearchParams({
+      game: game.toLowerCase(),
+      name: query,
+      page: page.toString(),
+      limit: limit.toString()
+    });
+
+    const response = await fetch(`/api/cards?${params.toString()}`);
+    const result = await response.json();
+
+    if (result.data) {
+      externalData = result.data.map((c: any) => ({
+        id: c.id?.toString() || Math.random().toString(),
+        name: c.name,
+        game: game,
+        game_id: gameId,
+        code: c.code || c.number || '',
+        rarity: c.rarity || 'Common',
+        price: parseFloat(c.price || 0),
+        imageUrl: c.imageUrl || c.image || (c.images && (c.images.small || c.images.large)) || (c.image_uris && (c.image_uris.normal || c.image_uris.small)),
+        set: c.set || c.set_name || '',
+        description: c.description || c.oracle_text || c.desc || '',
+        variants: c.variants || []
+      }));
+      total = result.total || result.total_cards || result.totalCount || externalData.length;
     } else {
-      // Fallback to local search for other games
+      // Fallback to local search for other games or if external search fails
       let q = supabase
         .from('cards')
         .select('*, cardgames(name)', { count: 'exact' })
@@ -1778,11 +1770,11 @@ export const searchExternalCards = async (game: string, query: string, page: num
       
       externalData = (data || []).map((c: any) => ({
         id: c.id.toString(),
-        name: c.beauty_name || c.name,
+        name: c.name,
         game: c.cardgames?.name || game,
         game_id: c.game_id,
-        code: c.slug || c.id.toString(),
-        rarity: c.product_type || 'Common',
+        code: c.external_id || c.id.toString(),
+        rarity: 'Common',
         price: c.price || 0,
         imageUrl: c.image_url || 'https://images.unsplash.com/photo-1614850523296-d8c1af93d400?auto=format&fit=crop&q=80&w=400',
         set: c.cardgames?.name || 'Base Set',
@@ -1808,7 +1800,7 @@ export const getStoreTournaments = async (username: string) => {
     const { data: user } = await supabase.from('users').select('id').eq('username', username).maybeSingle();
     if (!user) return [];
 
-    const { data: store } = await supabase.from('stores').select('id').eq('owner_id', user.id).maybeSingle();
+    const { data: store } = await supabase.from('stores').select('id').eq('user_id', user.id).maybeSingle();
     if (!store) return [];
 
     const { data, error } = await supabase
@@ -1840,7 +1832,7 @@ export const getFullUserProfile = async (username: string, followerId?: string) 
       supabase.from('user_cards').select('quantidade').eq('user_id', user.id),
       supabase.from('wishlist').select('quantidade').eq('user_id', user.id),
       supabase.from('offerlist').select('quantidade').eq('user_id', user.id),
-      supabase.from('user_followers').select('*', { count: 'exact', head: true }).eq('following_id', user.id),
+      supabase.from('user_followers').select('*', { count: 'exact', head: true }).eq('followed_id', user.id),
       supabase.from('user_followers').select('*', { count: 'exact', head: true }).eq('follower_id', user.id)
     ]);
 
@@ -1851,7 +1843,7 @@ export const getFullUserProfile = async (username: string, followerId?: string) 
     let isFollowing = false;
     if (followerId) {
        // ... existing follow check code ...
-       const { data: followData } = await supabase.from('user_followers').select('*').eq('following_id', user.id).eq('follower_id', followerId || '').maybeSingle();
+       const { data: followData } = await supabase.from('user_followers').select('*').eq('followed_id', user.id).eq('follower_id', followerId || '').maybeSingle();
        isFollowing = !!followData;
     }
 
@@ -1883,7 +1875,7 @@ export const followUser = async (username: string, followerId: string) => {
     if (!user) throw new Error('User not found');
 
     const { error } = await supabase.from('user_followers').insert({
-        following_id: user.id,
+        followed_id: user.id,
         follower_id: followerId
     });
 
@@ -1900,7 +1892,7 @@ export const unfollowUser = async (username: string, followerId: string) => {
     const { data: user } = await supabase.from('users').select('id').eq('username', username).maybeSingle();
     if (!user) throw new Error('User not found');
 
-    const { error } = await supabase.from('user_followers').delete().eq('following_id', user.id).eq('follower_id', followerId);
+    const { error } = await supabase.from('user_followers').delete().eq('followed_id', user.id).eq('follower_id', followerId);
 
     if (error) throw error;
     return { success: true };
@@ -2095,9 +2087,9 @@ export const getTournamentDetails = async (id: number | string) => {
       .from('tournaments')
       .select(`
         *, 
-        cardgames:cardgames!fk_tournament_cardgame(name), 
-        tournament_formats:tournament_formats!fk_tournament_format(name),
-        creator:users!created_by(id, username, codename, avatar),
+        cardgames:cardgames!tournaments_cardgame_id_fkey(name), 
+        tournament_formats:tournament_formats!tournaments_format_id_fkey(name),
+        creator:users!tournaments_created_by_fkey(id, username, codename, avatar),
         tickets:tournament_tickets!fk_tickets_tournament(
           *,
           product:products!fk_tickets_product(*)

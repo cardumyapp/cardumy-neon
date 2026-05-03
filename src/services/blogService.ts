@@ -12,11 +12,7 @@ export interface BlogPost {
 
 export const fetchLatestPosts = async (perPage: number = 3): Promise<BlogPost[]> => {
   try {
-    const targetUrl = `https://cardumy.blog/wp-json/wp/v2/posts?_embed&per_page=${perPage}`;
-    // Use allorigins to bypass CORS
-    const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`;
-    
-    const response = await fetch(proxyUrl);
+    const response = await fetch(`/api/blog?per_page=${perPage}`);
     
     if (!response.ok) {
       throw new Error(`WordPress API error: ${response.status}`);

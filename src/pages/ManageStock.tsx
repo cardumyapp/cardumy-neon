@@ -40,7 +40,7 @@ export const ManageStock: React.FC = () => {
         const { data: storeData, error: storeError } = await supabase
           .from('stores')
           .select('*')
-          .eq('owner_id', user.id)
+          .eq('user_id', user.id)
           .maybeSingle();
         
         if (storeError) throw storeError;

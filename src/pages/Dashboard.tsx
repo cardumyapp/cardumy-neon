@@ -229,13 +229,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ activeGame }) => {
           <div className="bg-slate-900/50 border border-slate-800 rounded-3xl p-3 md:p-4 divide-y divide-slate-800/50 shadow-xl">
             {filteredActions && filteredActions.length > 0 ? filteredActions.map((action, idx) => (
               <div key={idx} className="py-4 flex items-center space-x-3 md:space-x-4 px-2">
-                <Link to={`/perfil/${action.userId}`} className="relative flex-shrink-0">
-                  <img src={action.avatar || `https://i.pravatar.cc/150?u=${action.user}`} className="w-8 h-8 md:w-10 md:h-10 rounded-full border border-slate-700" alt="" />
+                <Link to={`/perfil/${action.user_id_safe || action.userId}`} className="relative flex-shrink-0">
+                  <img src={action.user_avatar || action.avatar || `https://i.pravatar.cc/150?u=${action.user}`} className="w-8 h-8 md:w-10 md:h-10 rounded-full border border-slate-700" alt="" />
                   <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 border-2 border-slate-900 rounded-full"></div>
                 </Link>
                 <div className="flex-1 min-w-0">
                   <p className="text-xs md:text-sm truncate">
-                    <Link to={`/perfil/${action.userId}`} className="font-bold text-white hover:text-purple-400 transition-colors">{action.user}</Link> <span className="text-slate-400">{action.action}</span>
+                    <Link to={`/perfil/${action.user_id_safe || action.userId}`} className="font-bold text-white hover:text-purple-400 transition-colors">{action.user_display_name || action.user}</Link> <span className="text-slate-400">{action.action}</span>
                   </p>
                   <p className="text-[9px] text-slate-600 font-bold uppercase tracking-tight">{action.timestamp}</p>
                 </div>

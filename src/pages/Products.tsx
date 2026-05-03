@@ -39,7 +39,7 @@ export const Products: React.FC<ProductsProps> = ({ onAddToCart, activeGame }) =
                 const { data } = await supabase
                     .from('stores')
                     .select('*')
-                    .eq('owner_id', user.id)
+                    .eq('user_id', user.id)
                     .maybeSingle();
                 setStore(data);
             } catch (e) {
