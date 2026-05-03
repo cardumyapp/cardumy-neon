@@ -1,5 +1,4 @@
 
-import { supabase } from '../lib/supabase';
 
 export interface BlogPost {
   id: number;
@@ -13,49 +12,26 @@ export interface BlogPost {
 
 export const fetchLatestPosts = async (perPage: number = 3): Promise<BlogPost[]> => {
   try {
-    const { data, error } = await supabase
-      .from('posts')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(perPage);
-
-    if (error) {
-      if (error.code === 'PGRST205') {
-        console.warn('Table "posts" not found. Using mock data instead.');
-        return [
-          {
-            id: 1,
-            title: 'Novidades no Cardumy: Novo Deckbuilder!',
-            excerpt: 'Confira as novas funcionalidades do nosso construtor de baralhos.',
-            created_at: new Date().toISOString(),
-            category: 'Update'
-          },
-          {
-            id: 2,
-            title: 'Guia de Início: Como começar no Pokémon TCG',
-            excerpt: 'Tudo o que você precisa saber para entrar no mundo competitivo.',
-            created_at: new Date().toISOString(),
-            category: 'Guia'
-          },
-          {
-            id: 3,
-            title: 'Top 10 cartas raras do mês',
-            excerpt: 'Veja quais cartas estão valorizando no mercado atual.',
-            created_at: new Date().toISOString(),
-            category: 'Mercado'
-          }
-        ];
-      }
-      throw error;
+    const response = await fetch(`https://cardumy.blog/wp-json/wp/v2/posts?_embed&per_page=${perPage}`);
+    
+    if (!response.ok) {
+      throw new Error(`WordPress API error: ${response.status}`);
     }
 
-    return (data || []).map(post => ({
-      ...post,
-      title: post.title,
-      excerpt: post.excerpt,
+    const data = await response.json();
+
+    return (data || []).map((post: any) => ({
+      id: post.id,
+      title: post.title.rendered,
+      excerpt: post.excerpt.rendered.replace(/<[^>]*>?/gm, '').substring(0, 120).trim() + '...',
+      content: post.content.rendered,
+      created_at: post.date,
+      image_url: post._embedded?.['wp:featuredmedia']?.[0]?.source_url,
+      category: post._embedded?.['wp:term']?.[0]?.[0]?.name || 'Blog'
     }));
   } catch (error) {
-    console.error('Error fetching blog posts:', error);
+    console.error('Error fetching blog posts from WordPress:', error);
+    // Silent fallback to empty array so UI doesn't crash
     return [];
   }
 };
