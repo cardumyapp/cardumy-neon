@@ -39,12 +39,14 @@ Como cada fonte de TCG (Scryfall, PokémonTCG.io, etc.) tem formatos diferentes,
 | Campo Cardumy | Mapeamento Homura (Fonte) | Descrição |
 | :--- | :--- | :--- |
 | `id` | `c.id` | Identificador único. |
-| `name` | `c.name` | Nome da carta. |
+| `name` | `c.name` / `c.juSTname` | Nome da carta (normalizado). |
 | `game` | Parâmetro da query | Jogo correspondente. |
-| `imageUrl` | `c.imageUrl` / `c.image` / `c.images.*` | URL da imagem da carta. |
-| `price` | `c.price` | Preço em formato numérico. |
-| `set` | `c.set` / `c.set_name` | Coleção/Expansão. |
-| `code` | `c.code` / `c.number` | Número/Código do colecionador. |
+| `imageUrl` | `c.imageUrl` / `c.images.small` / `c.images.large` / `c.image` | URL da imagem da carta. |
+| `price` | `c.price` / `c.variants[0].price` | Preço em formato numérico. |
+| `set` | `c.set.name` / `c.set` / `c.set_name` | Coleção/Expansão. |
+| `code` | `c.code` / `c.number` / `c.set_code` | Número/Código do colecionador. |
+| `rarity` | `c.rarity` / `c.set_rarity` | Raridade oficial da carta. |
+| `variants` | `c.variants` | Lista de variantes (foil, non-foil, etc e seus preços). |
 
 ## 🔐 Configuração
 As seguintes variáveis de ambiente são necessárias para o funcionamento:

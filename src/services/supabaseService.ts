@@ -122,10 +122,13 @@ export const getStores = (callback: (stores: any[]) => void) => {
 
 export const syncCard = async (card: any) => {
   try {
-    // No backend anymore. We do exactly what the backend did but on frontend.
-    // Check if card exists by code/external_id logic
-    const cardCode = card.code || card.number || card.id;
+    const cardCode = card.code || card.number || card.id?.toString();
+    if (!cardCode) {
+      console.warn('syncCard: No card identifier found', card);
+      return null;
+    }
     
+    // 1. Check if card exists
     const { data: existing, error: findError } = await supabase
       .from('cards')
       .select('*')
@@ -133,24 +136,40 @@ export const syncCard = async (card: any) => {
       .maybeSingle();
     
     if (existing) return existing;
+    if (findError) {
+      console.error('Error finding card during sync:', findError);
+      // If it's a connection error, we might want to throw, but for now we follow old logic
+    }
 
-    // If not exists, insert it
+    // 2. If not exists, insert it
     const { data: inserted, error: insertError } = await supabase
       .from('cards')
       .insert({
-        name: card.name,
+        name: card.name || 'Unknown Card',
         external_id: cardCode,
-        game_id: card.game_id || 1, // Defaulting to 1 if unknown
-        image_url: card.imageUrl || card.image_url
+        game_id: card.game_id || card.gameId || 1,
+        image_url: card.imageUrl || card.image_url || card.image
       })
       .select()
       .maybeSingle();
 
-    if (insertError) throw insertError;
+    if (insertError) {
+      // Handle race condition: if another user inserted the same card between our check and insert
+      if (insertError.code === '23505') {
+        const { data: retryData } = await supabase
+          .from('cards')
+          .select('*')
+          .eq('external_id', cardCode)
+          .maybeSingle();
+        if (retryData) return retryData;
+      }
+      throw insertError;
+    }
     return inserted;
   } catch (error) {
-    console.error('Error syncing card:', error);
-    return null;
+    console.error('Error in syncCard:', error);
+    // Instead of null, let's propagate the error if it's meaningful
+    throw error;
   }
 };
 
@@ -164,10 +183,15 @@ export const addCardToList = async (userId: any, listType: 'cards' | 'wishlist' 
     
     // If it's not a numeric ID, it's definitely an external ID that needs syncing
     if (isNaN(Number(card.id)) || !dbGameId) {
-       const dbCard = await syncCard(card);
-       if (!dbCard) throw new Error('Could not sync card to database');
-       dbCardId = dbCard.id;
-       dbGameId = dbCard.game_id;
+       try {
+         const dbCard = await syncCard(card);
+         if (!dbCard) throw new Error('Could not sync card (null returned)');
+         dbCardId = dbCard.id;
+         dbGameId = dbCard.game_id;
+       } catch (err: any) {
+         console.error('Critical sync failure:', err);
+         throw new Error(`Erro ao sincronizar carta: ${err.message || 'Erro desconhecido'}`);
+       }
     }
 
     if (!dbCardId) throw new Error('Invalid Card ID after sync');
@@ -182,21 +206,7 @@ export const addCardToList = async (userId: any, listType: 'cards' | 'wishlist' 
 
     if (fetchError && fetchError.code !== 'PGRST116') throw fetchError;
 
-    // BUSINESS RULE: For 'offerlist', card must exist in 'user_cards' (principal collection)
-    if (listType === 'offerlist') {
-      const { data: userCard, error: userCardCheckError } = await supabase
-        .from('user_cards')
-        .select('id')
-        .eq('user_id', userId)
-        .eq('card_id', dbCardId)
-        .maybeSingle();
-      
-      if (userCardCheckError) throw userCardCheckError;
-      if (!userCard) {
-        throw new Error('Esta carta deve ser adicionada à sua coleção principal primeiro.');
-      }
-    }
-
+    // 2. Insert into destination list
     if (existing) {
       const { error: updateError } = await supabase
         .from(table)
@@ -352,14 +362,21 @@ export const addCardToBinder = async (userId: any, binderId: any, card: any) => 
   try {
     // 1. Ensure we have the base card ID (BIGINT)
     let dbCardId = card.id;
+    let dbGameId = card.game_id || card.gameId;
+
     if (isNaN(Number(card.id))) {
-      const synced = await syncCard(card);
-      if (!synced) throw new Error('Falha ao sincronizar carta com o servidor');
-      dbCardId = synced.id;
+      try {
+        const synced = await syncCard(card);
+        if (!synced) throw new Error('Sync returned null');
+        dbCardId = synced.id;
+        dbGameId = synced.game_id;
+      } catch (err: any) {
+        throw new Error(`Falha ao sincronizar carta com o servidor: ${err.message}`);
+      }
     }
 
     // 2. Check if the card is already in the user's principal collection (user_cards)
-    const { data: userCard, error: userCardError } = await supabase
+    let { data: userCard, error: userCardError } = await supabase
       .from('user_cards')
       .select('id')
       .eq('user_id', userId)
@@ -367,9 +384,35 @@ export const addCardToBinder = async (userId: any, binderId: any, card: any) => 
       .maybeSingle();
     
     if (userCardError) throw userCardError;
+
     if (!userCard) {
-      throw new Error('Esta carta deve ser adicionada à sua coleção principal primeiro.');
+      // Processo automático: Adiciona primeiro à coleção principal
+      const { data: newUserCard, error: insertUserCardError } = await supabase
+        .from('user_cards')
+        .insert({
+          user_id: userId,
+          card_id: dbCardId,
+          quantidade: 1,
+          game_id: dbGameId || 1,
+          raridade: card.rarity || 'Common'
+        })
+        .select('id')
+        .maybeSingle();
+      
+      if (insertUserCardError) throw insertUserCardError;
+      userCard = newUserCard;
+
+      // Log automatic addition
+      await supabase.from('action_logs').insert({
+        user_id: userId,
+        action: 'adicionou',
+        entity: 'a carta (automático via pasta)',
+        entity_id: String(dbCardId),
+        details: { destino: 'user_cards', name: card.name, quantidade: 1 }
+      });
     }
+
+    if (!userCard) throw new Error('Erro ao vincular carta à coleção principal.');
 
     // 3. Add the link in binder_cards using user_card_id
     const { error: insertError } = await supabase
@@ -381,10 +424,13 @@ export const addCardToBinder = async (userId: any, binderId: any, card: any) => 
     
     if (insertError) {
       if (insertError.code === '23505') {
-        throw new Error('Esta carta já está nesta pasta.');
+        // Idempotent success: if already in binder, we just stop quietly or return a status
+        console.info('Card already in binder:', userCard.id);
+        return { success: true, alreadyExists: true };
       }
       throw insertError;
     }
+    return { success: true };
   } catch (error: any) {
     console.error('Error adding card to binder:', error);
     throw error;
@@ -1161,14 +1207,22 @@ export const updateStoreStock = async (store_id: string | number, product_id: nu
 
 export const getStoreEvents = async (storeId: string) => {
   try {
+    const { data: store } = await supabase
+      .from('stores')
+      .select('user_id')
+      .eq('id', storeId)
+      .maybeSingle();
+
+    if (!store) return [];
+
     const { data, error } = await supabase
       .from('tournaments')
-      .select('id, name, max_players, start_date, status, description, image_url, cardgames:cardgames!tournaments_cardgame_id_fkey(name)')
-      .eq('location', storeId);
+      .select('*, cardgames:cardgames!tournaments_cardgame_id_fkey(name)')
+      .eq('created_by', store.user_id);
     
     if (error) {
-      // Try fetching by store name if storeId fails? 
-      // Actually tournaments usually have a store reference.
+      console.error('Error fetching store tournaments:', error);
+      return [];
     }
     return data || [];
   } catch (error) {
@@ -1343,20 +1397,17 @@ export const createTournament = async (tournamentData: any) => {
     const profile = await getUserByAuthId(session.user.id);
     if (!profile) throw new Error('Perfil não encontrado');
 
-    // 1. Create Tournament
+    // 1. Create Tournament (removing columns missing from updated schema)
     const { data: tournament, error: tError } = await supabase
       .from('tournaments')
       .insert({
         name: tournamentData.name,
-        description: tournamentData.description,
         start_date: tournamentData.start_date,
-        location: tournamentData.location,
         max_players: Number(tournamentData.max_players) || 32,
         cardgame_id: Number(tournamentData.cardgame_id),
         format_id: Number(tournamentData.format_id),
         created_by: profile.id,
-        status: 'open',
-        image_url: tournamentData.image_url
+        status: 'open'
       })
       .select()
       .maybeSingle();
@@ -1375,11 +1426,12 @@ export const createTournament = async (tournamentData: any) => {
       const { data: product, error: pError } = await supabase
         .from('products')
         .insert({
-          name: `Inscrição: ${tournament.name}`,
+          name: `Inscrição: ${tournamentData.name}`,
           product_type_id: 3, // Assuming 3 is tickets
-          game_id: tournament.cardgame_id,
+          game_id: Number(tournamentData.cardgame_id),
           mspr: tournamentData.ticket_price,
-          image_url: tournament.image_url,
+          image_url: tournamentData.image_url,
+          description: tournamentData.description,
           store_id: store?.id
         })
         .select()
@@ -1738,17 +1790,19 @@ export const searchExternalCards = async (game: string, query: string, page: num
     const response = await fetch(`/api/cards?${params.toString()}`);
     const result = await response.json();
 
-    if (result.data) {
-      externalData = result.data.map((c: any) => ({
+    const list = Array.isArray(result) ? result : (result.data || []);
+    
+    if (list.length > 0) {
+      externalData = list.map((c: any) => ({
         id: c.id?.toString() || Math.random().toString(),
-        name: c.name,
+        name: c.name || c.juSTname || 'Unknown Card',
         game: game,
         game_id: gameId,
-        code: c.code || c.number || '',
-        rarity: c.rarity || 'Common',
-        price: parseFloat(c.price || 0),
-        imageUrl: c.imageUrl || c.image || (c.images && (c.images.small || c.images.large)) || (c.image_uris && (c.image_uris.normal || c.image_uris.small)),
-        set: c.set || c.set_name || '',
+        code: c.code || c.number || c.set_code || '',
+        rarity: c.rarity || c.set_rarity || (c.product_type === 'single' ? 'Common' : c.product_type) || 'Common',
+        price: parseFloat(c.price || (c.variants?.length > 0 ? c.variants[0].price : 0) || 0),
+        imageUrl: c.imageUrl || c.image || (c.images && (c.images.small || c.images.large || c.images.png)) || (c.image_uris && (c.image_uris.normal || c.image_uris.small)),
+        set: c.set?.name || c.set || c.set_name || '',
         description: c.description || c.oracle_text || c.desc || '',
         variants: c.variants || []
       }));
@@ -1800,13 +1854,13 @@ export const getStoreTournaments = async (username: string) => {
     const { data: user } = await supabase.from('users').select('id').eq('username', username).maybeSingle();
     if (!user) return [];
 
-    const { data: store } = await supabase.from('stores').select('id').eq('user_id', user.id).maybeSingle();
+    const { data: store } = await supabase.from('stores').select('id, user_id').eq('user_id', user.id).maybeSingle();
     if (!store) return [];
 
     const { data, error } = await supabase
       .from('tournaments')
-      .select('*, cardgames(name), tournament_formats(name)')
-      .eq('location', store.id);
+      .select('*, cardgames!tournaments_cardgame_id_fkey(name), tournament_formats!tournaments_format_id_fkey(name)')
+      .eq('created_by', user.id);
 
     if (error) throw error;
     return data || [];
