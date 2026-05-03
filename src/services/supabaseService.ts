@@ -834,7 +834,7 @@ export const getUserProfile = async (userId: string | number) => {
     // Determine if we should search by ID, Email, or Username
     const isNumeric = !isNaN(Number(userId)) && !String(userId).includes('@') && !String(userId).includes('-');
     
-    let query = supabase.from('users').select('*, role:roles(name)');
+    let query = supabase.from('safe_users').select('*');
     
     if (isNumeric) {
       const { data, error } = await query
@@ -1235,7 +1235,7 @@ export const getActivities = async (limit: number = 10) => {
   try {
     const { data, error } = await supabase
       .from('action_logs')
-      .select('*, user:users(id, username, codename, avatar)')
+      .select('*, user:safe_users(id, username, fullname, avatar)')
       .order('created_at', { ascending: false })
       .limit(limit);
 
@@ -1244,7 +1244,7 @@ export const getActivities = async (limit: number = 10) => {
     // Flatten and safe-guard the data
     return (data || []).map(log => ({
       ...log,
-      user_display_name: log.user?.username || log.user?.codename || log.username || 'Usuário',
+      user_display_name: log.user?.fullname || log.user?.username || log.username || 'Usuário',
       user_avatar: log.user?.avatar || log.avatar,
       user_id_safe: log.user?.id || log.user_id
     }));
@@ -1633,13 +1633,22 @@ export const getStoreShippingMethods = async (storeId: string | number) => {
             .eq('is_active', true);
             
         if (error) throw error;
-        // Flatten the response to maintain compatibility
-        return (data || []).map(item => ({
-            ...item.shipping_methods,
-            ...item,
-            id: item.shipping_method_id, // Ensure ID is the method ID for order context
-            original_id: item.id
-        }));
+        // Flatten the response and calculate correct price/days
+        return (data || []).map(item => {
+            // Supabase relationship might return an object or a single-item array
+            const base = Array.isArray(item.shipping_methods) ? item.shipping_methods[0] : item.shipping_methods;
+            const finalBase = base || {};
+            
+            return {
+                ...finalBase,
+                ...item,
+                id: item.shipping_method_id,
+                original_id: item.id,
+                name: finalBase.name || item.name || 'Envio',
+                price: item.price_override !== null && item.price_override !== undefined ? Number(item.price_override) : Number(finalBase.avg_price || 0),
+                estimated_days: item.delivery_days_override !== null && item.delivery_days_override !== undefined ? Number(item.delivery_days_override) : Number(finalBase.delivery_days || 0)
+            };
+        });
     } catch (error) {
         console.error('Error fetching shipping methods:', error);
         return [];
@@ -1699,7 +1708,7 @@ export const createOrderFull = async (params: {
                 shipping_method_id: params.shipping_method_id,
                 payment_method_id: Number(params.payment_method_id),
                 products_total: productsTotal,
-                shipping_cost: shippingCost,
+                shipping_price: shippingCost,
                 amount: totalAmount,
                 status: 'pending'
             })
@@ -1894,7 +1903,7 @@ export const getStoreTournaments = async (username: string) => {
 export const getFullUserProfile = async (username: string, followerId?: string) => {
   try {
     const { data: user, error: userError } = await supabase
-      .from('users')
+      .from('safe_users')
       .select('*, stores(*)')
       .eq('username', username)
       .maybeSingle();
@@ -1902,18 +1911,22 @@ export const getFullUserProfile = async (username: string, followerId?: string) 
     if (userError) throw userError;
     if (!user) return null;
 
-    // Fetch collections counts (sum of quantities)
-    const [colecaoRes, wishlistRes, offerlistRes, { count: followersCount }, { count: followingCount }] = await Promise.all([
-      supabase.from('user_cards').select('quantidade').eq('user_id', user.id),
-      supabase.from('wishlist').select('quantidade').eq('user_id', user.id),
-      supabase.from('offerlist').select('quantidade').eq('user_id', user.id),
-      supabase.from('user_followers').select('*', { count: 'exact', head: true }).eq('followed_id', user.id),
-      supabase.from('user_followers').select('*', { count: 'exact', head: true }).eq('follower_id', user.id)
+    // Use counts from safe_users view
+    const followersCountQuery = supabase.from('user_followers').select('*', { count: 'exact', head: true }).eq('followed_id', user.id);
+    const followingCountQuery = supabase.from('user_followers').select('*', { count: 'exact', head: true }).eq('follower_id', user.id);
+
+    const [{ count: followersCount }, { count: followingCount }] = await Promise.all([
+      followersCountQuery,
+      followingCountQuery
     ]);
 
-    const collection_size = colecaoRes.data?.reduce((acc, curr) => acc + (curr.quantidade || 0), 0) || 0;
-    const wishlist_size = wishlistRes.data?.reduce((acc, curr) => acc + (curr.quantidade || 0), 0) || 0;
-    const offers_size = offerlistRes.data?.reduce((acc, curr) => acc + (curr.quantidade || 0), 0) || 0;
+    const collection_size = Number(user.collection_size || 0);
+    const wishlist_size = Number(user.wishlist_size || 0);
+    const offers_size = Number(user.offers_size || 0);
+    const likes = Number(user.likes || 0);
+    const dislikes = Number(user.dislikes || 0);
+    const total_reviews = likes + dislikes;
+    const approval_rate = total_reviews > 0 ? Math.round((likes / total_reviews) * 100) : 100;
 
     let isFollowing = false;
     if (followerId) {
@@ -1925,6 +1938,7 @@ export const getFullUserProfile = async (username: string, followerId?: string) 
     return {
       user: {
         ...user,
+        codename: user.fullname || user.codename, // Handle codename alias from view
         store_logo: user.stores?.[0]?.logo || user.stores?.logo
       },
       stats: {
@@ -1933,8 +1947,10 @@ export const getFullUserProfile = async (username: string, followerId?: string) 
         offers_size,
         followers: followersCount || 0,
         following: followingCount || 0,
-        approval_rate: 100, // Placeholder or fetch from reviews table
-        total_reviews: 0
+        approval_rate,
+        total_reviews,
+        likes,
+        dislikes
       },
       isFollowing
     };

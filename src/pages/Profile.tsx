@@ -135,7 +135,7 @@ export const Profile: React.FC = () => {
       <div className="relative mb-32 md:mb-32">
         <div className="h-40 md:h-64 w-full rounded-2xl md:rounded-3xl overflow-hidden relative">
           <img 
-            src={profileUser.banner_url || profileUser.cover_url || "https://images.unsplash.com/photo-1614850523296-d8c1af93d400?auto=format&fit=crop&q=80&w=1200"} 
+            src={profileUser.banner_url || "https://images.unsplash.com/photo-1614850523296-d8c1af93d400?auto=format&fit=crop&q=80&w=1200"} 
             className="w-full h-full object-cover" 
             alt="Cover" 
           />
@@ -156,7 +156,7 @@ export const Profile: React.FC = () => {
 
           <div className="text-center md:text-left flex-1 min-w-0 pb-1">
             <div className="flex items-center justify-center md:justify-start space-x-2 mb-1">
-              <h1 className="text-2xl md:text-4xl font-black tracking-tight text-white leading-tight truncate">{profileUser.codename || profileUser.displayName}</h1>
+              <h1 className="text-2xl md:text-4xl font-black tracking-tight text-white leading-tight truncate">{profileUser.fullname || profileUser.codename || profileUser.displayName}</h1>
               <i className="fas fa-circle-check text-blue-400 text-sm md:text-xl" title="Verificada"></i>
             </div>
             <p className="text-slate-400 text-xs md:text-sm font-medium mb-2">@{profileUser.username} • {profileUser.role === 'admin' ? 'Administrador' : (profileUser.cardgames?.name || profileUser.favorite_game)}</p>
