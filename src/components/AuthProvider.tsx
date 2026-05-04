@@ -109,9 +109,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = async () => {
-    await supabase.auth.signOut();
+    try {
+      await supabase.auth.signOut();
+    } catch (err) {
+      console.error('Error during Supabase signout:', err);
+    }
     setUser(null);
-    window.location.href = '/login';
+    setLoading(false);
+    // Force redirect to login and clear any stale URL params
+    window.location.replace('/login');
   };
 
   const switchUser = (newUser: any) => {

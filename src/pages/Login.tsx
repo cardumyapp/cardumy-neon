@@ -19,28 +19,15 @@ export const Login: React.FC = () => {
     }
   }, [user, authLoading, navigate]);
 
-  const handleAnonymousLogin = async () => {
+  const handleVisitorLogin = async () => {
     setLoading(true);
     setError(null);
     try {
-      const { data, error: anonError } = await supabase.auth.signInAnonymously();
-      if (anonError) throw anonError;
+      // Use the demo account logic as requested for "Visitante"
+      await login('demo@cardumy.dev', 'cardumy');
       navigate('/');
     } catch (err: any) {
-      setError(err.message || 'Erro ao entrar como visitante');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleDemoLogin = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      await login('dev@cardumy.app', 'caos1234');
-      navigate('/');
-    } catch (err: any) {
-      setError('Erro na conta demo: ' + (err.message || 'Credenciais inválidas'));
+      setError('Erro ao entrar como visitante: ' + (err.message || 'Falha na autenticação'));
     } finally {
       setLoading(false);
     }
@@ -98,21 +85,11 @@ export const Login: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-[80vh] py-12 px-4 sm:px-6 lg:px-8 bg-slate-950">
-      <div className="absolute top-4 right-4">
-        <button 
-          onClick={handleClearData}
-          className="text-[9px] font-black uppercase tracking-widest text-slate-600 hover:text-red-500 transition-colors bg-slate-900/50 px-3 py-2 rounded-lg border border-slate-800"
-          title="Limpar dados locais e recarregar"
-        >
-          <i className="fas fa-trash-can mr-2"></i>
-          Limpar Cache
-        </button>
-      </div>
+    <div className="flex flex-col items-center justify-center min-h-screen py-6 px-4 sm:px-6 lg:px-8 bg-slate-950">
       <motion.div 
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="max-w-md w-full space-y-8 bg-slate-900/40 p-10 rounded-[2.5rem] border border-slate-800/50 backdrop-blur-2xl shadow-3xl relative overflow-hidden"
+        className="max-w-md w-full space-y-6 bg-slate-900/40 p-6 sm:p-10 rounded-[2rem] sm:rounded-[2.5rem] border border-slate-800/50 backdrop-blur-2xl shadow-3xl relative overflow-hidden"
       >
         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-purple-500 to-transparent opacity-50"></div>
         
@@ -125,7 +102,7 @@ export const Login: React.FC = () => {
               <i className="fas fa-fish-fins text-4xl text-white"></i>
             </motion.div>
           </div>
-          <h2 className="text-center text-3xl font-black text-white tracking-tight leading-tight">
+          <h2 className="text-center text-2xl sm:text-3xl font-black text-white tracking-tight leading-tight">
             Seja bem-vindo ao <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400">Cardumy</span>
           </h2>
           <p className="mt-3 text-center text-[10px] text-slate-500 font-bold uppercase tracking-[0.2em]">
@@ -200,18 +177,9 @@ export const Login: React.FC = () => {
             <button
               type="submit"
               disabled={loading}
-              className="group relative flex-[2] flex justify-center py-5 px-4 border border-transparent text-xs font-black uppercase tracking-[0.2em] rounded-2xl text-white bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition-all shadow-xl shadow-purple-600/20 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="group relative w-full flex justify-center py-5 px-4 border border-transparent text-xs font-black uppercase tracking-[0.2em] rounded-2xl text-white bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition-all shadow-xl shadow-purple-600/20 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? <i className="fas fa-circle-notch fa-spin text-lg"></i> : 'Entrar'}
-            </button>
-            <button
-              type="button"
-              onClick={handleDemoLogin}
-              disabled={loading}
-              className="flex-1 py-5 px-2 text-[10px] font-black uppercase tracking-widest text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-2xl transition-all"
-              title="Entrar com conta de teste"
-            >
-              Demo
             </button>
           </div>
 
@@ -223,7 +191,7 @@ export const Login: React.FC = () => {
 
           <button
             type="button"
-            onClick={handleAnonymousLogin}
+            onClick={handleVisitorLogin}
             disabled={loading}
             className="w-full py-4 px-4 text-[10px] font-black uppercase tracking-widest text-slate-300 bg-slate-800/50 hover:bg-slate-800 border border-slate-700/50 rounded-2xl transition-all"
           >
