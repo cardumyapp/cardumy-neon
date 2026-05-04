@@ -921,18 +921,36 @@ export const getUserByAuthId = async (authId: string) => {
   try {
     const { data, error } = await supabase
       .from('users')
-      .select('*, role:roles(name)')
+      .select('*, roles(name)')
       .eq('auth_id', authId)
       .maybeSingle();
 
     if (error) throw error;
     if (data) {
-      return { ...data, role: (data.role as any)?.name || 'user' };
+      const roleName = Array.isArray(data.roles) 
+        ? (data.roles[0] as any)?.name 
+        : (data.roles as any)?.name;
+      return { ...data, role: roleName || 'user' };
     }
     return data;
   } catch (error) {
     console.error('Error in getUserByAuthId:', error);
     return null;
+  }
+};
+
+export const isAdmin = async (authId: string) => {
+  try {
+    const { data, error } = await supabase
+      .from('user_rolas')
+      .select('role')
+      .eq('user_id', authId)
+      .maybeSingle();
+    
+    if (error) return false;
+    return data?.role === 'admin';
+  } catch {
+    return false;
   }
 };
 
@@ -1111,17 +1129,72 @@ export const getRandomUser = async () => {
   }
 };
 
-export const syncUser = async (userData: any) => {
-  // Now handled by devAutoLogin or directly after standard login.
-  // We keep the export to avoid breaking imports but it does nothing.
-  return { success: true };
+export const syncUser = async (profile: { auth_id: string; email: string; displayName?: string }) => {
+  try {
+    // 1. Check if user already exists by auth_id (using existing function for safety)
+    const existing = await getUserByAuthId(profile.auth_id);
+    if (existing) return existing;
+
+    // 2. Check if user exists by email (legacy link)
+    const { data: byEmail } = await supabase
+      .from('users')
+      .select('*')
+      .eq('email', profile.email)
+      .maybeSingle();
+
+    if (byEmail && !byEmail.auth_id) {
+      // Update legacy user with new auth_id
+      const { data: updated, error: updateError } = await supabase
+        .from('users')
+        .update({ auth_id: profile.auth_id })
+        .eq('id', byEmail.id)
+        .select()
+        .single();
+      
+      if (!updateError) return updated;
+    }
+
+    // 3. Create new user
+    const username = profile.displayName || profile.email.split('@')[0] + '_' + Math.random().toString(36).slice(2, 7);
+    
+    const { data: inserted, error: insertError } = await supabase
+      .from('users')
+      .insert({
+        auth_id: profile.auth_id,
+        email: profile.email,
+        username: username,
+        codename: username,
+        password: 'managed_by_supabase_auth', // password is NOT NULL in schema
+        fighter_tags: 'novato',
+        avatar: 'https://api.dicebear.com/7.x/pixel-art/svg?seed=' + profile.auth_id
+      })
+      .select()
+      .single();
+
+    if (insertError) throw insertError;
+    return inserted;
+  } catch (error) {
+    console.error('Error in syncUser:', error);
+    return null;
+  }
 };
 
 export const updateUserProfile = async (userId: string | number, updates: any) => {
   try {
+    // Sanitize birth_date - if it's an empty string, set it to null to avoid DB errors
+    const sanitizedUpdates = { ...updates };
+    if (sanitizedUpdates.birth_date === "") {
+      sanitizedUpdates.birth_date = null;
+    }
+
+    // Convert fighter_tags array to comma-separated string if needed
+    if (Array.isArray(sanitizedUpdates.fighter_tags)) {
+      sanitizedUpdates.fighter_tags = sanitizedUpdates.fighter_tags.join(',');
+    }
+
     const { error } = await supabase
       .from('users')
-      .update(updates)
+      .update(sanitizedUpdates)
       .eq(typeof userId === 'string' && userId.length > 30 ? 'auth_id' : 'id', userId);
     
     if (error) throw error;
@@ -1939,7 +2012,7 @@ export const getFullUserProfile = async (username: string, followerId?: string) 
     const { data: user, error: userError } = await supabase
       .from('safe_users')
       .select('*, stores(*)')
-      .or(isUUID ? `id.eq.${username}` : `username.eq.${username}`)
+      .or(isUUID ? `auth_id.eq.${username}` : `username.eq.${username}`)
       .maybeSingle();
 
     if (userError) throw userError;
