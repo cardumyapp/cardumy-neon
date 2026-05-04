@@ -13,35 +13,57 @@ interface NavItemProps {
 const NavItem: React.FC<NavItemProps> = ({ to, icon, label, active, collapsed }) => (
   <Link
     to={to}
-    className={`flex items-center space-x-4 p-4 rounded-2xl transition-all duration-300 group ${
-      active
-        ? 'bg-purple-600 text-white shadow-lg shadow-purple-900/40 translate-x-2'
+    className={`flex items-center group relative px-4 py-3 rounded-lg transition-all duration-300 ${
+      active 
+        ? 'bg-purple-600/20 text-purple-400 border-r-4 border-purple-600' 
         : 'text-slate-400 hover:bg-slate-800 hover:text-white'
     }`}
+    title={collapsed ? label : ''}
   >
-    <div className={`w-6 h-6 flex items-center justify-center`}>
-      <i className={`fas ${icon} ${active ? 'text-white' : 'group-hover:text-purple-400'}`}></i>
+    <div className={`flex items-center ${collapsed ? 'justify-center w-full' : 'space-x-3'}`}>
+      <i className={`fas ${icon} w-6 text-center text-lg ${active ? 'text-purple-400' : 'group-hover:text-purple-400'}`}></i>
+      {!collapsed && <span className="font-medium text-sm transition-opacity duration-300 opacity-100">{label}</span>}
     </div>
-    {!collapsed && <span className="font-bold whitespace-nowrap">{label}</span>}
   </Link>
+);
+
+const SidebarGroup: React.FC<{ label: string; collapsed: boolean; children: React.ReactNode }> = ({ label, collapsed, children }) => (
+  <div className="mb-4">
+    {!collapsed && (
+      <p className="px-4 text-[9px] font-black uppercase tracking-widest text-slate-500 mb-2 mt-4 flex items-center">
+        <span className="mr-2">{label}</span>
+        <span className="flex-1 h-[1px] bg-slate-800/50"></span>
+      </p>
+    )}
+    <div className="space-y-1">
+      {children}
+    </div>
+  </div>
 );
 
 export const Sidebar: React.FC<{ collapsed: boolean }> = ({ collapsed }) => {
   const { user } = useAuth();
   const location = useLocation();
-  const isLojista = user?.role_id === 6;
+  const isLojista = user?.role_id === 6 || user?.role_id === 1;
 
-  const lojistaItems = [
-    { to: '/', icon: 'fa-house', label: 'Início', active: location.pathname === '/' },
-    { to: '/minha-loja', icon: 'fa-briefcase', label: 'Minha Loja', active: location.pathname === '/minha-loja' },
-    { to: '/produtos', icon: 'fa-bag-shopping', label: 'Produtos', active: location.pathname === '/produtos' },
-    { to: '/gerenciar-estoque', icon: 'fa-box-archive', label: 'Estoque', active: location.pathname === '/gerenciar-estoque' },
-    { to: '/meus-torneios', icon: 'fa-calendar-check', label: 'Meus Torneios', active: location.pathname === '/meus-torneios' || location.pathname === '/novo-torneio' },
-    { to: '/pedidos-recebidos', icon: 'fa-ticket', label: 'Meus Ingressos', active: location.pathname === '/pedidos-recebidos' },
-    { to: '/suporte', icon: 'fa-circle-question', label: 'Suporte', active: location.pathname === '/suporte' },
+  // Lojista Specific Items
+  const lojistaGeral = [
+    { to: '/', icon: 'fa-chart-pie', label: 'Dashboard', active: location.pathname === '/' },
+    { to: '/perfil', icon: 'fa-user-circle', label: 'Meu Perfil', active: location.pathname === '/perfil' },
   ];
 
-  // common items for members
+  const lojistaStore = [
+    { to: '/minha-loja', icon: 'fa-store', label: 'Configurações', active: location.pathname === '/minha-loja' },
+    { to: '/gerenciar-estoque', icon: 'fa-boxes-stacked', label: 'Estoque', active: location.pathname === '/gerenciar-estoque' },
+    { to: '/pedidos-recebidos', icon: 'fa-clipboard-check', label: 'Pedidos', active: location.pathname === '/pedidos-recebidos' },
+  ];
+
+  const lojistaExtra = [
+    { to: '/meus-torneios', icon: 'fa-trophy', label: 'Meus Torneios', active: location.pathname === '/meus-torneios' || location.pathname === '/novo-torneio' },
+    { to: '/produtos', icon: 'fa-bag-shopping', label: 'Meus Produtos', active: location.pathname === '/produtos' },
+  ];
+
+  // Common items for members (used if !isLojista)
   const commonTopItems = [
     { to: '/', icon: 'fa-house', label: 'Início', active: location.pathname === '/' },
     { to: '/lojas', icon: 'fa-store', label: 'Lojas', active: location.pathname === '/lojas' },
@@ -58,36 +80,54 @@ export const Sidebar: React.FC<{ collapsed: boolean }> = ({ collapsed }) => {
   ];
 
   return (
-    <div className="flex flex-col h-full py-6">
-      <div className="px-4 mb-8">
-        {!collapsed ? (
-            <h1 className="text-2xl font-black text-white tracking-tighter">CARDUMY<span className="text-purple-500">.</span></h1>
-        ) : (
-            <div className="w-10 h-10 bg-purple-600 rounded-xl flex items-center justify-center font-black text-white ml-1">C</div>
-        )}
+    <div className="flex flex-col h-full py-4">
+      <div className={`p-6 mb-2 flex items-center ${collapsed ? 'justify-center w-full' : 'space-x-3'}`}>
+        <div className="bg-gradient-to-br from-purple-600 to-pink-600 p-2 rounded-lg shadow-lg shadow-purple-600/20">
+          <i className="fas fa-fish-fins text-white text-xl"></i>
+        </div>
+        {!collapsed && <span className="text-xl font-bold tracking-tight text-white transition-opacity duration-300">Cardumy</span>}
       </div>
 
-      <nav className="flex-1 px-3 space-y-2 overflow-y-auto no-scrollbar">
+      <nav className="flex-1 px-4 overflow-y-auto no-scrollbar">
         {isLojista ? (
           <>
-            {lojistaItems.map((item) => (
-              <NavItem key={item.to} {...item} collapsed={collapsed} />
-            ))}
+            <SidebarGroup label="Geral" collapsed={collapsed}>
+              {lojistaGeral.map(item => <NavItem key={item.to} {...item} collapsed={collapsed} />)}
+            </SidebarGroup>
+
+            <SidebarGroup label="Gerenciamento" collapsed={collapsed}>
+              {lojistaStore.map(item => <NavItem key={item.to} {...item} collapsed={collapsed} />)}
+            </SidebarGroup>
+
+            <SidebarGroup label="Atividades" collapsed={collapsed}>
+              {lojistaExtra.map(item => <NavItem key={item.to} {...item} collapsed={collapsed} />)}
+            </SidebarGroup>
+
+            <div className="mt-4 pt-4 border-t border-slate-800/50">
+              <NavItem 
+                  to="/suporte" 
+                  icon="fa-circle-question" 
+                  label="Suporte" 
+                  active={location.pathname === '/suporte'} 
+                  collapsed={collapsed} 
+              />
+            </div>
           </>
         ) : (
           <>
-            {commonTopItems.map((item) => (
-              <NavItem key={item.to} {...item} collapsed={collapsed} />
-            ))}
-
-            <div className="my-6 border-t border-slate-800/50" />
+            <SidebarGroup label="Navegação" collapsed={collapsed}>
+              {commonTopItems.map((item) => (
+                <NavItem key={item.to} {...item} collapsed={collapsed} />
+              ))}
+            </SidebarGroup>
             
-            {!collapsed && <p className="px-4 text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] mb-4">Membro</p>}
-            {memberItems.map((item) => (
-              <NavItem key={item.to} {...item} collapsed={collapsed} />
-            ))}
+            <SidebarGroup label="Membro" collapsed={collapsed}>
+              {memberItems.map((item) => (
+                <NavItem key={item.to} {...item} collapsed={collapsed} />
+              ))}
+            </SidebarGroup>
             
-            <div className="px-3 mt-4">
+            <div className="mt-4 pt-4 border-t border-slate-800/50">
               <NavItem 
                   to="/suporte" 
                   icon="fa-circle-question" 

@@ -243,7 +243,7 @@ export const ManageStock: React.FC = () => {
                       </button>
                       <input 
                         type="number"
-                        value={edit.quantity}
+                        value={edit.quantity ?? ''}
                         onChange={(e) => handleLocalChange(item.product_id, 'quantity', parseInt(e.target.value) || 0)}
                         className="bg-transparent w-12 text-center text-sm font-bold focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       />
@@ -263,7 +263,7 @@ export const ManageStock: React.FC = () => {
                       <input 
                         type="number"
                         step="0.01"
-                        value={edit.price}
+                        value={edit.price ?? ''}
                         onChange={(e) => handleLocalChange(item.product_id, 'price', parseFloat(e.target.value) || 0)}
                         className="bg-transparent w-full text-sm font-bold focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       />

@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 
 export const Login: React.FC = () => {
-  const { login, user, loading: authLoading } = useAuth();
+  const { login, user, supabaseUser, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -14,10 +14,10 @@ export const Login: React.FC = () => {
   const [legacyFlowRequired, setLegacyFlowRequired] = useState(false);
 
   React.useEffect(() => {
-    if (!authLoading && user) {
-      navigate('/');
+    if (!authLoading && supabaseUser) {
+      navigate('/verificar-sessao');
     }
-  }, [user, authLoading, navigate]);
+  }, [supabaseUser, authLoading, navigate]);
 
   const handleVisitorLogin = async () => {
     setLoading(true);
@@ -25,7 +25,7 @@ export const Login: React.FC = () => {
     try {
       // Use the demo account logic as requested for "Visitante"
       await login('demo@cardumy.dev', 'cardumy');
-      navigate('/');
+      navigate('/verificar-sessao');
     } catch (err: any) {
       setError('Erro ao entrar como visitante: ' + (err.message || 'Falha na autenticação'));
     } finally {
@@ -45,7 +45,7 @@ export const Login: React.FC = () => {
 
     try {
       await login(email, password);
-      navigate('/');
+      navigate('/verificar-sessao');
     } catch (err: any) {
       console.error('Login error:', err);
       

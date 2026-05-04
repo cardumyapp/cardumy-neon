@@ -1015,7 +1015,7 @@ export const getReceivedOrders = async () => {
 
         const { data, error } = await supabase
           .from('orders')
-          .select('*, order_items(*, product:products(*)), buyer:users!buyer_id(*)')
+          .select('*, order_items(*, product:products(*)), buyer:users!fk_order_buyer(*)')
           .eq('store_id', store.id)
           .order('created_at', { ascending: false });
 
@@ -1380,7 +1380,7 @@ export const getCards = async (game?: string): Promise<any[]> => {
     
     if (game && game !== 'All') {
       const { data: g } = await supabase.from('cardgames').select('id').eq('name', game).maybeSingle();
-      if (g) query = query.eq('card_game_id', g.id);
+      if (g) query = query.eq('game_id', g.id);
     }
     
     const { data, error } = await query;
@@ -1633,7 +1633,7 @@ export const getAddresses = async () => {
     }
 };
 
-export const createAddress = async (address: { street: string, city: string, state: string, cep: string, is_default?: boolean }) => {
+export const createAddress = async (address: { street: string, number: string, neighborhood: string, complement?: string, city: string, state: string, zip_code: string, is_primary?: boolean }) => {
     try {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session?.user) throw new Error('Not authenticated');
@@ -1641,11 +1641,11 @@ export const createAddress = async (address: { street: string, city: string, sta
         const profile = await getUserByAuthId(session.user.id);
         if (!profile) throw new Error('Profile not found');
 
-        // If this is set as default, unset others first
-        if (address.is_default) {
+        // If this is set as primary, unset others first
+        if (address.is_primary) {
             await supabase
                 .from('user_addresses')
-                .update({ is_default: false })
+                .update({ is_primary: false })
                 .eq('user_id', profile.id);
         }
 
@@ -1666,7 +1666,7 @@ export const createAddress = async (address: { street: string, city: string, sta
     }
 };
 
-export const updateAddress = async (addressId: number, address: { street?: string, city?: string, state?: string, cep?: string, is_default?: boolean }) => {
+export const updateAddress = async (addressId: number, address: { street?: string, number?: string, neighborhood?: string, complement?: string, city?: string, state?: string, zip_code?: string, is_primary?: boolean }) => {
     try {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session?.user) throw new Error('Not authenticated');
@@ -1674,10 +1674,10 @@ export const updateAddress = async (addressId: number, address: { street?: strin
         const profile = await getUserByAuthId(session.user.id);
         if (!profile) throw new Error('Profile not found');
 
-        if (address.is_default) {
+        if (address.is_primary) {
             await supabase
                 .from('user_addresses')
-                .update({ is_default: false })
+                .update({ is_primary: false })
                 .eq('user_id', profile.id)
                 .neq('id', addressId);
         }

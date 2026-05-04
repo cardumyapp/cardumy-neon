@@ -28,6 +28,7 @@ import { ManageTournaments } from './pages/ManageTournaments';
 import { ManageTournamentDetails } from './pages/ManageTournamentDetails';
 import { CreateTournament } from './pages/CreateTournament';
 import { ManageAddresses } from './pages/ManageAddresses';
+import { SessionCheck } from './pages/SessionCheck';
 import { Product, CartItem, GameType } from './types';
 import { AuthProvider, useAuth } from './components/AuthProvider';
 import { NotificationProvider } from './components/NotificationProvider';
@@ -73,7 +74,7 @@ import { Sidebar } from './components/Navigation';
 
 const AppContent: React.FC = () => {
   const location = useLocation();
-  const { user, login, logout, loading } = useAuth();
+  const { user, supabaseUser, login, logout, loading, confirmAndLoadProfile } = useAuth();
   const navigate = useNavigate();
 
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -148,15 +149,57 @@ const AppContent: React.FC = () => {
   // IMPORTANT: All Hooks (useAuth, useNavigate, useState, useMemo, etc) 
   // MUST be declared above this line to avoid "Rendered more hooks than during the previous render" errors.
   
-  if (loading) return null;
+  if (loading) {
+    return (
+      <div className="fixed inset-0 bg-slate-950 flex flex-col items-center justify-center z-[9999]">
+        <div className="w-16 h-16 bg-gradient-to-br from-purple-600 to-pink-600 rounded-2xl flex items-center justify-center animate-pulse shadow-2xl shadow-purple-600/20 mb-6">
+          <i className="fas fa-fish-fins text-white text-3xl"></i>
+        </div>
+        <div className="flex flex-col items-center space-y-4">
+          <h2 className="text-white font-black text-xl tracking-tight">Cardumy</h2>
+          <div className="flex space-x-1">
+            <div className="w-1.5 h-1.5 bg-purple-500 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+            <div className="w-1.5 h-1.5 bg-purple-500 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+            <div className="w-1.5 h-1.5 bg-purple-500 rounded-full animate-bounce"></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
   
-  if (!user) {
+  // 1. No Supabase session -> Force Login
+  if (!supabaseUser) {
     return (
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/suporte" element={<SupportPage />} />
         <Route path="*" element={<Login />} />
       </Routes>
+    );
+  }
+
+  // 2. Has session but hasn't confirmed yet -> Only allow SessionCheck
+  const isConfirmed = localStorage.getItem('session_confirmed') === 'true';
+  
+  if (!isConfirmed || location.pathname === '/verificar-sessao') {
+    return (
+      <Routes>
+        <Route path="/verificar-sessao" element={<SessionCheck />} />
+        <Route path="*" element={<SessionCheck />} />
+      </Routes>
+    );
+  }
+
+  // 3. Confirmed but profile still loading (should be fast)
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center space-y-4">
+        <div className="w-16 h-16 bg-gradient-to-br from-purple-600 to-pink-600 rounded-2xl flex items-center justify-center animate-pulse shadow-2xl shadow-purple-600/20 mb-6">
+          <i className="fas fa-fish-fins text-white text-3xl"></i>
+        </div>
+        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-purple-500"></div>
+        <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest">Sincronizando Perfil...</p>
+      </div>
     );
   }
 
@@ -436,6 +479,7 @@ const AppContent: React.FC = () => {
             <Route path="/carrinho" element={<CartPage cart={cart} updateQuantity={updateQuantity} removeFromCart={removeFromCart} clearCart={clearCart} />} />
             <Route path="/suporte" element={<SupportPage />} />
             <Route path="/admin/stats" element={<AdminStats />} />
+            <Route path="/verificar-sessao" element={<SessionCheck />} />
           </Routes>
         </div>
       </main>

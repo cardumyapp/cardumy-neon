@@ -219,7 +219,7 @@ export const EditProfile: React.FC = () => {
                 <input 
                   type="text" 
                   name="username"
-                  value={formData.username}
+                  value={formData.username || ''}
                   onChange={handleChange}
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-8 pr-4 py-3 text-sm text-white focus:border-purple-500 transition-colors"
                   placeholder="seu_username"
@@ -232,7 +232,7 @@ export const EditProfile: React.FC = () => {
               <input 
                 type="text" 
                 name="codename"
-                value={formData.codename}
+                value={formData.codename || ''}
                 onChange={handleChange}
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:border-purple-500 transition-colors"
                 placeholder="Ex: Mestre Pokémon"
@@ -243,7 +243,7 @@ export const EditProfile: React.FC = () => {
               <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Bio / Sobre Você</label>
               <textarea 
                 name="bio"
-                value={formData.bio}
+                value={formData.bio || ''}
                 onChange={handleChange}
                 rows={4}
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:border-purple-500 transition-colors resize-none"
@@ -256,7 +256,7 @@ export const EditProfile: React.FC = () => {
               <input 
                 type="date" 
                 name="birth_date"
-                value={formData.birth_date}
+                value={formData.birth_date || ''}
                 onChange={handleChange}
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:border-purple-500 transition-colors color-scheme-dark"
               />
@@ -267,7 +267,7 @@ export const EditProfile: React.FC = () => {
               <input 
                 type="tel" 
                 name="phone"
-                value={formData.phone}
+                value={formData.phone || ''}
                 onChange={handleChange}
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:border-purple-500 transition-colors"
                 placeholder="(00) 00000-0000"
@@ -278,7 +278,7 @@ export const EditProfile: React.FC = () => {
               <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Gênero</label>
               <select 
                 name="gender"
-                value={formData.gender}
+                value={formData.gender || ''}
                 onChange={handleChange}
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:border-purple-500 transition-colors appearance-none"
               >
@@ -295,7 +295,7 @@ export const EditProfile: React.FC = () => {
               <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Jogo Favorito</label>
               <select 
                 name="favorite_cardgame_id"
-                value={formData.favorite_cardgame_id}
+                value={formData.favorite_cardgame_id || ''}
                 onChange={handleChange}
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:border-purple-500 transition-colors appearance-none"
               >

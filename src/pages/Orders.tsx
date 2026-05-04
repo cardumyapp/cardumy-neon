@@ -120,7 +120,7 @@ export const Orders: React.FC = () => {
                     <p className="text-xs text-slate-500 uppercase font-black mb-1">Status</p>
                     {isLojista ? (
                         <select 
-                            value={order.status} 
+                            value={order.status || ''} 
                             onChange={(e) => handleStatusChange(order.id, e.target.value)}
                             className={`text-[10px] font-black px-2 py-1 rounded-lg uppercase tracking-widest bg-slate-800 border-none focus:ring-1 focus:ring-purple-500 cursor-pointer ${getStatusColor(order.status)}`}
                         >

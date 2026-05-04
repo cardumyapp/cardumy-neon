@@ -60,7 +60,7 @@ export const OrderDetails: React.FC = () => {
             <div className="ml-auto flex items-center space-x-3">
                 <span className="text-[10px] font-black uppercase text-slate-500">Alterar Status:</span>
                 <select 
-                    value={order.status} 
+                    value={order.status || ''} 
                     onChange={(e) => handleStatusChange(e.target.value)}
                     className="bg-slate-900 border border-slate-800 text-xs font-bold text-white rounded-lg px-3 py-1.5 focus:ring-1 focus:ring-purple-500 outline-none"
                 >

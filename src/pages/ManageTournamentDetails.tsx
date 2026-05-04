@@ -230,7 +230,7 @@ export const ManageTournamentDetails: React.FC = () => {
                                         type="text"
                                         placeholder="User ID"
                                         className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-purple-500 transition-colors"
-                                        value={winners.top1}
+                                        value={winners.top1 || ''}
                                         onChange={(e) => setWinners({ ...winners, top1: e.target.value })}
                                     />
                                 </div>
@@ -240,7 +240,7 @@ export const ManageTournamentDetails: React.FC = () => {
                                         type="text"
                                         placeholder="User ID"
                                         className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-purple-500 transition-colors"
-                                        value={winners.top2}
+                                        value={winners.top2 || ''}
                                         onChange={(e) => setWinners({ ...winners, top2: e.target.value })}
                                     />
                                 </div>
@@ -250,7 +250,7 @@ export const ManageTournamentDetails: React.FC = () => {
                                         type="text"
                                         placeholder="User ID"
                                         className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-purple-500 transition-colors"
-                                        value={winners.top3}
+                                        value={winners.top3 || ''}
                                         onChange={(e) => setWinners({ ...winners, top3: e.target.value })}
                                     />
                                 </div>

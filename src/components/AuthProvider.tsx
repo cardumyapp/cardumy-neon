@@ -1,21 +1,23 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { syncUser, getUserByAuthId } from '../services/supabaseService';
-import { devAutoLogin } from '../auth/devAutoLogin';
 import { supabase } from '../lib/supabase';
 
 interface AuthContextType {
   user: any;
+  supabaseUser: any;
   loading: boolean;
   isOffline: boolean;
   login: (email?: string, password?: string) => Promise<any>;
   logout: () => Promise<void>;
   switchUser: (newUser: any) => void;
+  confirmAndLoadProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<any>(null); // Database Profile
+  const [supabaseUser, setSupabaseUser] = useState<any>(null); // Raw Auth User
   const [loading, setLoading] = useState(true);
   const [isOffline, setIsOffline] = useState(!window.navigator.onLine);
 
@@ -33,101 +35,177 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const [authError, setAuthError] = useState<string | null>(null);
-  const loadingRef = React.useRef(true);
 
   useEffect(() => {
     let isMounted = true;
+    let authCheckTimeout: any;
 
-    const checkSession = async () => {
-      setLoading(true);
+    const handleAuthAction = async (session: any) => {
+      if (!isMounted) return;
+
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (isMounted && session) {
-          await syncProfile(session);
+        if (session) {
+          console.log("[AUTH]: Sessão detectada para", session.user.email);
+          setSupabaseUser(session.user);
+          const confirmed = localStorage.getItem('session_confirmed') === 'true';
+          
+          if (confirmed) {
+            try {
+              const profile = await getUserByAuthId(session.user.id);
+              if (isMounted) {
+                if (profile) {
+                  setUser(profile);
+                } else {
+                  console.warn("[AUTH]: Perfil não encontrado, tentando sincronização automática...");
+                  const synced = await syncUser({
+                    auth_id: session.user.id,
+                    email: session.user.email || '',
+                    displayName: session.user.user_metadata?.username || session.user.email?.split('@')[0] || ''
+                  });
+                  if (isMounted) {
+                    if (synced) {
+                      setUser(synced);
+                    } else {
+                      console.error("[AUTH]: Falha ao sincronizar perfil. Resetando confirmação.");
+                      localStorage.removeItem('session_confirmed');
+                    }
+                  }
+                }
+              }
+            } catch (err) {
+              console.error("[AUTH]: Erro na sincronização de perfil:", err);
+            }
+          }
+        } else {
+          console.log("[AUTH]: Nenhuma sessão ativa.");
+          setSupabaseUser(null);
+          setUser(null);
+          localStorage.removeItem('session_confirmed');
         }
       } catch (err) {
-        console.error('AuthProvider Error:', err);
+        console.error("[AUTH]: Erro crítico no handleAuthAction:", err);
       } finally {
-        if (isMounted) setLoading(false);
+        if (isMounted) {
+          console.log("[AUTH]: Finalizando loading.");
+          setLoading(false);
+          if (authCheckTimeout) clearTimeout(authCheckTimeout);
+        }
       }
     };
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (!isMounted) return;
-      
-      if (session) {
-        await syncProfile(session);
-      } else {
-        setUser(null);
+    // Safety timeout to prevent infinite loading if Supabase calls hang
+    authCheckTimeout = setTimeout(() => {
+      if (isMounted && loading) {
+        console.warn("[AUTH]: Timeout de segurança atingido. Forçando fim do loading.");
+        setLoading(false);
       }
-      setLoading(false);
+    }, 5000);
+
+    // 1. Initial Check
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
+      if (error) {
+        console.error("[AUTH]: Erro inicial:", error.message);
+        handleAuthAction(null);
+      } else {
+        handleAuthAction(session);
+      }
+    }).catch(err => {
+      console.error("[AUTH]: Falha fatal no check inicial:", err);
+      if (isMounted) setLoading(false);
     });
 
-    checkSession();
+    // 2. Auth State Listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log(`[AUTH EVENT]: ${event}`);
+      if (event === 'SIGNED_OUT') {
+        handleAuthAction(null);
+      } else if (session) {
+        handleAuthAction(session);
+      } else if (event === 'INITIAL_SESSION') {
+        // Handle initial session event if needed
+      }
+    });
 
     return () => {
       isMounted = false;
+      if (authCheckTimeout) clearTimeout(authCheckTimeout);
       subscription.unsubscribe();
     };
   }, []);
 
-  const syncProfile = async (session: any) => {
-    try {
-      const profile = await getUserByAuthId(session.user.id);
-      if (profile) {
-        setUser(profile);
-      } else {
-        // If profile doesn't exist, create it
-        const synced = await syncUser({
-          auth_id: session.user.id,
-          email: session.user.email,
-          displayName: session.user.user_metadata?.full_name || session.user.email
-        });
-        if (synced) {
-          setUser(synced);
+  const confirmAndLoadProfile = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session) {
+      localStorage.setItem('session_confirmed', 'true');
+      setLoading(true);
+      try {
+        const profile = await getUserByAuthId(session.user.id);
+        if (profile) {
+          setUser(profile);
         } else {
-          console.error('Falha ao sincronizar perfil.');
-          await logout();
+          const synced = await syncUser({
+            auth_id: session.user.id,
+            email: session.user.email || '',
+            displayName: session.user.user_metadata?.username || session.user.email?.split('@')[0] || ''
+          });
+          if (synced) setUser(synced);
         }
+      } catch (error) {
+        console.error("Falha ao carregar perfil:", error);
+      } finally {
+        setLoading(false);
       }
-    } catch (err) {
-      console.error('Error syncing profile:', err);
     }
   };
 
   const login = async (email?: string, password?: string) => {
+    localStorage.removeItem('session_confirmed');
+    
     if (email && password) {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) throw error;
-      return data.session;
+      try {
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+        return data.session;
+      } catch (error: any) {
+        // Tratamento para "Invalid Refresh Token" ou sessão corrompida
+        if (error.message?.includes('Refresh Token') || error.status === 400) {
+          await forceLogout();
+        }
+        throw error;
+      }
     } else {
-      // Dev login fallback
-      const devSession = await devAutoLogin();
-      if (devSession) window.location.reload();
-      return devSession;
+      throw new Error('E-mail e senha são obrigatórios.');
     }
   };
 
+  const forceLogout = async () => {
+    localStorage.clear(); 
+    await supabase.auth.signOut();
+    window.location.reload();
+  };
+
   const logout = async () => {
+    setLoading(true);
     try {
-      await supabase.auth.signOut();
+      localStorage.removeItem('session_confirmed');
+      const { error } = await supabase.auth.signOut();
+      if (error) console.error('Erro ao sair:', error.message);
     } catch (err) {
-      console.error('Error during Supabase signout:', err);
+      console.error('Error during logout:', err);
+    } finally {
+      setUser(null);
+      setSupabaseUser(null);
+      window.location.href = '/login';
     }
-    setUser(null);
-    setLoading(false);
-    // Force redirect to login and clear any stale URL params
-    window.location.replace('/login');
   };
 
   const switchUser = (newUser: any) => {
     setUser(newUser);
-    // Reload to ensure all services/headers are updated
     window.location.reload();
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, isOffline, login, logout, switchUser }}>
+    <AuthContext.Provider value={{ user, supabaseUser, loading, isOffline, login, logout, switchUser, confirmAndLoadProfile }}>
       {authError ? (
         <div className="fixed inset-0 bg-slate-950 flex flex-col items-center justify-center p-6 z-[9999]">
           <div className="w-16 h-16 bg-red-500/20 rounded-2xl flex items-center justify-center shadow-lg shadow-red-500/10 mb-6">
@@ -143,20 +221,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           >
             Tentar Novamente
           </button>
-        </div>
-      ) : loading ? (
-        <div className="fixed inset-0 bg-slate-950 flex flex-col items-center justify-center z-[9999]">
-          <div className="w-16 h-16 bg-gradient-to-br from-purple-600 to-pink-600 rounded-2xl flex items-center justify-center animate-pulse shadow-2xl shadow-purple-600/20 mb-6">
-            <i className="fas fa-fish-fins text-white text-3xl"></i>
-          </div>
-          <div className="flex flex-col items-center space-y-4">
-            <h2 className="text-white font-black text-xl tracking-tight">Cardumy</h2>
-            <div className="flex space-x-1">
-              <div className="w-1.5 h-1.5 bg-purple-500 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
-              <div className="w-1.5 h-1.5 bg-purple-500 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
-              <div className="w-1.5 h-1.5 bg-purple-500 rounded-full animate-bounce"></div>
-            </div>
-          </div>
         </div>
       ) : children}
     </AuthContext.Provider>

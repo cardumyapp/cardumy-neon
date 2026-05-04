@@ -167,7 +167,7 @@ export const ManageStore: React.FC = () => {
                                     <input 
                                         type="text"
                                         className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:border-purple-500 transition-colors"
-                                        value={formData.name}
+                                        value={formData.name || ''}
                                         onChange={(e) => setFormData({...formData, name: e.target.value})}
                                     />
                                 </div>
@@ -176,7 +176,7 @@ export const ManageStore: React.FC = () => {
                                     <input 
                                         type="text"
                                         className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:border-purple-500 transition-colors"
-                                        value={formData.logo}
+                                        value={formData.logo || ''}
                                         onChange={(e) => setFormData({...formData, logo: e.target.value})}
                                     />
                                 </div>
@@ -185,7 +185,7 @@ export const ManageStore: React.FC = () => {
                                     <input 
                                         type="text"
                                         className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:border-purple-500 transition-colors"
-                                        value={formData.site}
+                                        value={formData.site || ''}
                                         onChange={(e) => setFormData({...formData, site: e.target.value})}
                                     />
                                 </div>
@@ -194,7 +194,7 @@ export const ManageStore: React.FC = () => {
                                     <input 
                                         type="text"
                                         className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:border-purple-500 transition-colors"
-                                        value={formData.whatsapp}
+                                        value={formData.whatsapp || ''}
                                         onChange={(e) => setFormData({...formData, whatsapp: e.target.value})}
                                     />
                                 </div>
@@ -205,7 +205,7 @@ export const ManageStore: React.FC = () => {
                                 <textarea 
                                     rows={4}
                                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:border-purple-500 transition-colors resize-none"
-                                    value={formData.about}
+                                    value={formData.about || ''}
                                     onChange={(e) => setFormData({...formData, about: e.target.value})}
                                     placeholder="Nós somos a melhor loja de TCG..."
                                 />
@@ -217,7 +217,7 @@ export const ManageStore: React.FC = () => {
                                     <input 
                                         type="text"
                                         className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:border-purple-500 transition-colors"
-                                        value={formData.endereco}
+                                        value={formData.endereco || ''}
                                         onChange={(e) => setFormData({...formData, endereco: e.target.value})}
                                     />
                                 </div>
@@ -226,7 +226,7 @@ export const ManageStore: React.FC = () => {
                                     <input 
                                         type="text"
                                         className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:border-purple-500 transition-colors"
-                                        value={formData.cidade}
+                                        value={formData.cidade || ''}
                                         onChange={(e) => setFormData({...formData, cidade: e.target.value})}
                                     />
                                 </div>
@@ -236,7 +236,7 @@ export const ManageStore: React.FC = () => {
                                         type="text"
                                         maxLength={2}
                                         className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:border-purple-500 transition-colors"
-                                        value={formData.estado}
+                                        value={formData.estado || ''}
                                         onChange={(e) => setFormData({...formData, estado: e.target.value})}
                                     />
                                 </div>

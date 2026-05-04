@@ -6,10 +6,13 @@ import { getAddresses, createAddress, updateAddress, deleteAddress } from '../se
 interface Address {
     id: number;
     street: string;
+    number: string;
+    neighborhood: string;
+    complement: string;
     city: string;
     state: string;
-    cep: string;
-    is_default: boolean;
+    zip_code: string;
+    is_primary: boolean;
 }
 
 export const ManageAddresses: React.FC = () => {
@@ -20,10 +23,13 @@ export const ManageAddresses: React.FC = () => {
     const [isEditing, setIsEditing] = useState<number | null>(null);
     const [formData, setFormData] = useState({
         street: '',
+        number: '',
+        neighborhood: '',
+        complement: '',
         city: '',
         state: '',
-        cep: '',
-        is_default: false
+        zip_code: '',
+        is_primary: false
     });
     const [saving, setSaving] = useState(false);
 
@@ -76,10 +82,13 @@ export const ManageAddresses: React.FC = () => {
     const resetForm = () => {
         setFormData({
             street: '',
+            number: '',
+            neighborhood: '',
+            complement: '',
             city: '',
             state: '',
-            cep: '',
-            is_default: false
+            zip_code: '',
+            is_primary: false
         });
         setIsAdding(false);
         setIsEditing(null);
@@ -88,10 +97,13 @@ export const ManageAddresses: React.FC = () => {
     const startEdit = (address: Address) => {
         setFormData({
             street: address.street,
+            number: address.number,
+            neighborhood: address.neighborhood,
+            complement: address.complement || '',
             city: address.city,
             state: address.state,
-            cep: address.cep,
-            is_default: address.is_default
+            zip_code: address.zip_code,
+            is_primary: address.is_primary
         });
         setIsEditing(address.id);
         setIsAdding(true);
@@ -104,13 +116,15 @@ export const ManageAddresses: React.FC = () => {
                     <h1 className="text-3xl font-black italic tracking-tighter">MEUS ENDEREÇOS</h1>
                     <p className="text-slate-400 text-sm">Gerencie seus endereços de entrega</p>
                 </div>
-                <button 
-                    onClick={() => setIsAdding(true)}
-                    className="bg-purple-600 hover:bg-purple-500 text-white px-6 py-3 rounded-xl font-black text-sm transition-all flex items-center space-x-2 shadow-lg shadow-purple-600/20"
-                >
-                    <i className="fas fa-plus"></i>
-                    <span>NOVO ENDEREÇO</span>
-                </button>
+                {!isAdding && (
+                    <button 
+                        onClick={() => setIsAdding(true)}
+                        className="bg-purple-600 hover:bg-purple-500 text-white px-6 py-3 rounded-xl font-black text-sm transition-all flex items-center space-x-2 shadow-lg shadow-purple-600/20"
+                    >
+                        <i className="fas fa-plus"></i>
+                        <span>NOVO ENDEREÇO</span>
+                    </button>
+                )}
             </div>
 
             <AnimatePresence>
@@ -127,17 +141,53 @@ export const ManageAddresses: React.FC = () => {
                             </h2>
                             
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div className="md:col-span-2">
-                                    <label className="block text-xs font-black uppercase text-slate-500 mb-2">Logradouro (Rua, Número, Complemento)</label>
+                                <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-4 gap-4">
+                                    <div className="md:col-span-3">
+                                        <label className="block text-xs font-black uppercase text-slate-500 mb-2">Rua / Logradouro</label>
+                                        <input 
+                                            required
+                                            type="text" 
+                                            value={formData.street}
+                                            onChange={e => setFormData({ ...formData, street: e.target.value })}
+                                            placeholder="Ex: Rua das Flores"
+                                            className="w-full bg-slate-800 border-none rounded-xl px-4 py-3 text-white placeholder:text-slate-600 focus:ring-2 focus:ring-purple-600"
+                                        />
+                                    </div>
+                                    <div className="md:col-span-1">
+                                        <label className="block text-xs font-black uppercase text-slate-500 mb-2">Número</label>
+                                        <input 
+                                            required
+                                            type="text" 
+                                            value={formData.number}
+                                            onChange={e => setFormData({ ...formData, number: e.target.value })}
+                                            placeholder="Ex: 123"
+                                            className="w-full bg-slate-800 border-none rounded-xl px-4 py-3 text-white placeholder:text-slate-600 focus:ring-2 focus:ring-purple-600"
+                                        />
+                                    </div>
+                                </div>
+                                
+                                <div>
+                                    <label className="block text-xs font-black uppercase text-slate-500 mb-2">Complemento</label>
                                     <input 
-                                        required
                                         type="text" 
-                                        value={formData.street}
-                                        onChange={e => setFormData({ ...formData, street: e.target.value })}
-                                        placeholder="Ex: Rua das Flores, 123, Ap 4"
+                                        value={formData.complement}
+                                        onChange={e => setFormData({ ...formData, complement: e.target.value })}
+                                        placeholder="Ex: Ap 4, Bloco B"
                                         className="w-full bg-slate-800 border-none rounded-xl px-4 py-3 text-white placeholder:text-slate-600 focus:ring-2 focus:ring-purple-600"
                                     />
                                 </div>
+                                <div>
+                                    <label className="block text-xs font-black uppercase text-slate-500 mb-2">Bairro</label>
+                                    <input 
+                                        required
+                                        type="text" 
+                                        value={formData.neighborhood}
+                                        onChange={e => setFormData({ ...formData, neighborhood: e.target.value })}
+                                        placeholder="Ex: Centro"
+                                        className="w-full bg-slate-800 border-none rounded-xl px-4 py-3 text-white placeholder:text-slate-600 focus:ring-2 focus:ring-purple-600"
+                                    />
+                                </div>
+
                                 <div>
                                     <label className="block text-xs font-black uppercase text-slate-500 mb-2">Cidade</label>
                                     <input 
@@ -168,8 +218,8 @@ export const ManageAddresses: React.FC = () => {
                                             required
                                             type="text" 
                                             maxLength={8}
-                                            value={formData.cep}
-                                            onChange={e => setFormData({ ...formData, cep: e.target.value.replace(/\D/g, '') })}
+                                            value={formData.zip_code}
+                                            onChange={e => setFormData({ ...formData, zip_code: e.target.value.replace(/\D/g, '') })}
                                             placeholder="00000000"
                                             className="w-full bg-slate-800 border-none rounded-xl px-4 py-3 text-white placeholder:text-slate-600 focus:ring-2 focus:ring-purple-600"
                                         />
@@ -180,12 +230,12 @@ export const ManageAddresses: React.FC = () => {
                             <div className="flex items-center space-x-3">
                                 <input 
                                     type="checkbox" 
-                                    id="is_default"
-                                    checked={formData.is_default}
-                                    onChange={e => setFormData({ ...formData, is_default: e.target.checked })}
+                                    id="is_primary"
+                                    checked={formData.is_primary}
+                                    onChange={e => setFormData({ ...formData, is_primary: e.target.checked })}
                                     className="w-5 h-5 rounded border-slate-700 bg-slate-800 text-purple-600 focus:ring-purple-600"
                                 />
-                                <label htmlFor="is_default" className="text-sm text-slate-300 font-medium cursor-pointer">
+                                <label htmlFor="is_primary" className="text-sm text-slate-300 font-medium cursor-pointer">
                                     Definir como endereço padrão
                                 </label>
                             </div>
@@ -232,14 +282,14 @@ export const ManageAddresses: React.FC = () => {
                         <motion.div 
                             layout
                             key={address.id}
-                            className={`p-6 rounded-2xl border transition-all ${address.is_default ? 'bg-purple-600/10 border-purple-500/50 shelf-glow' : 'bg-slate-900 border-slate-800 hover:border-slate-700'}`}
+                            className={`p-6 rounded-2xl border transition-all ${address.is_primary ? 'bg-purple-600/10 border-purple-500/50 shelf-glow' : 'bg-slate-900 border-slate-800 hover:border-slate-700'}`}
                         >
                             <div className="flex justify-between items-start mb-4">
                                 <div className="flex items-center space-x-2">
-                                    <div className={`p-2 rounded-lg ${address.is_default ? 'bg-purple-600 text-white' : 'bg-slate-800 text-slate-400'}`}>
+                                    <div className={`p-2 rounded-lg ${address.is_primary ? 'bg-purple-600 text-white' : 'bg-slate-800 text-slate-400'}`}>
                                         <i className="fas fa-map-marker-alt"></i>
                                     </div>
-                                    {address.is_default && (
+                                    {address.is_primary && (
                                         <span className="text-[10px] font-black uppercase tracking-widest text-purple-400 bg-purple-400/10 px-2 py-1 rounded">PADRÃO</span>
                                     )}
                                 </div>
@@ -262,9 +312,10 @@ export const ManageAddresses: React.FC = () => {
                             </div>
                             
                             <div className="space-y-1">
-                                <p className="text-white font-bold leading-tight">{address.street}</p>
-                                <p className="text-slate-400 text-sm">{address.city}, {address.state}</p>
-                                <p className="text-slate-500 text-xs font-mono">CEP: {address.cep}</p>
+                                <p className="text-white font-bold leading-tight">{address.street}, {address.number}</p>
+                                {address.complement && <p className="text-slate-300 text-xs">{address.complement}</p>}
+                                <p className="text-slate-400 text-sm">{address.neighborhood}, {address.city}, {address.state}</p>
+                                <p className="text-slate-500 text-xs font-mono">CEP: {address.zip_code}</p>
                             </div>
                         </motion.div>
                     ))
