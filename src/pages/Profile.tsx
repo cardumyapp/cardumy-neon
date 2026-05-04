@@ -355,13 +355,13 @@ export const Profile: React.FC = () => {
                   return (
                     <div key={i} className="flex items-start space-x-4 py-4 border-b border-slate-800/50 last:border-none">
                       <img 
-                        src={reviewer?.avatar || `https://ui-avatars.com/api/?name=${reviewer?.codename || 'User'}&background=8b5cf6&color=fff`} 
+                        src={reviewer?.avatar || `https://ui-avatars.com/api/?name=${reviewer?.fullname || reviewer?.username || 'User'}&background=8b5cf6&color=fff`} 
                         className="w-10 h-10 rounded-full border border-slate-800 object-cover"
                         alt=""
                       />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between mb-1">
-                          <span className="text-xs font-bold text-white">{reviewer?.codename || 'Usuário'}</span>
+                          <span className="text-xs font-bold text-white">{reviewer?.fullname || reviewer?.username || 'Usuário'}</span>
                           <div className={`flex items-center space-x-1.5 px-2 py-0.5 rounded-full text-[8px] font-black uppercase ${review.is_positive ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
                             <i className={`fas ${review.is_positive ? 'fa-thumbs-up' : 'fa-thumbs-down'}`}></i>
                             <span>{review.is_positive ? 'Positiva' : 'Negativa'}</span>

@@ -80,6 +80,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await supabase.auth.signOut();
     setUser(null);
     localStorage.removeItem('cardumy_impersonated_user');
+    window.location.href = '/login';
   };
 
   const switchUser = (newUser: any) => {

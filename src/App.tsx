@@ -5,6 +5,7 @@ import { Dashboard } from './pages/Dashboard';
 import { Search } from './pages/Search';
 import { DeckBuilderPage } from './pages/DeckBuilder';
 import { Stores } from './pages/Stores';
+import { Login } from './pages/Login';
 import { Profile } from './pages/Profile';
 import { Products } from './pages/Products';
 import { Orders } from './pages/Orders';
@@ -30,7 +31,6 @@ import { ManageAddresses } from './pages/ManageAddresses';
 import { Product, CartItem, GameType } from './types';
 import { AuthProvider, useAuth } from './components/AuthProvider';
 import { NotificationProvider } from './components/NotificationProvider';
-import { UserPicker } from './components/UserPicker';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
 import { getCardgames, getNotifications, getGameIcon } from './services/supabaseService';
@@ -73,12 +73,11 @@ import { Sidebar } from './components/Navigation';
 
 const AppContent: React.FC = () => {
   const location = useLocation();
-  const { user, login, logout, switchUser } = useAuth();
+  const { user, login, logout } = useAuth();
   const isLojista = useMemo(() => user?.role_id === 6 || user?.role_id === 1, [user]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [activeGame, setActiveGame] = useState<GameType | 'All'>('All');
   const [isGamePickerOpen, setIsGamePickerOpen] = useState(false);
-  const [isUserPickerOpen, setIsUserPickerOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [dbGames, setDbGames] = useState<{id: any, name: string, slug?: string}[]>([]);
@@ -374,12 +373,6 @@ const AppContent: React.FC = () => {
                   <Link to="/perfil/enderecos" className="block w-full text-left px-4 py-2 text-xs font-bold text-slate-300 hover:bg-slate-800 rounded-lg transition-colors mb-1">
                     <i className="fas fa-map-location-dot mr-2"></i> Meus Endereços
                   </Link>
-                  <button 
-                    onClick={() => setIsUserPickerOpen(true)} 
-                    className="w-full text-left px-4 py-2 text-xs font-bold text-slate-300 hover:bg-slate-800 rounded-lg transition-colors mb-1"
-                  >
-                    <i className="fas fa-random mr-2"></i> Mudar Sessão
-                  </button>
                   <button onClick={logout} className="w-full text-left px-4 py-2 text-xs font-bold text-red-400 hover:bg-red-500/10 rounded-lg transition-colors">
                     <i className="fas fa-sign-out-alt mr-2"></i> Sair
                   </button>
@@ -406,6 +399,7 @@ const AppContent: React.FC = () => {
             <Route path="/deckbuilder" element={<DeckBuilderPage activeGame={activeGame} />} />
             <Route path="/lojas" element={<Stores />} />
             <Route path="/loja/:id" element={<StoreProfile onAddToCart={addToCart} />} />
+            <Route path="/login" element={<Login />} />
             <Route path="/evento/:id" element={<EventDetails onAddToCart={addToCart} />} />
             <Route path="/perfil" element={<Profile />} />
             <Route path="/perfil/:userId" element={<Profile />} />
@@ -429,16 +423,6 @@ const AppContent: React.FC = () => {
             <Route path="/admin/stats" element={<AdminStats />} />
           </Routes>
         </div>
-
-        {isUserPickerOpen && (
-          <UserPicker 
-            onClose={() => setIsUserPickerOpen(false)} 
-            onSelect={(newUser) => {
-              switchUser(newUser);
-              setIsUserPickerOpen(false);
-            }} 
-          />
-        )}
       </main>
     </div>
   );

@@ -1902,10 +1902,12 @@ export const getStoreTournaments = async (username: string) => {
 
 export const getFullUserProfile = async (username: string, followerId?: string) => {
   try {
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(username);
+    
     const { data: user, error: userError } = await supabase
       .from('safe_users')
       .select('*, stores(*)')
-      .eq('username', username)
+      .or(isUUID ? `id.eq.${username}` : `username.eq.${username}`)
       .maybeSingle();
 
     if (userError) throw userError;
@@ -1914,10 +1916,17 @@ export const getFullUserProfile = async (username: string, followerId?: string) 
     // Use counts from safe_users view
     const followersCountQuery = supabase.from('user_followers').select('*', { count: 'exact', head: true }).eq('followed_id', user.id);
     const followingCountQuery = supabase.from('user_followers').select('*', { count: 'exact', head: true }).eq('follower_id', user.id);
+    const reviewsQuery = supabase
+      .from('user_reviews')
+      .select('*, reviewer:safe_users(id, username, fullname, avatar)')
+      .eq('reviewed_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(10);
 
-    const [{ count: followersCount }, { count: followingCount }] = await Promise.all([
+    const [{ count: followersCount }, { count: followingCount }, { data: reviewsData }] = await Promise.all([
       followersCountQuery,
-      followingCountQuery
+      followingCountQuery,
+      reviewsQuery
     ]);
 
     const collection_size = Number(user.collection_size || 0);
@@ -1952,6 +1961,7 @@ export const getFullUserProfile = async (username: string, followerId?: string) 
         likes,
         dislikes
       },
+      reviews: reviewsData || [],
       isFollowing
     };
   } catch (error) {
