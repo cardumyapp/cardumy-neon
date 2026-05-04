@@ -49,11 +49,12 @@ export const Sidebar: React.FC<{ collapsed: boolean }> = ({ collapsed }) => {
   // Lojista Specific Items
   const lojistaGeral = [
     { to: '/', icon: 'fa-chart-pie', label: 'Dashboard', active: location.pathname === '/' },
-    { to: '/perfil', icon: 'fa-user-circle', label: 'Meu Perfil', active: location.pathname === '/perfil' },
+    { to: '/minha-loja/agenda', icon: 'fa-calendar-days', label: 'Agenda Semanal', active: location.pathname === '/minha-loja/agenda' },
+    { to: '/minha-loja/horarios', icon: 'fa-clock', label: 'Horários', active: location.pathname === '/minha-loja/horarios' },
   ];
 
   const lojistaStore = [
-    { to: '/minha-loja', icon: 'fa-store', label: 'Configurações', active: location.pathname === '/minha-loja' },
+    { to: '/minha-loja', icon: 'fa-store', label: 'Configurações', active: location.pathname === '/minha-loja' && !location.pathname.includes('agenda') && !location.pathname.includes('horarios') },
     { to: '/gerenciar-estoque', icon: 'fa-boxes-stacked', label: 'Estoque', active: location.pathname === '/gerenciar-estoque' },
     { to: '/pedidos-recebidos', icon: 'fa-clipboard-check', label: 'Pedidos', active: location.pathname === '/pedidos-recebidos' },
   ];

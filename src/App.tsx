@@ -473,6 +473,8 @@ const AppContent: React.FC = () => {
             <Route path="/meu-estoque" element={<ManageStock />} />
             <Route path="/gerenciar-estoque" element={<ManageStock />} />
             <Route path="/minha-loja" element={<ManageStore />} />
+            <Route path="/minha-loja/agenda" element={<ManageStore initialTab="agenda" />} />
+            <Route path="/minha-loja/horarios" element={<ManageStore initialTab="horarios" />} />
             <Route path="/meus-torneios" element={<ManageTournaments />} />
             <Route path="/torneio/:id/gerenciar" element={<ManageTournamentDetails />} />
             <Route path="/novo-torneio" element={<CreateTournament />} />
