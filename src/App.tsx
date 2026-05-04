@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { MemoryRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
+import { MemoryRouter as Router, Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
 import { Dashboard } from './pages/Dashboard';
 import { Search } from './pages/Search';
 import { DeckBuilderPage } from './pages/DeckBuilder';
@@ -73,8 +73,9 @@ import { Sidebar } from './components/Navigation';
 
 const AppContent: React.FC = () => {
   const location = useLocation();
-  const { user, login, logout } = useAuth();
-  const isLojista = useMemo(() => user?.role_id === 6 || user?.role_id === 1, [user]);
+  const { user, login, logout, loading } = useAuth();
+  const navigate = useNavigate();
+
   const [cart, setCart] = useState<CartItem[]>([]);
   const [activeGame, setActiveGame] = useState<GameType | 'All'>('All');
   const [isGamePickerOpen, setIsGamePickerOpen] = useState(false);
@@ -127,7 +128,6 @@ const AppContent: React.FC = () => {
         ];
         const randomIndex = Math.floor(Math.random() * FALLBACK_IMAGES.length);
         target.src = FALLBACK_IMAGES[randomIndex];
-        // Also ensure no-referrer if we suspect external images might block
         target.referrerPolicy = "no-referrer";
       }
     };
@@ -137,15 +137,30 @@ const AppContent: React.FC = () => {
 
   const cartCount = useMemo(() => cart.reduce((acc, item) => acc + item.quantity, 0), [cart]);
 
+  // Use useMemo for info that depends on other state but doesn't change on every render
   const currentGameInfo = useMemo(() => {
     if (activeGame === 'All') return { label: 'Todos os Jogos', color: 'text-slate-400' };
-    
-    // Try to find the name from dbGames if the slug matches
     const dbGame = dbGames.find(g => g.slug === activeGame || g.name === activeGame);
     if (dbGame) return { label: dbGame.name, color: 'text-purple-400' };
-    
     return { label: activeGame, color: 'text-purple-400' };
   }, [activeGame, dbGames]);
+
+  // IMPORTANT: All Hooks (useAuth, useNavigate, useState, useMemo, etc) 
+  // MUST be declared above this line to avoid "Rendered more hooks than during the previous render" errors.
+  
+  if (loading) return null;
+  
+  if (!user) {
+    return (
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="/suporte" element={<SupportPage />} />
+        <Route path="*" element={<Login />} />
+      </Routes>
+    );
+  }
+
+  const isLojista = user?.role_id === 6 || user?.role_id === 1;
 
   const addToCart = (product: Product) => {
     setCart(prev => {
@@ -380,7 +395,7 @@ const AppContent: React.FC = () => {
               </div>
             ) : (
               <button 
-                onClick={login}
+                onClick={() => login()}
                 className="bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold px-4 py-2 rounded-xl transition-all shadow-lg shadow-purple-600/20"
               >
                 Entrar

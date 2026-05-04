@@ -20,7 +20,7 @@ export async function devAutoLogin() {
 
   // const email = `dev_${deviceId}@cardumy.app`;
   const email = `dev@cardumy.app`;
-  const password = '12345678';
+  const password = 'caos1234';
 
   try {
     // 4. Nova estratégia: Login Anônimo -> Upgrade (Link) para Conta Dev

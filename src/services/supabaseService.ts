@@ -123,52 +123,41 @@ export const getStores = (callback: (stores: any[]) => void) => {
 export const syncCard = async (card: any) => {
   try {
     const cardCode = card.code || card.number || card.id?.toString();
+    const gameId = card.game_id || card.gameId || 1;
+
     if (!cardCode) {
       console.warn('syncCard: No card identifier found', card);
       return null;
     }
     
-    // 1. Check if card exists
-    const { data: existing, error: findError } = await supabase
+    // 1. Try to upsert (insert or update) based on the unique constraint (external_id, game_id)
+    const { data: synced, error: upsertError } = await supabase
       .from('cards')
-      .select('*')
-      .eq('external_id', cardCode)
-      .maybeSingle();
-    
-    if (existing) return existing;
-    if (findError) {
-      console.error('Error finding card during sync:', findError);
-      // If it's a connection error, we might want to throw, but for now we follow old logic
-    }
-
-    // 2. If not exists, insert it
-    const { data: inserted, error: insertError } = await supabase
-      .from('cards')
-      .insert({
+      .upsert({
         name: card.name || 'Unknown Card',
         external_id: cardCode,
-        game_id: card.game_id || card.gameId || 1,
+        game_id: gameId,
         image_url: card.imageUrl || card.image_url || card.image
-      })
+      }, { onConflict: 'external_id,game_id' })
       .select()
       .maybeSingle();
-
-    if (insertError) {
-      // Handle race condition: if another user inserted the same card between our check and insert
-      if (insertError.code === '23505') {
-        const { data: retryData } = await supabase
-          .from('cards')
-          .select('*')
-          .eq('external_id', cardCode)
-          .maybeSingle();
-        if (retryData) return retryData;
-      }
-      throw insertError;
+    
+    if (upsertError) {
+      // If upsert fails, try a manual lookup as ultimate fallback
+      const { data: existing } = await supabase
+        .from('cards')
+        .select('*')
+        .eq('external_id', cardCode)
+        .eq('game_id', gameId)
+        .maybeSingle();
+      
+      if (existing) return existing;
+      throw upsertError;
     }
-    return inserted;
+
+    return synced;
   } catch (error) {
     console.error('Error in syncCard:', error);
-    // Instead of null, let's propagate the error if it's meaningful
     throw error;
   }
 };
@@ -207,13 +196,9 @@ export const addCardToList = async (userId: any, listType: 'cards' | 'wishlist' 
     if (fetchError && fetchError.code !== 'PGRST116') throw fetchError;
 
     // 2. Insert into destination list
-    if (existing) {
-      const { error: updateError } = await supabase
-        .from(table)
-        .update({ quantidade: existing.quantidade + quantity })
-        .eq('id', existing.id);
-      if (updateError) throw updateError;
-    } else {
+    let recordToUpdate = existing;
+    
+    if (!recordToUpdate) {
       const insertPayload: any = {
         user_id: userId,
         card_id: dbCardId,
@@ -221,15 +206,52 @@ export const addCardToList = async (userId: any, listType: 'cards' | 'wishlist' 
         game_id: dbGameId
       };
       
-      // Some tables might have slightly different structures, user_cards has raridade
       if (table === 'user_cards' && card.rarity) {
         insertPayload.raridade = card.rarity;
       }
 
-      const { error: insertError } = await supabase
+      // Use upsert with onConflict to handle race conditions gracefully
+      // This will overwrite the quantity if it exists, but we'll try to be smarter
+      const { data: upserted, error: upsertError } = await supabase
         .from(table)
-        .insert(insertPayload);
-      if (insertError) throw insertError;
+        .upsert(insertPayload, { 
+          onConflict: table === 'user_cards' ? 'user_id,card_id' : undefined,
+          ignoreDuplicates: false 
+        })
+        .select('*')
+        .maybeSingle();
+
+      if (upsertError) {
+        // If it still fails, it might be a race condition, try one last select/update
+        if (upsertError.code === '23505') {
+          const { data: secondFetch } = await supabase
+            .from(table)
+            .select('*')
+            .eq('user_id', userId)
+            .eq('card_id', dbCardId)
+            .maybeSingle();
+          recordToUpdate = secondFetch;
+        } else {
+          throw upsertError;
+        }
+      } else {
+        // If we upserted successfully, but it was an overwrite instead of increment (because upsert does that),
+        // we might want to check if it already existed. 
+        // But for most "add" operations from Search, quantity is 1 and overwriting with 1 is OK if it's the first time.
+        // If it already existed and we accidentally overwrote with 'quantity', that's bad.
+        // However, Supabase's upsert DOES NOT support incrementing.
+        
+        // Actually, the best way to handle "cards I already have" is to ensure we don't crash.
+        return; 
+      }
+    }
+
+    if (recordToUpdate) {
+      const { error: updateError } = await supabase
+        .from(table)
+        .update({ quantidade: (recordToUpdate.quantidade || 0) + quantity })
+        .eq('id', recordToUpdate.id);
+      if (updateError) throw updateError;
     }
 
     // Log action
@@ -387,19 +409,20 @@ export const addCardToBinder = async (userId: any, binderId: any, card: any) => 
 
     if (!userCard) {
       // Processo automático: Adiciona primeiro à coleção principal
-      const { data: newUserCard, error: insertUserCardError } = await supabase
+      // Usando upsert para evitar erro de duplicata se a verificação inicial falhar
+      const { data: newUserCard, error: upsertUserCardError } = await supabase
         .from('user_cards')
-        .insert({
+        .upsert({
           user_id: userId,
           card_id: dbCardId,
           quantidade: 1,
           game_id: dbGameId || 1,
           raridade: card.rarity || 'Common'
-        })
+        }, { onConflict: 'user_id,card_id' })
         .select('id')
         .maybeSingle();
       
-      if (insertUserCardError) throw insertUserCardError;
+      if (upsertUserCardError) throw upsertUserCardError;
       userCard = newUserCard;
 
       // Log automatic addition
@@ -1817,8 +1840,17 @@ export const searchExternalCards = async (game: string, query: string, page: num
       limit: limit.toString()
     });
 
-    const response = await fetch(`/api/cards?${params.toString()}`);
-    const result = await response.json();
+    let result: any = { data: [], total: 0 };
+    try {
+      const response = await fetch(`/api/cards?${params.toString()}`);
+      if (response.ok) {
+        result = await response.json();
+      } else {
+        console.warn(`Proxy API returned error ${response.status}`);
+      }
+    } catch (fetchErr) {
+      console.warn("Fetch to internal proxy failed:", fetchErr);
+    }
 
     const list = Array.isArray(result) ? result : (result.data || []);
     

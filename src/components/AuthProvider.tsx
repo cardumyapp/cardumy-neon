@@ -7,7 +7,7 @@ interface AuthContextType {
   user: any;
   loading: boolean;
   isOffline: boolean;
-  login: () => Promise<void>;
+  login: (email?: string, password?: string) => Promise<any>;
   logout: () => Promise<void>;
   switchUser: (newUser: any) => void;
 }
@@ -32,67 +32,127 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
+  const [authError, setAuthError] = useState<string | null>(null);
+  const loadingRef = React.useRef(true);
+
   useEffect(() => {
-    const initAuth = async () => {
+    let isMounted = true;
+
+    const checkSession = async () => {
       setLoading(true);
       try {
-        // 1. Tenta login automático de dev
-        const session = await devAutoLogin();
-        
-        if (session) {
-          // 2. Se logado no Supabase, sincroniza os dados do perfil (tabela public.users)
-          const profile = await getUserByAuthId(session.user.id);
-          if (profile) {
-            setUser(profile);
-            localStorage.setItem('cardumy_impersonated_user', JSON.stringify(profile));
-          } else {
-            // Se não tiver perfil, tenta sincronizar
-            const synced = await syncUser({
-              auth_id: session.user.id,
-              email: session.user.email,
-              displayName: session.user.user_metadata?.full_name || session.user.email
-            });
-            setUser(synced);
-          }
-        } else {
-          // Fallback para o sistema de impersonation existente se o login dev falhar
-          const savedUser = localStorage.getItem('cardumy_impersonated_user');
-          if (savedUser) {
-            setUser(JSON.parse(savedUser));
-          }
+        const { data: { session } } = await supabase.auth.getSession();
+        if (isMounted && session) {
+          await syncProfile(session);
         }
-      } catch (error) {
-        console.error('Erro na inicialização do Auth:', error);
+      } catch (err) {
+        console.error('AuthProvider Error:', err);
       } finally {
-        setLoading(false);
+        if (isMounted) setLoading(false);
       }
     };
 
-    initAuth();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!isMounted) return;
+      
+      if (session) {
+        await syncProfile(session);
+      } else {
+        setUser(null);
+      }
+      setLoading(false);
+    });
+
+    checkSession();
+
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
-  const login = async () => {
-    await devAutoLogin();
-    window.location.reload();
+  const syncProfile = async (session: any) => {
+    try {
+      const profile = await getUserByAuthId(session.user.id);
+      if (profile) {
+        setUser(profile);
+      } else {
+        // If profile doesn't exist, create it
+        const synced = await syncUser({
+          auth_id: session.user.id,
+          email: session.user.email,
+          displayName: session.user.user_metadata?.full_name || session.user.email
+        });
+        if (synced) {
+          setUser(synced);
+        } else {
+          console.error('Falha ao sincronizar perfil.');
+          await logout();
+        }
+      }
+    } catch (err) {
+      console.error('Error syncing profile:', err);
+    }
+  };
+
+  const login = async (email?: string, password?: string) => {
+    if (email && password) {
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      return data.session;
+    } else {
+      // Dev login fallback
+      const devSession = await devAutoLogin();
+      if (devSession) window.location.reload();
+      return devSession;
+    }
   };
 
   const logout = async () => {
     await supabase.auth.signOut();
     setUser(null);
-    localStorage.removeItem('cardumy_impersonated_user');
     window.location.href = '/login';
   };
 
   const switchUser = (newUser: any) => {
     setUser(newUser);
-    localStorage.setItem('cardumy_impersonated_user', JSON.stringify(newUser));
     // Reload to ensure all services/headers are updated
     window.location.reload();
   };
 
   return (
     <AuthContext.Provider value={{ user, loading, isOffline, login, logout, switchUser }}>
-      {!loading && children}
+      {authError ? (
+        <div className="fixed inset-0 bg-slate-950 flex flex-col items-center justify-center p-6 z-[9999]">
+          <div className="w-16 h-16 bg-red-500/20 rounded-2xl flex items-center justify-center shadow-lg shadow-red-500/10 mb-6">
+            <i className="fas fa-triangle-exclamation text-red-500 text-3xl"></i>
+          </div>
+          <h2 className="text-white font-black text-xl tracking-tight mb-2">Ops! Algo deu errado</h2>
+          <p className="text-slate-400 text-center text-xs font-medium max-w-xs mb-8">
+            {authError}
+          </p>
+          <button 
+            onClick={() => window.location.reload()}
+            className="bg-white text-slate-950 font-black text-[10px] uppercase tracking-widest px-8 py-4 rounded-xl hover:bg-slate-200 transition-colors shadow-xl shadow-white/5"
+          >
+            Tentar Novamente
+          </button>
+        </div>
+      ) : loading ? (
+        <div className="fixed inset-0 bg-slate-950 flex flex-col items-center justify-center z-[9999]">
+          <div className="w-16 h-16 bg-gradient-to-br from-purple-600 to-pink-600 rounded-2xl flex items-center justify-center animate-pulse shadow-2xl shadow-purple-600/20 mb-6">
+            <i className="fas fa-fish-fins text-white text-3xl"></i>
+          </div>
+          <div className="flex flex-col items-center space-y-4">
+            <h2 className="text-white font-black text-xl tracking-tight">Cardumy</h2>
+            <div className="flex space-x-1">
+              <div className="w-1.5 h-1.5 bg-purple-500 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+              <div className="w-1.5 h-1.5 bg-purple-500 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+              <div className="w-1.5 h-1.5 bg-purple-500 rounded-full animate-bounce"></div>
+            </div>
+          </div>
+        </div>
+      ) : children}
     </AuthContext.Provider>
   );
 };

@@ -22,13 +22,15 @@ async function startServer() {
         return res.status(400).json({ error: "game obrigatório" });
       }
 
-      const HOMURA_URL = process.env.HOMURA_URL || "https://homura-cards.vercel.app";
+      let HOMURA_URL = process.env.HOMURA_URL || "https://homura-cards.vercel.app";
       const HOMURA_TOKEN = process.env.HOMURA_TOKEN;
 
       if (!HOMURA_TOKEN) {
-        console.error("HOMURA_TOKEN not found in environment variables");
-        return res.status(500).json({ error: "Configuração do servidor incompleta" });
+        console.warn("HOMURA_TOKEN not found in environment variables - proxying without token");
       }
+
+      // Ensure HOMURA_URL doesn't end with a slash
+      HOMURA_URL = HOMURA_URL.replace(/\/$/, "");
 
       // Reconstruct query parameters
       const params = new URLSearchParams();
@@ -40,17 +42,40 @@ async function startServer() {
       
       console.log(`Proxying request to: ${targetUrl}`);
 
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10000); // 10s timeout
+
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        "User-Agent": "Cardumy-TCG/1.0.0 (Node.js Proxy)"
+      };
+
+      if (HOMURA_TOKEN) {
+        headers["Authorization"] = `Bearer ${HOMURA_TOKEN}`;
+      }
+
       const response = await fetch(targetUrl, {
         method: 'GET',
-        headers: {
-          "Authorization": `Bearer ${HOMURA_TOKEN}`,
-          "Content-Type": "application/json"
-        }
+        headers,
+        signal: controller.signal
       });
 
-      const data = await response.json();
-      res.status(response.status).json(data);
-    } catch (error) {
+      clearTimeout(timeout);
+
+      const contentType = response.headers.get("content-type");
+      if (contentType && contentType.includes("application/json")) {
+        const data = await response.json();
+        res.status(response.status).json(data);
+      } else {
+        const text = await response.text();
+        console.error(`External API returned non-JSON response from ${targetUrl}:`, text.substring(0, 500));
+        res.status(response.status).send(text);
+      }
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        console.error("Proxy request timed out");
+        return res.status(504).json({ error: "Gateway Timeout" });
+      }
       console.error("Error proxying card search:", error);
       res.status(500).json({ error: "Internal Server Error" });
     }
@@ -64,15 +89,29 @@ async function startServer() {
       
       console.log(`Proxying blog request to: ${targetUrl}`);
 
-      const response = await fetch(targetUrl);
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 8000);
+
+      const response = await fetch(targetUrl, {
+        headers: {
+          "User-Agent": "Cardumy-TCG/1.0.0 (Node.js Proxy)"
+        },
+        signal: controller.signal
+      });
       
+      clearTimeout(timeout);
+
       if (!response.ok) {
         throw new Error(`WordPress API error: ${response.status}`);
       }
 
       const data = await response.json();
       res.json(data);
-    } catch (error) {
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        console.error("Blog proxy request timed out");
+        return res.status(504).json({ error: "Blog Timeout" });
+      }
       console.error("Error proxying blog fetch:", error);
       res.status(500).json({ error: "Erro ao buscar posts do blog" });
     }

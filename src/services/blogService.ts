@@ -15,7 +15,8 @@ export const fetchLatestPosts = async (perPage: number = 3): Promise<BlogPost[]>
     const response = await fetch(`/api/blog?per_page=${perPage}`);
     
     if (!response.ok) {
-      throw new Error(`WordPress API error: ${response.status}`);
+      console.warn(`WordPress Proxy error: ${response.status}`);
+      return [];
     }
 
     const data = await response.json();
