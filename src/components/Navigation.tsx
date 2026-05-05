@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from './AuthProvider';
 
@@ -41,10 +41,25 @@ const SidebarGroup: React.FC<{ label: string; collapsed: boolean; children: Reac
   </div>
 );
 
-export const Sidebar: React.FC<{ collapsed: boolean }> = ({ collapsed }) => {
+interface SidebarProps {
+  collapsed: boolean;
+  onMobileClose?: () => void;
+  activeGame: string;
+  setActiveGame: (game: any) => void;
+  dbGames: any[];
+}
+
+export const Sidebar: React.FC<SidebarProps> = ({ collapsed, onMobileClose, activeGame, setActiveGame, dbGames }) => {
   const { user } = useAuth();
   const location = useLocation();
   const isLojista = user?.role_id === 6 || user?.role_id === 1;
+  const [isGamePickerOpen, setIsGamePickerOpen] = useState(false);
+
+  const currentGameInfo = useMemo(() => {
+    if (activeGame === 'All') return { label: 'Todos os Jogos' };
+    const dbGame = dbGames.find(g => g.slug === activeGame || g.name === activeGame);
+    return { label: dbGame ? dbGame.name : activeGame };
+  }, [activeGame, dbGames]);
 
   // Lojista Specific Items
   const lojistaGeral = [
@@ -73,20 +88,68 @@ export const Sidebar: React.FC<{ collapsed: boolean }> = ({ collapsed }) => {
   ];
 
   const memberItems = [
-    { to: '/social', icon: 'fa-users', label: 'Social', active: location.pathname === '/social' },
+    { to: '/comunidade', icon: 'fa-users', label: 'Social', active: location.pathname === '/comunidade' },
     { to: '/pastas', icon: 'fa-folder', label: 'Minhas Cartas', active: location.pathname === '/pastas' },
-    { to: '/decks', icon: 'fa-layer-group', label: 'Meus Decks', active: location.pathname === '/decks' },
+    { to: '/deckbuilder', icon: 'fa-layer-group', label: 'Meus Decks', active: location.pathname === '/deckbuilder' },
     { to: '/pedidos', icon: 'fa-clipboard-list', label: 'Meus Pedidos', active: location.pathname === '/pedidos' },
     { to: '/perfil', icon: 'fa-user-circle', label: 'Meu Perfil', active: location.pathname === '/perfil' },
   ];
 
   return (
     <div className="flex flex-col h-full py-4">
-      <div className={`p-6 mb-2 flex items-center ${collapsed ? 'justify-center w-full' : 'space-x-3'}`}>
-        <div className="bg-gradient-to-br from-purple-600 to-pink-600 p-2 rounded-lg shadow-lg shadow-purple-600/20">
-          <i className="fas fa-fish-fins text-white text-xl"></i>
+      <div className={`p-6 mb-2 flex items-center ${collapsed ? 'justify-center w-full' : 'justify-between'}`}>
+        <div className="flex items-center space-x-3">
+          <div className="bg-gradient-to-br from-purple-600 to-pink-600 p-2 rounded-lg shadow-lg shadow-purple-600/20">
+            <i className="fas fa-fish-fins text-white text-xl"></i>
+          </div>
+          {!collapsed && <span className="text-xl font-bold tracking-tight text-white transition-opacity duration-300">Cardumy</span>}
         </div>
-        {!collapsed && <span className="text-xl font-bold tracking-tight text-white transition-opacity duration-300">Cardumy</span>}
+        
+        {onMobileClose && (
+          <button onClick={onMobileClose} className="md:hidden text-slate-500 hover:text-white p-2">
+            <i className="fas fa-xmark text-lg"></i>
+          </button>
+        )}
+      </div>
+
+      {/* Global Game Selector */}
+      <div className={`px-4 mb-4 transition-all duration-300 ${collapsed ? 'md:h-0 md:opacity-0 md:overflow-hidden md:mb-0' : 'opacity-100'}`}>
+        <div className="relative">
+          <button 
+            onClick={() => setIsGamePickerOpen(!isGamePickerOpen)}
+            className="w-full bg-slate-800/50 hover:bg-slate-800 border border-slate-700/50 rounded-xl p-3 flex items-center justify-between transition-all group"
+          >
+            <div className="flex items-center space-x-3">
+              <div className="text-left">
+                <p className="text-[9px] font-black uppercase tracking-widest text-slate-500 leading-none mb-1">Foco Global</p>
+                <p className="text-xs font-bold text-white truncate max-w-[120px]">{currentGameInfo.label}</p>
+              </div>
+            </div>
+            <i className="fas fa-chevron-down text-[10px] text-slate-500"></i>
+          </button>
+
+          {isGamePickerOpen && (
+            <div className="absolute top-full left-0 right-0 mt-2 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl z-50 overflow-hidden animate-in zoom-in-95 duration-200">
+              <div className="p-2 max-h-64 overflow-y-auto scrollbar-hide">
+                <button 
+                  onClick={() => { setActiveGame('All'); setIsGamePickerOpen(false); }}
+                  className={`w-full text-left px-3 py-2.5 rounded-lg text-xs font-bold transition-colors mb-1 flex items-center ${activeGame === 'All' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:bg-slate-700 hover:text-white'}`}
+                >
+                  <span>Ver Tudo</span>
+                </button>
+                {dbGames.map((game, idx) => (
+                  <button 
+                    key={game.id || `game-nav-${idx}`}
+                    onClick={() => { setActiveGame(game.slug || game.name); setIsGamePickerOpen(false); }}
+                    className={`w-full text-left px-3 py-2.5 rounded-lg text-xs font-bold transition-colors mb-1 flex items-center ${activeGame === (game.slug || game.name) ? 'bg-purple-600 text-white' : 'text-slate-400 hover:bg-slate-700 hover:text-white'}`}
+                  >
+                    <span>{game.name}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       <nav className="flex-1 px-4 overflow-y-auto no-scrollbar">
@@ -103,16 +166,6 @@ export const Sidebar: React.FC<{ collapsed: boolean }> = ({ collapsed }) => {
             <SidebarGroup label="Atividades" collapsed={collapsed}>
               {lojistaExtra.map(item => <NavItem key={item.to} {...item} collapsed={collapsed} />)}
             </SidebarGroup>
-
-            <div className="mt-4 pt-4 border-t border-slate-800/50">
-              <NavItem 
-                  to="/suporte" 
-                  icon="fa-circle-question" 
-                  label="Suporte" 
-                  active={location.pathname === '/suporte'} 
-                  collapsed={collapsed} 
-              />
-            </div>
           </>
         ) : (
           <>
@@ -127,19 +180,28 @@ export const Sidebar: React.FC<{ collapsed: boolean }> = ({ collapsed }) => {
                 <NavItem key={item.to} {...item} collapsed={collapsed} />
               ))}
             </SidebarGroup>
-            
-            <div className="mt-4 pt-4 border-t border-slate-800/50">
-              <NavItem 
-                  to="/suporte" 
-                  icon="fa-circle-question" 
-                  label="Suporte" 
-                  active={location.pathname === '/suporte'} 
-                  collapsed={collapsed} 
-              />
-            </div>
           </>
         )}
+
+        <div className="mt-4 pt-4 border-t border-slate-800/50">
+          <NavItem 
+              to="/suporte" 
+              icon="fa-circle-question" 
+              label="Suporte" 
+              active={location.pathname === '/suporte'} 
+              collapsed={collapsed} 
+          />
+        </div>
       </nav>
+
+      {/* Social Links Sidebar */}
+      {!collapsed && (
+        <div className="px-4 py-4 border-t border-slate-800/50 flex items-center justify-around transition-all mt-auto">
+          <a href="https://www.instagram.com/cardumy/" target="_blank" rel="noopener noreferrer" className="text-slate-500 hover:text-pink-500 transition-colors p-1.5"><i className="fab fa-instagram"></i></a>
+          <a href="https://chat.whatsapp.com/CdX5OCXmlojHTutlbjEqId" target="_blank" rel="noopener noreferrer" className="text-slate-500 hover:text-emerald-500 transition-colors p-1.5"><i className="fab fa-whatsapp"></i></a>
+          <a href="https://discord.gg/hNWvmdz6ja" target="_blank" rel="noopener noreferrer" className="text-slate-500 hover:text-indigo-400 transition-colors p-1.5"><i className="fab fa-discord"></i></a>
+        </div>
+      )}
     </div>
   );
 };

@@ -200,12 +200,12 @@ export const ManageStock: React.FC = () => {
                              edit.preSale !== !!item.pre_sale;
 
             return (
-              <div key={item.id} className="bg-slate-900/50 backdrop-blur-sm border border-slate-800 p-4 md:p-6 rounded-3xl flex flex-col md:flex-row items-center gap-6 group hover:border-purple-500/50 transition-all duration-500">
+              <div key={item.id} className="bg-slate-900/50 backdrop-blur-sm border border-slate-800 p-4 md:p-5 rounded-3xl flex flex-col lg:flex-row items-center gap-6 group hover:border-purple-500/50 transition-all duration-500">
                 <div className="relative shrink-0">
                   <img 
                     src={item.products?.image_url || 'https://via.placeholder.com/150'} 
                     alt={item.products?.name || 'Produto'}
-                    className="w-24 h-32 object-cover rounded-xl border border-white/5 shadow-2xl group-hover:scale-105 transition-transform duration-500"
+                    className="w-20 h-28 object-cover rounded-xl border border-white/5 shadow-2xl group-hover:scale-105 transition-transform duration-500"
                   />
                   {edit.quantity === 0 && (
                     <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px] rounded-xl flex items-center justify-center">
@@ -214,8 +214,8 @@ export const ManageStock: React.FC = () => {
                   )}
                 </div>
 
-                <div className="flex-1 min-w-0 text-center md:text-left">
-                  <div className="flex items-center justify-center md:justify-start space-x-2 mb-1">
+                <div className="flex-1 min-w-0 text-center lg:text-left">
+                  <div className="flex items-center justify-center lg:justify-start space-x-2 mb-1.5">
                     {item.products?.cardgames?.name && (
                       <span className="text-[10px] font-black uppercase tracking-widest text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded-full">
                         {item.products?.cardgames?.name}
@@ -231,13 +231,13 @@ export const ManageStock: React.FC = () => {
                   <p className="text-xs text-slate-500 font-mono">ID: {item.product_id}</p>
                 </div>
 
-                <div className="grid grid-cols-2 lg:grid-cols-5 items-center gap-4 w-full lg:w-auto">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 items-end gap-4 w-full lg:w-auto">
                   <div className="space-y-1">
-                    <label className="text-[9px] font-black uppercase tracking-widest text-slate-500 block">Quantidade</label>
-                    <div className="flex items-center space-x-2 bg-slate-950 px-3 py-2 rounded-xl border border-slate-800">
+                    <label className="text-[9px] font-black uppercase tracking-widest text-slate-500 block ml-1">Quantidade</label>
+                    <div className="flex items-center justify-between bg-slate-950 px-3 py-2.5 rounded-xl border border-slate-800">
                       <button 
                         onClick={() => handleLocalChange(item.product_id, 'quantity', Math.max(0, edit.quantity - 1))}
-                        className="text-slate-500 hover:text-white transition-colors"
+                        className="text-slate-500 hover:text-white transition-colors p-1"
                       >
                         <i className="fas fa-minus text-xs"></i>
                       </button>
@@ -245,11 +245,11 @@ export const ManageStock: React.FC = () => {
                         type="number"
                         value={edit.quantity ?? ''}
                         onChange={(e) => handleLocalChange(item.product_id, 'quantity', parseInt(e.target.value) || 0)}
-                        className="bg-transparent w-12 text-center text-sm font-bold focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        className="bg-transparent w-12 text-center text-sm font-bold focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none text-white"
                       />
                       <button 
                         onClick={() => handleLocalChange(item.product_id, 'quantity', edit.quantity + 1)}
-                        className="text-slate-500 hover:text-white transition-colors"
+                        className="text-slate-500 hover:text-white transition-colors p-1"
                       >
                         <i className="fas fa-plus text-xs"></i>
                       </button>
@@ -257,39 +257,39 @@ export const ManageStock: React.FC = () => {
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-[9px] font-black uppercase tracking-widest text-slate-500 block">Preço (R$)</label>
-                    <div className="bg-slate-950 px-3 py-2 rounded-xl border border-slate-800 flex items-center">
-                      <span className="text-slate-600 text-xs mr-1">R$</span>
+                    <label className="text-[9px] font-black uppercase tracking-widest text-slate-500 block ml-1">Preço (R$)</label>
+                    <div className="bg-slate-950 px-3 py-2.5 rounded-xl border border-slate-800 flex items-center h-[46px]">
+                      <span className="text-slate-600 text-xs mr-1 font-bold">R$</span>
                       <input 
                         type="number"
                         step="0.01"
                         value={edit.price ?? ''}
                         onChange={(e) => handleLocalChange(item.product_id, 'price', parseFloat(e.target.value) || 0)}
-                        className="bg-transparent w-full text-sm font-bold focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        className="bg-transparent w-full text-sm font-bold focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none text-white"
                       />
                     </div>
                   </div>
 
-                  <div className="flex flex-col items-center justify-center space-y-1">
-                     <label className="text-[9px] font-black uppercase tracking-widest text-slate-500 block">Pré-Venda</label>
+                  <div className="flex flex-col items-center justify-end space-y-2 h-full pb-2">
+                     <label className="text-[9px] font-black uppercase tracking-widest text-slate-500 block leading-none">Pré-Venda</label>
                      <button 
                        onClick={() => handleLocalChange(item.product_id, 'preSale', !edit.preSale)}
-                       className={`w-10 h-6 rounded-full transition-all relative ${edit.preSale ? 'bg-amber-600' : 'bg-slate-800'}`}
+                       className={`w-10 h-5 rounded-full transition-all relative ${edit.preSale ? 'bg-amber-600' : 'bg-slate-800'}`}
                      >
-                       <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${edit.preSale ? 'left-5' : 'left-1'}`}></div>
+                       <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-all ${edit.preSale ? 'left-5' : 'left-1'}`}></div>
                      </button>
                   </div>
 
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center space-x-2 h-[46px]">
                      <button 
                        disabled={!hasChanges}
                        onClick={() => handleSave(item.product_id)}
-                       className={`flex-1 h-10 font-black text-[10px] uppercase tracking-widest rounded-xl transition-all border ${hasChanges ? 'bg-purple-600 text-white border-purple-500 shadow-lg shadow-purple-950/20' : 'bg-slate-800/50 text-slate-600 border-slate-800 cursor-not-allowed opacity-50'}`}
+                       className={`flex-1 h-full font-black text-[10px] uppercase tracking-widest rounded-xl transition-all border ${hasChanges ? 'bg-purple-600 text-white border-purple-500 shadow-lg shadow-purple-950/20 active:scale-95' : 'bg-slate-800/50 text-slate-600 border-slate-800 cursor-not-allowed opacity-50'}`}
                      >
                        SALVAR
                      </button>
                      <button 
-                       className="w-10 h-10 bg-red-600/10 hover:bg-red-600 text-red-500 hover:text-white rounded-xl transition-all flex items-center justify-center border border-red-600/20"
+                       className="w-11 h-full bg-red-600/10 hover:bg-red-600 text-red-500 hover:text-white rounded-xl transition-all flex items-center justify-center border border-red-600/20 active:scale-95"
                        onClick={() => handleRemove(item.product_id)}
                        title="Zerar estoque"
                      >

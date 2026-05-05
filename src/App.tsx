@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { MemoryRouter as Router, Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
 import { Dashboard } from './pages/Dashboard';
 import { Search } from './pages/Search';
 import { DeckBuilderPage } from './pages/DeckBuilder';
@@ -254,107 +254,13 @@ const AppContent: React.FC = () => {
         ${isSidebarCollapsed ? 'md:w-20' : 'md:w-64'}
         w-72 bg-slate-900 border-r border-slate-800 transition-all duration-300 flex flex-col
       `}>
-        {isLojista ? (
-          <Sidebar collapsed={isSidebarCollapsed} />
-        ) : (
-          <>
-            <div className={`p-6 flex items-center ${isSidebarCollapsed ? 'md:justify-center' : 'justify-between'}`}>
-              <div className={`flex items-center space-x-3 ${isSidebarCollapsed ? 'md:hidden' : 'flex'}`}>
-                <div className="bg-gradient-to-br from-purple-600 to-pink-600 p-2 rounded-lg shadow-lg shadow-purple-600/20">
-                  <i className="fas fa-fish-fins text-white text-xl"></i>
-                </div>
-                <span className="text-xl font-bold tracking-tight">Cardumy</span>
-              </div>
-              
-              <div className={`hidden ${isSidebarCollapsed ? 'md:flex' : ''} bg-gradient-to-br from-purple-600 to-pink-600 p-2 rounded-lg shadow-lg shadow-purple-600/20`}>
-                <i className="fas fa-fish-fins text-white text-base"></i>
-              </div>
-
-              <button onClick={() => setIsMobileMenuOpen(false)} className="md:hidden text-slate-500 hover:text-white p-2">
-                <i className="fas fa-xmark text-lg"></i>
-              </button>
-            </div>
-
-            {/* Global Game Selector */}
-            <div className={`px-4 mb-4 transition-all duration-300 ${isSidebarCollapsed ? 'md:h-0 md:opacity-0 md:overflow-hidden md:mb-0' : 'opacity-100'}`}>
-              <div className="relative">
-                <button 
-                  onClick={() => setIsGamePickerOpen(!isGamePickerOpen)}
-                  className="w-full bg-slate-800/50 hover:bg-slate-800 border border-slate-700/50 rounded-xl p-3 flex items-center justify-between transition-all group"
-                >
-                  <div className="flex items-center space-x-3">
-                    <div className="text-left">
-                      <p className="text-[9px] font-black uppercase tracking-widest text-slate-500 leading-none mb-1">Foco Global</p>
-                      <p className="text-xs font-bold text-white truncate max-w-[120px]">{currentGameInfo.label}</p>
-                    </div>
-                  </div>
-                  <i className="fas fa-chevron-down text-[10px] text-slate-500"></i>
-                </button>
-
-                {isGamePickerOpen && (
-                  <div className="absolute top-full left-0 right-0 mt-2 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl z-50 overflow-hidden animate-in zoom-in-95 duration-200">
-                    <div className="p-2 max-h-64 overflow-y-auto scrollbar-hide">
-                      <button 
-                        onClick={() => { setActiveGame('All'); setIsGamePickerOpen(false); }}
-                        className={`w-full text-left px-3 py-2.5 rounded-lg text-xs font-bold transition-colors mb-1 flex items-center ${activeGame === 'All' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:bg-slate-700 hover:text-white'}`}
-                      >
-                        <span>Ver Tudo</span>
-                      </button>
-                      {dbGames.map((game, idx) => (
-                        <button 
-                          key={game.id || `game-app-${idx}`}
-                          onClick={() => { setActiveGame((game.slug || game.name) as GameType); setIsGamePickerOpen(false); }}
-                          className={`w-full text-left px-3 py-2.5 rounded-lg text-xs font-bold transition-colors mb-1 flex items-center ${activeGame === (game.slug || game.name) ? 'bg-purple-600 text-white' : 'text-slate-400 hover:bg-slate-700 hover:text-white'}`}
-                        >
-                          <span>{game.name}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <nav className="flex-1 px-4 py-4 overflow-y-auto scrollbar-hide">
-              <SidebarGroup label="Geral" collapsed={isSidebarCollapsed}>
-                <SidebarItem to="/" icon="fa-house" label="Início" active={location.pathname === '/'} collapsed={isSidebarCollapsed} />
-                <SidebarItem to="/perfil" icon="fa-user" label="Perfil" active={location.pathname === '/perfil'} collapsed={isSidebarCollapsed} />
-                <SidebarItem to="/comunidade" icon="fa-users" label="Comunidade" active={location.pathname === '/comunidade'} collapsed={isSidebarCollapsed} />
-              </SidebarGroup>
-
-              <SidebarGroup label="Coleção" collapsed={isSidebarCollapsed}>
-                <SidebarItem to="/busca" icon="fa-magnifying-glass" label="Cartas" active={location.pathname === '/busca'} collapsed={isSidebarCollapsed} />
-                <SidebarItem to="/deckbuilder" icon="fa-hammer" label="Deckbuilder" active={location.pathname === '/deckbuilder'} collapsed={isSidebarCollapsed} />
-                <SidebarItem to="/pastas" icon="fa-folder-open" label="Pastas" active={location.pathname === '/pastas'} collapsed={isSidebarCollapsed} />
-                <SidebarItem to="/trocas" icon="fa-right-left" label="Trocas" active={location.pathname === '/trocas'} collapsed={isSidebarCollapsed} />
-              </SidebarGroup>
-
-              <SidebarGroup label="Eventos" collapsed={isSidebarCollapsed}>
-                <SidebarItem to="/torneios" icon="fa-trophy" label="Torneios" active={location.pathname === '/torneios'} collapsed={isSidebarCollapsed} />
-              </SidebarGroup>
-
-              <SidebarGroup label="Mercado" collapsed={isSidebarCollapsed}>
-                <SidebarItem to="/carrinho" icon="fa-shopping-cart" label="Carrinho" active={location.pathname === '/carrinho'} badge={cartCount} collapsed={isSidebarCollapsed} />
-                <SidebarItem to="/lojas" icon="fa-shop" label="Lojas" active={location.pathname === '/lojas' || location.pathname.startsWith('/loja/')} collapsed={isSidebarCollapsed} />
-                <SidebarItem to="/pedidos" icon="fa-clipboard-list" label="Pedidos" active={location.pathname === '/pedidos' || location.pathname.startsWith('/pedido/')} collapsed={isSidebarCollapsed} />
-                <SidebarItem to="/produtos" icon="fa-bag-shopping" label="Produtos" active={location.pathname === '/produtos'} collapsed={isSidebarCollapsed} />
-              </SidebarGroup>
-
-              <div className="mt-4 pt-4 border-t border-slate-800/50">
-                <SidebarItem to="/suporte" icon="fa-circle-question" label="Suporte" active={location.pathname === '/suporte'} collapsed={isSidebarCollapsed} />
-              </div>
-            </nav>
-
-            {/* Social Links Sidebar */}
-            {!isSidebarCollapsed && (
-              <div className="px-4 py-4 border-t border-slate-800/50 flex items-center justify-around transition-all">
-                <a href="https://www.instagram.com/cardumy/" target="_blank" rel="noopener noreferrer" className="text-slate-500 hover:text-pink-500 transition-colors p-1.5"><i className="fab fa-instagram"></i></a>
-                <a href="https://chat.whatsapp.com/CdX5OCXmlojHTutlbjEqId" target="_blank" rel="noopener noreferrer" className="text-slate-500 hover:text-emerald-500 transition-colors p-1.5"><i className="fab fa-whatsapp"></i></a>
-                <a href="https://discord.gg/hNWvmdz6ja" target="_blank" rel="noopener noreferrer" className="text-slate-500 hover:text-indigo-400 transition-colors p-1.5"><i className="fab fa-discord"></i></a>
-              </div>
-            )}
-          </>
-        )}
+        <Sidebar 
+          collapsed={isSidebarCollapsed} 
+          onMobileClose={() => setIsMobileMenuOpen(false)} 
+          activeGame={activeGame}
+          setActiveGame={setActiveGame}
+          dbGames={dbGames}
+        />
         
         {/* Toggle Button at Bottom of Sidebar */}
         <button 

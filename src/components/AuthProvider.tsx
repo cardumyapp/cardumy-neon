@@ -195,7 +195,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } finally {
       setUser(null);
       setSupabaseUser(null);
-      window.location.href = '/login';
+      window.location.href = '/';
     }
   };
 
