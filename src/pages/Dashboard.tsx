@@ -188,7 +188,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ activeGame }) => {
       </section>
 
       {/* Stats and Feed */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8 px-2">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-3 gap-6 md:gap-8 px-2 max-w-[1700px]">
         <div className="space-y-4 md:space-y-6">
           <h3 className="text-lg md:text-xl font-bold flex items-center space-x-3">
             <div className="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center text-purple-500">

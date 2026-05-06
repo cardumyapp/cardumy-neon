@@ -207,14 +207,14 @@ export const FolderDetails: React.FC = () => {
   if (!folder) return null;
 
   return (
-    <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in duration-500 pb-20">
+    <div className="max-w-6xl 2xl:max-w-[1700px] mx-auto space-y-8 animate-in fade-in duration-500 pb-20">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 px-2">
         <div className="flex items-center space-x-6">
           <Link to="/pastas" className="w-12 h-12 bg-slate-900 border border-slate-800 rounded-2xl flex items-center justify-center text-slate-400 hover:text-white transition-colors">
             <i className="fas fa-chevron-left"></i>
           </Link>
           <div className="flex items-center space-x-4">
-            <div className={`w-14 h-14 rounded-2xl ${folder.color} flex items-center justify-center text-white text-xl shadow-lg shadow-black/20`}>
+            <div className={`w-14 h-14 rounded-2xl ${folder.color} flex items-center justify-center text-white text-xl shadow-lg shadow-black/20 text-center`}>
               <i className={`fas ${folder.icon}`}></i>
             </div>
             <div>
@@ -266,7 +266,7 @@ export const FolderDetails: React.FC = () => {
         </div>
       )}
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 3xl:grid-cols-8 gap-6">
         <AnimatePresence>
           {filteredCards.length > 0 ? (
             filteredCards.map((card, idx) => (

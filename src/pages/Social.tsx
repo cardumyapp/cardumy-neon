@@ -72,9 +72,9 @@ export const Social: React.FC = () => {
   }, []);
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+    <div className="grid grid-cols-1 lg:grid-cols-12 2xl:grid-cols-16 gap-8 max-w-[1800px]">
       {/* Rankings - Now primary focus on the left */}
-      <div className="lg:col-span-8 space-y-8">
+      <div className="lg:col-span-8 2xl:col-span-11 space-y-8">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-black text-white tracking-tight uppercase italic">Hall da Fama</h1>
@@ -184,7 +184,7 @@ export const Social: React.FC = () => {
       </div>
 
       {/* Feed de Atividade - Right sidebar */}
-      <div className="lg:col-span-4 space-y-6">
+      <div className="lg:col-span-4 2xl:col-span-5 space-y-6">
         <div className="space-y-4">
           <div className="flex items-center justify-between px-2">
             <h2 className="text-xl font-black text-white tracking-tight uppercase italic flex items-center">

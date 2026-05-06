@@ -6,6 +6,107 @@ import { useAuth } from '../components/AuthProvider';
 import { useNotification } from '../components/NotificationProvider';
 import { addCardToList, searchExternalCards, getBinders, addCardToBinder } from '../services/supabaseService';
 
+const GAME_FILTERS_CONFIG: Record<string, any> = {
+  "digimon": {
+    quickOptions: { 
+      cardType: ['Digi-Egg','Digimon','Tamer','Option'],
+      form:     ['In-Training','Rookie','Champion','Ultimate','Mega'],
+      attribute:['Data','Vaccine','Virus','Free'],
+      level:    ["Lv.2","Lv.3","Lv.4","Lv.5","Lv.6","Lv.7"] 
+    },
+    advanced: ["id","code","name","level","colors","cardType","form","attribute","type","dp","playCost","digivolveCost","effect"]
+  },
+  "dragon-ball-fusion": {
+    quickOptions: {
+      cardType:['LEADER','BATTLE','EXTRA','ENERGY MAKER'],
+      color:   ['Red','Blue','Green','Yellow','Black'],
+      rarity:  ['L','C','U','R','SR','SCR','PR']
+    },
+    advanced: ["id","code","name","rarity","color","cardType","cost","specifiedCost","power","comboPower","features","effect"]
+  },  
+  "fab": {
+    quickOptions: {
+      color: ['Red','Blue','Yellow']
+    },
+    advanced: ["id","name","rarity","health","arcane","pitch","cost","power","defense"]
+  },
+  "gundam": {
+    quickOptions: { 
+      cardType:['UNIT','RESOURCE','EX RESOURCE','EX BASE'],
+      color:   ['Red','Blue','Green','Yellow','Black','White'],
+      rarity:  ['P','C','C+','LR','LR+']
+    },
+    advanced: ["id","code","name","rarity","color","cost","level","cardType","effect","zone","trait","link","ap","hp","sourceTitle","getIt"]
+  },
+  "magic": {
+    quickOptions: {
+      colors:['W','U','B','R','G','C'],
+      rarity:['common','uncommon','rare','mythic']
+    },
+    advanced: ["id","name","set","colorIdentity","type","supertypes","types","subtypes","rarity","layout","cmc","loyalty","gameFormat","legality","contains","language"]
+  },
+  "one-piece": {
+    quickOptions: {
+      type:  ['Character','Event','Stage','Leader'],
+      color: ['Red','Green','Blue','Purple','Black','Yellow'],
+      rarity:['C','UC','R','SR','SEC','L','P','SP']      
+    },
+    advanced: ["id","name","rarity","type","color","family","cost","power","counter","ability","trigger"]
+  },
+  "pokemon":   { 
+    quickOptions: {
+      supertype: ['Pokémon','Trainer','Energy']
+    }, 
+    advanced: ["id","name","supertype","level","hp"] 
+  },
+  "riftbound": { 
+    quickOptions: {
+      cardType:['Legend','Champion','Unit','Spell','Signature'],
+      domain:  ['Fury','Calm','Mind','Body','Chaos','Order'],
+      rarity:  ['Common','Uncommon','Rare','Epic','Alternate Art'],
+    }, 
+    advanced: ["id","name","number","code","rarity","cardType","domain","energyCost","powerCost","might"] 
+  },
+  "sorcery": {
+    quickOptions: {
+      type:   ['Avatar','Minion','Magic','Aura','Artifact','Site'],
+      element:['Earth','Fire','Water','Air','None'],
+      rarity: ['Unique','Elite','Exceptional','Ordinary'],
+      finish: ['Standard','Foil'],
+    },
+    advanced: ["id","name","type","element","rarity","finish"]
+  },
+  "star-wars": {
+    quickOptions: { 
+      type:  ['Base','Event','Force Token','Leader','Leader Unit','Token Unit','Token Upgrade','Unit'],
+      arena: ['Ground','Space'],
+      rarity:['Common','Uncommon','Rare','Special','Legendary']
+    },
+    advanced: ["id","type","cost","hp","power","rarity","frontText","backText","arenas","aspects","traits"]
+  },
+  "union-arena": { 
+    quickOptions: {
+      type:  ['Character','Site','Event','Action Point'],
+      rarity:['C','U','R','R★','SR','SR★','SR★★']
+    }, 
+    advanced: ["id","code","name","type","rarity","ap","bp","affinity","effect","trigger"] 
+  },
+  "yugioh": {
+    quickOptions: { 
+      type:     ['Monster','Spell','Trap'],
+      frameType:['xyz','synchro','fusion','link'],
+      attribute:['Dark','Light','Fire','Water','Earth','Wind']
+    },
+    advanced: ["id","code","name","frameType","type","attribute","level","effect","race","atk","def","archetype"]
+  }
+};
+
+const pretty = (k: string) => ({
+  id:'ID', name:'Name', code:'Code', set:'Set', number:'Number',
+  cardType:'Card Type', color:'Color', colors:'Colors',
+  rarity:'Rarity', type:'Type', element:'Element', finish:'Finish'
+}[k] || k.charAt(0).toUpperCase() + k.slice(1));
+
 interface Folder {
   id: string;
   name: string;
@@ -52,12 +153,14 @@ export const Search: React.FC<SearchProps> = ({ activeGame }) => {
   const [totalResults, setTotalResults] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
   const [userBinders, setUserBinders] = useState<any[]>([]);
+  const [filterMode, setFilterMode] = useState<'quick' | 'advanced' | null>(null);
+  const [activeFilters, setActiveFilters] = useState<Record<string, string>>({});
   const itemsPerPage = 20;
 
-  const fetchCards = useCallback(async (game: string, query: string, page: number) => {
+  const fetchCards = useCallback(async (game: string, query: string, page: number, currentFilters: Record<string, string>) => {
     if (game === 'All') return;
     setLoading(true);
-    const response = await searchExternalCards(game, query, page, itemsPerPage);
+    const response = await searchExternalCards(game, query, page, itemsPerPage, currentFilters);
     setCards(response.data);
     setTotalPages(response.totalPages);
     setTotalResults(response.total);
@@ -74,16 +177,22 @@ export const Search: React.FC<SearchProps> = ({ activeGame }) => {
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      fetchCards(activeGame, searchQuery, currentPage);
+      fetchCards(activeGame, searchQuery, currentPage, activeFilters);
     }, 500);
 
     return () => clearTimeout(timer);
-  }, [activeGame, searchQuery, currentPage, fetchCards]);
+  }, [activeGame, searchQuery, currentPage, fetchCards, activeFilters]);
 
-  // Reset to page 1 when game or search query changes
+  // Reset to page 1 when game, filters or search query changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, activeGame]);
+  }, [searchQuery, activeGame, activeFilters]);
+
+  // Clear filters when game changes
+  useEffect(() => {
+    setActiveFilters({});
+    setFilterMode(null);
+  }, [activeGame]);
 
   const systemFolders: Folder[] = [
     { id: 'colecao', name: 'Minha Coleção', color: 'bg-purple-500', listType: 'cards' },
@@ -153,33 +262,88 @@ export const Search: React.FC<SearchProps> = ({ activeGame }) => {
             <h3 className="font-black uppercase text-xs tracking-widest text-slate-500">Filtros Avançados</h3>
           </div>
 
-          <div className="space-y-8">
-            {/* Contexto Atual (Informativo) */}
+          <div className="space-y-6">
+            {/* Contexto Atual */}
             <div className="p-4 bg-purple-600/10 rounded-2xl border border-purple-500/20">
-               <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Explorando</p>
-               <p className="text-xs font-bold text-white">{activeGame}</p>
+               <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Jogo Selecionado</p>
+               <p className="text-xs font-bold text-white mb-2">{activeGame}</p>
+               <div className="flex gap-2">
+                 <button 
+                  onClick={() => setFilterMode(filterMode === 'quick' ? null : 'quick')}
+                  className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all ${filterMode === 'quick' ? 'bg-purple-600 border-purple-500 text-white' : 'bg-slate-950 border-slate-800 text-slate-500 hover:border-purple-500/50'}`}
+                 >
+                   Rápido
+                 </button>
+                 <button 
+                  onClick={() => setFilterMode(filterMode === 'advanced' ? null : 'advanced')}
+                  className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all ${filterMode === 'advanced' ? 'bg-purple-600 border-purple-500 text-white' : 'bg-slate-950 border-slate-800 text-slate-500 hover:border-purple-500/50'}`}
+                 >
+                   Avançado
+                 </button>
+               </div>
             </div>
 
-            {/* Rarity */}
-            <div className="space-y-3">
-              <label className="text-sm font-bold text-slate-300">Raridade</label>
-              <div className="flex flex-wrap gap-2">
-                {['C', 'U', 'R', 'SR', 'SEC', 'P'].map(r => (
-                  <button key={r} className="w-10 h-10 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-center text-[10px] font-black hover:border-purple-500 transition-colors">
-                    {r}
-                  </button>
-                ))}
-              </div>
-            </div>
+            {Object.keys(activeFilters).length > 0 && (
+              <button 
+                onClick={() => setActiveFilters({})}
+                className="w-full py-2 bg-pink-600/10 hover:bg-pink-600/20 border border-pink-500/20 text-pink-500 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+              >
+                Limpar Filtros
+              </button>
+            )}
 
-            {/* Price Range */}
-            <div className="space-y-3">
-              <label className="text-sm font-bold text-slate-300">Preço (R$)</label>
-              <div className="flex items-center space-x-2">
-                <input type="number" placeholder="Min" className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs focus:border-purple-500 outline-none" />
-                <span className="text-slate-600">-</span>
-                <input type="number" placeholder="Max" className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs focus:border-purple-500 outline-none" />
-              </div>
+            <div className="space-y-6">
+              {filterMode === 'quick' && GAME_FILTERS_CONFIG[activeGame?.toLowerCase()]?.quickOptions && (
+                <div className="space-y-6">
+                  {Object.entries(GAME_FILTERS_CONFIG[activeGame.toLowerCase()].quickOptions).map(([field, options]: [string, any]) => (
+                    <div key={field} className="space-y-3">
+                      <label className="text-sm font-bold text-slate-300 capitalize">{pretty(field)}</label>
+                      <div className="flex flex-wrap gap-2">
+                        {options.map((opt: string) => (
+                          <button 
+                            key={opt} 
+                            onClick={() => {
+                              setActiveFilters(prev => ({
+                                ...prev,
+                                [field]: prev[field] === opt ? '' : opt
+                              }));
+                            }}
+                            className={`px-3 py-2 rounded-xl border flex items-center justify-center text-[10px] font-black transition-all ${activeFilters[field] === opt ? 'bg-purple-600 border-purple-500 text-white' : 'bg-slate-950 border-slate-800 text-slate-500 hover:border-purple-500/50'}`}
+                          >
+                            {opt}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {filterMode === 'advanced' && GAME_FILTERS_CONFIG[activeGame?.toLowerCase()]?.advanced && (
+                <div className="space-y-4">
+                  {GAME_FILTERS_CONFIG[activeGame.toLowerCase()].advanced.map((f: string) => (
+                    <div key={f} className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{pretty(f)}</label>
+                      <input 
+                        type="text" 
+                        placeholder="..." 
+                        value={activeFilters[f] || ''}
+                        onChange={(e) => setActiveFilters(prev => ({ ...prev, [f]: e.target.value }))}
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs focus:border-purple-500 outline-none transition-colors text-white"
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {!filterMode && (
+                <div className="py-10 text-center space-y-3 opacity-50">
+                  <i className="fas fa-filter text-slate-700 text-2xl"></i>
+                  <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest leading-relaxed">
+                    Escolha um modo de filtragem acima para refinar sua busca
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -189,7 +353,7 @@ export const Search: React.FC<SearchProps> = ({ activeGame }) => {
       <div className="flex-1 space-y-6">
         
         {/* Search Header */}
-        <div className="flex flex-col md:flex-row gap-4 items-center">
+        <div className="flex flex-col md:flex-row gap-4 items-center max-w-7xl">
           <div className="relative flex-1 w-full">
             <i className="fas fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-slate-500"></i>
             <input 
@@ -209,7 +373,7 @@ export const Search: React.FC<SearchProps> = ({ activeGame }) => {
         </div>
 
         {/* Results Info */}
-        <div className="flex items-center justify-between text-sm px-2">
+        <div className="flex items-center justify-between text-sm px-2 max-w-7xl">
           <p className="text-slate-400 text-xs uppercase font-bold tracking-tight">
             <span className="text-white">{totalResults}</span> resultados encontrados em {activeGame}
           </p>
@@ -225,7 +389,7 @@ export const Search: React.FC<SearchProps> = ({ activeGame }) => {
         </div>
 
         {/* Cards Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-6 relative min-h-[400px]">
+        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 3xl:grid-cols-6 gap-6 relative min-h-[400px]">
           {loading && (
             <div className="absolute inset-0 z-50 flex items-center justify-center bg-slate-950/20 backdrop-blur-sm rounded-3xl">
               <div className="w-10 h-10 border-4 border-purple-500 border-t-transparent rounded-full animate-spin"></div>

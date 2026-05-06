@@ -1902,7 +1902,7 @@ export const finalizeTournament = async (id: number | string, tops: { top1?: str
   }
 };
 
-export const searchExternalCards = async (game: string, query: string, page: number = 1, limit: number = 20): Promise<{ data: any[], total: number, totalPages: number }> => {
+export const searchExternalCards = async (game: string, query: string, page: number = 1, limit: number = 20, filters: Record<string, string> = {}): Promise<{ data: any[], total: number, totalPages: number }> => {
   try {
     const cardGames = await getCardgames();
     const gameData = (cardGames as any[]).find((g: any) => g.name.toLowerCase() === game.toLowerCase());
@@ -1915,7 +1915,8 @@ export const searchExternalCards = async (game: string, query: string, page: num
     const params = new URLSearchParams({
       name: query,
       page: page.toString(),
-      limit: limit.toString()
+      limit: limit.toString(),
+      ...filters
     });
 
     let result: any = { data: [], total: 0 };

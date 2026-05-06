@@ -132,7 +132,7 @@ export const EditProfile: React.FC = () => {
   }
 
   return (
-    <div className="max-w-4xl mx-auto pb-20 pt-6 animate-in fade-in slide-in-from-bottom-4 duration-500 px-4 md:px-0">
+    <div className="max-w-4xl lg:max-w-5xl xl:max-w-6xl 2xl:max-w-7xl mx-auto pb-20 pt-6 animate-in fade-in slide-in-from-bottom-4 duration-500 px-4 md:px-0">
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-3xl font-black text-white uppercase tracking-tighter">Editar Perfil</h1>

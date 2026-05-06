@@ -130,7 +130,7 @@ export const Profile: React.FC = () => {
   ];
 
   return (
-    <div className="max-w-6xl mx-auto pb-20 md:pb-12 animate-in fade-in duration-500">
+    <div className="max-w-6xl 2xl:max-w-[1700px] mx-auto pb-20 md:pb-12 animate-in fade-in duration-500">
       {/* Hero Section / Cover */}
       <div className="relative mb-32 md:mb-32">
         <div className="h-40 md:h-64 w-full rounded-2xl md:rounded-3xl overflow-hidden relative">

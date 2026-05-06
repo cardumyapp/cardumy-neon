@@ -315,7 +315,7 @@ export const Products: React.FC<ProductsProps> = ({ onAddToCart, activeGame }) =
   }
 
   return (
-    <div className="max-w-7xl mx-auto space-y-12 pb-20 px-4 sm:px-6">
+    <div className="max-w-7xl 2xl:max-w-[1800px] mx-auto space-y-12 pb-20 px-4 sm:px-6">
       {isOffline && <OfflineWarning />}
 
       {/* MARKETPLACE LAYOUT */}
@@ -421,7 +421,7 @@ export const Products: React.FC<ProductsProps> = ({ onAddToCart, activeGame }) =
         {/* Grid de Itens */}
         <div className="flex-1 space-y-8">
            <div className="flex flex-col sm:flex-row gap-4">
-              <div className="relative flex-1 group">
+              <div className="relative flex-1 group focus-within:max-w-xl transition-all duration-300">
                  <i className="fas fa-search absolute left-5 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within:text-purple-500 transition-colors"></i>
                  <input 
                    type="text" 
@@ -438,7 +438,7 @@ export const Products: React.FC<ProductsProps> = ({ onAddToCart, activeGame }) =
               </div>
            </div>
 
-           <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-6">
+           <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 3xl:grid-cols-6 gap-6">
               {loading ? (
                 Array.from({ length: 8 }).map((_, i) => (
                   <div key={i} className="aspect-[3/4] bg-slate-900/40 border border-slate-800 rounded-[32px] animate-pulse"></div>

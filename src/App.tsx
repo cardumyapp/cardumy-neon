@@ -282,7 +282,7 @@ const AppContent: React.FC = () => {
             >
               <i className="fas fa-bars"></i>
             </button>
-            <div className="hidden md:flex items-center space-x-4 bg-slate-800/50 px-4 py-2 rounded-full w-96 border border-white/5">
+            <div className="hidden md:flex items-center space-x-4 bg-slate-800/50 px-4 py-2 rounded-full w-96 lg:w-[32rem] xl:w-[40rem] border border-white/5 transition-all focus-within:border-purple-500/50">
               <i className="fas fa-search text-slate-500"></i>
               <input type="text" placeholder="Buscar no Cardumy..." className="bg-transparent border-none focus:outline-none w-full text-sm placeholder:text-slate-600" />
             </div>

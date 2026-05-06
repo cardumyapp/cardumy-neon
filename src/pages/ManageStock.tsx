@@ -183,7 +183,7 @@ export const ManageStock: React.FC = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4">
+      <div className="grid grid-cols-1 2xl:grid-cols-2 gap-6">
         {filteredStock.length === 0 ? (
           <div className="bg-slate-900 border border-slate-800 rounded-3xl p-12 text-center">
             <div className="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-500 text-2xl">

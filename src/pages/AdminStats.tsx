@@ -37,7 +37,7 @@ export const AdminStats: React.FC = () => {
   ];
 
   return (
-    <div className="max-w-6xl mx-auto space-y-10 animate-in fade-in duration-500 pb-20">
+    <div className="max-w-6xl 2xl:max-w-[1700px] mx-auto space-y-10 animate-in fade-in duration-500 pb-20">
       {isOffline && <OfflineWarning />}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 px-2">
         <div className="space-y-2">
@@ -55,7 +55,7 @@ export const AdminStats: React.FC = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
         {statCards.map((stat, idx) => (
           <motion.div
             key={stat.label}
