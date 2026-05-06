@@ -2029,11 +2029,13 @@ export const getStoreTournaments = async (username: string) => {
 export const getFullUserProfile = async (username: string, followerId?: string) => {
   try {
     const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(username);
+    const isInteger = /^\d+$/.test(username);
+    const isEmail = username.includes('@');
     
     const { data: user, error: userError } = await supabase
       .from('safe_users')
       .select('*, stores(*)')
-      .or(isUUID ? `auth_id.eq.${username}` : `username.eq.${username}`)
+      .or(isUUID ? `auth_id.eq.${username}` : isInteger ? `id.eq.${username}` : isEmail ? `email.eq.${username}` : `username.eq.${username}`)
       .maybeSingle();
 
     if (userError) throw userError;
@@ -2042,26 +2044,37 @@ export const getFullUserProfile = async (username: string, followerId?: string) 
     // Use counts from safe_users view
     const followersCountQuery = supabase.from('user_followers').select('*', { count: 'exact', head: true }).eq('followed_id', user.id);
     const followingCountQuery = supabase.from('user_followers').select('*', { count: 'exact', head: true }).eq('follower_id', user.id);
+    const reviewsCountQuery = supabase.from('user_reviews').select('*', { count: 'exact', head: true }).eq('reviewed_id', user.id);
     const reviewsQuery = supabase
       .from('user_reviews')
-      .select('*, reviewer:safe_users(id, username, fullname, avatar)')
+      .select('*, reviewer:safe_users!reviewer_id(id, username, fullname, avatar)')
       .eq('reviewed_id', user.id)
       .order('created_at', { ascending: false })
       .limit(10);
 
-    const [{ count: followersCount }, { count: followingCount }, { data: reviewsData }] = await Promise.all([
+    const results = await Promise.all([
       followersCountQuery,
       followingCountQuery,
+      reviewsCountQuery,
       reviewsQuery
     ]);
+
+    const followersCount = results[0].count;
+    const followingCount = results[1].count;
+    const totalReviewsCount = results[2].count;
+    const reviewsData = results[3].data;
+    
+    if (results[3].error) {
+      console.error('Error fetching reviews:', results[3].error);
+    }
 
     const collection_size = Number(user.collection_size || 0);
     const wishlist_size = Number(user.wishlist_size || 0);
     const offers_size = Number(user.offers_size || 0);
     const likes = Number(user.likes || 0);
     const dislikes = Number(user.dislikes || 0);
-    const total_reviews = likes + dislikes;
-    const approval_rate = total_reviews > 0 ? Math.round((likes / total_reviews) * 100) : 100;
+    const total_reviews = totalReviewsCount !== null ? totalReviewsCount : (likes + dislikes);
+    const approval_rate = (likes + dislikes) > 0 ? Math.round((likes / (likes + dislikes)) * 100) : 100;
 
     let isFollowing = false;
     if (followerId) {
