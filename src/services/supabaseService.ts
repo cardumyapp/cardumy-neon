@@ -1181,10 +1181,16 @@ export const syncUser = async (profile: { auth_id: string; email: string; displa
 
 export const updateUserProfile = async (userId: string | number, updates: any) => {
   try {
-    // Sanitize birth_date - if it's an empty string, set it to null to avoid DB errors
+    // Sanitize numeric/date fields - if it's an empty string, set it to null to avoid DB errors
     const sanitizedUpdates = { ...updates };
     if (sanitizedUpdates.birth_date === "") {
       sanitizedUpdates.birth_date = null;
+    }
+    if (sanitizedUpdates.favorite_cardgame_id === "") {
+      sanitizedUpdates.favorite_cardgame_id = null;
+    }
+    if (sanitizedUpdates.phone === "") {
+      sanitizedUpdates.phone = null;
     }
 
     // Convert fighter_tags array to comma-separated string if needed
@@ -1905,9 +1911,8 @@ export const searchExternalCards = async (game: string, query: string, page: num
     let externalData: any[] = [];
     let total = 0;
 
-    // Search using our internal proxy that points to Homura API
+    // Search directly from Homura API
     const params = new URLSearchParams({
-      game: game.toLowerCase(),
       name: query,
       page: page.toString(),
       limit: limit.toString()
@@ -1915,14 +1920,29 @@ export const searchExternalCards = async (game: string, query: string, page: num
 
     let result: any = { data: [], total: 0 };
     try {
-      const response = await fetch(`/api/cards?${params.toString()}`);
+      const targetUrl = `https://homura-cards.vercel.app/api/${game.toLowerCase()}/cards?${params.toString()}`;
+      const token = import.meta.env.VITE_HOMURA_TOKEN;
+      
+      const response = await fetch(targetUrl, {
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : '',
+          'Content-Type': 'application/json'
+        }
+      });
+      
       if (response.ok) {
         result = await response.json();
       } else {
-        console.warn(`Proxy API returned error ${response.status}`);
+        const errorText = await response.text();
+        console.error(`[DEBUG] External API Error:
+          Status: ${response.status}
+          URL: ${targetUrl}
+          Response: ${errorText}
+        `);
+        console.warn(`External API returned error ${response.status}`);
       }
     } catch (fetchErr) {
-      console.warn("Fetch to internal proxy failed:", fetchErr);
+      console.warn("Fetch to external API failed:", fetchErr);
     }
 
     const list = Array.isArray(result) ? result : (result.data || []);

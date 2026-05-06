@@ -12,10 +12,11 @@ export interface BlogPost {
 
 export const fetchLatestPosts = async (perPage: number = 3): Promise<BlogPost[]> => {
   try {
-    const response = await fetch(`/api/blog?per_page=${perPage}`);
+    // Calling WordPress directly from JS
+    const response = await fetch(`https://cardumy.blog/wp-json/wp/v2/posts?_embed&per_page=${perPage}`);
     
     if (!response.ok) {
-      console.warn(`WordPress Proxy error: ${response.status}`);
+      console.warn(`WordPress API error: ${response.status}`);
       return [];
     }
 

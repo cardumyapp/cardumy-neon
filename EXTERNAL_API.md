@@ -15,23 +15,20 @@ Ela serve como a fonte de verdade para:
 O código fonte do serviço Homura Cards pode ser encontrado em: [https://github.com/vitcas/homura-cards](https://github.com/vitcas/homura-cards)
 
 ## 🏗️ Implementação no Cardumy
-Para garantir a segurança das chaves de API e contornar problemas de CORS no navegador, o Cardumy implementa um **Proxy reverso** no servidor Node.js/Express.
+Para maior compatibilidade com ambientes de deploy como Vercel, o Cardumy realiza chamadas **diretas** para a API Homura Cards no lado do cliente (Frontend).
 
-### Endpoint do Proxy
-- **Local:** `/api/cards`
+### Endpoint Direto
+- **URL:** `https://homura-cards.vercel.app/api/{game}/cards`
 - **Método:** `GET`
 - **Parâmetros:**
-  - `game`: (Obrigatório) O jogo alvo (ex: `magic`, `pokemon`, `yugioh`).
   - `name`: Termo de pesquisa.
   - `page`: Número da página.
   - `limit`: Resultados por página.
 
 ### Fluxo de Requisição
-1. O Frontend solicita `/api/cards?game=pokemon&name=charizard`.
-2. O servidor `server.ts` recebe a requisição.
-3. O servidor anexa o `HOMURA_TOKEN` nos headers de autorização.
-4. O servidor encaminha a chamada para `HOMURA_URL/api/{game}/cards`.
-5. A resposta é retornada ao frontend de forma transparente.
+1. O Frontend constrói a URL com base no jogo ativo e parâmetros de busca.
+2. O navegador realiza o `fetch` direto para a API externa.
+3. A resposta é normalizada no `supabaseService.ts` para exibição no sistema.
 
 ## 📊 Mapeamento de Dados
 Como cada fonte de TCG (Scryfall, PokémonTCG.io, etc.) tem formatos diferentes, o serviço `supabaseService.ts` realiza uma normalização dos dados retornados pelo Homura:
