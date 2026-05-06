@@ -79,20 +79,29 @@ export const Sidebar: React.FC<SidebarProps> = ({ collapsed, onMobileClose, acti
     { to: '/produtos', icon: 'fa-bag-shopping', label: 'Meus Produtos', active: location.pathname === '/produtos' },
   ];
 
-  // Common items for members (used if !isLojista)
-  const commonTopItems = [
+  // Member Specific Groups
+  const memberGeral = [
     { to: '/', icon: 'fa-house', label: 'Início', active: location.pathname === '/' },
-    { to: '/lojas', icon: 'fa-store', label: 'Lojas', active: location.pathname === '/lojas' },
-    { to: '/torneios', icon: 'fa-trophy', label: 'Torneios', active: location.pathname === '/torneios' || location.pathname.includes('/evento/') },
-    { to: '/produtos', icon: 'fa-bag-shopping', label: 'Produtos', active: location.pathname === '/produtos' },
+    { to: '/perfil', icon: 'fa-user-circle', label: 'Perfil', active: location.pathname === '/perfil' },
+    { to: '/comunidade', icon: 'fa-users', label: 'Comunidade', active: location.pathname === '/comunidade' },
   ];
 
-  const memberItems = [
-    { to: '/comunidade', icon: 'fa-users', label: 'Social', active: location.pathname === '/comunidade' },
-    { to: '/pastas', icon: 'fa-folder', label: 'Minhas Cartas', active: location.pathname === '/pastas' },
-    { to: '/deckbuilder', icon: 'fa-layer-group', label: 'Meus Decks', active: location.pathname === '/deckbuilder' },
-    { to: '/pedidos', icon: 'fa-clipboard-list', label: 'Meus Pedidos', active: location.pathname === '/pedidos' },
-    { to: '/perfil', icon: 'fa-user-circle', label: 'Meu Perfil', active: location.pathname === '/perfil' },
+  const memberColecao = [
+    { to: '/busca', icon: 'fa-magnifying-glass', label: 'Cartas', active: location.pathname === '/busca' },
+    { to: '/deckbuilder', icon: 'fa-hammer', label: 'Deckbuilder', active: location.pathname === '/deckbuilder' },
+    { to: '/pastas', icon: 'fa-folder-open', label: 'Pastas', active: location.pathname === '/pastas' },
+    { to: '/trocas', icon: 'fa-right-left', label: 'Trocas', active: location.pathname === '/trocas' },
+  ];
+
+  const memberEventos = [
+    { to: '/torneios', icon: 'fa-trophy', label: 'Torneios', active: location.pathname === '/torneios' || location.pathname.includes('/evento/') },
+  ];
+
+  const memberMercado = [
+    { to: '/carrinho', icon: 'fa-shopping-cart', label: 'Carrinho', active: location.pathname === '/carrinho' },
+    { to: '/lojas', icon: 'fa-shop', label: 'Lojas', active: location.pathname === '/lojas' || location.pathname.startsWith('/loja/') },
+    { to: '/pedidos', icon: 'fa-clipboard-list', label: 'Pedidos', active: location.pathname === '/pedidos' || location.pathname.startsWith('/pedido/') },
+    { to: '/produtos', icon: 'fa-bag-shopping', label: 'Produtos', active: location.pathname === '/produtos' },
   ];
 
   return (
@@ -169,16 +178,20 @@ export const Sidebar: React.FC<SidebarProps> = ({ collapsed, onMobileClose, acti
           </>
         ) : (
           <>
-            <SidebarGroup label="Navegação" collapsed={collapsed}>
-              {commonTopItems.map((item) => (
-                <NavItem key={item.to} {...item} collapsed={collapsed} />
-              ))}
+            <SidebarGroup label="Geral" collapsed={collapsed}>
+              {memberGeral.map(item => <NavItem key={item.to} {...item} collapsed={collapsed} />)}
             </SidebarGroup>
-            
-            <SidebarGroup label="Membro" collapsed={collapsed}>
-              {memberItems.map((item) => (
-                <NavItem key={item.to} {...item} collapsed={collapsed} />
-              ))}
+
+            <SidebarGroup label="Coleção" collapsed={collapsed}>
+              {memberColecao.map(item => <NavItem key={item.to} {...item} collapsed={collapsed} />)}
+            </SidebarGroup>
+
+            <SidebarGroup label="Eventos" collapsed={collapsed}>
+              {memberEventos.map(item => <NavItem key={item.to} {...item} collapsed={collapsed} />)}
+            </SidebarGroup>
+
+            <SidebarGroup label="Mercado" collapsed={collapsed}>
+              {memberMercado.map(item => <NavItem key={item.to} {...item} collapsed={collapsed} />)}
             </SidebarGroup>
           </>
         )}

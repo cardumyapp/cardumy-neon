@@ -40,10 +40,10 @@ async function startServer() {
 
       const targetUrl = `${HOMURA_URL}/api/${game}/cards?${params.toString()}`;
       
-      console.log(`Proxying request to: ${targetUrl}`);
+      console.log(`[Proxy] Request to: ${targetUrl}`);
 
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 10000); // 10s timeout
+      const timeout = setTimeout(() => controller.abort(), 20000); // Increased to 20s for slower external APIs
 
       const headers: Record<string, string> = {
         "Content-Type": "application/json",
@@ -54,11 +54,22 @@ async function startServer() {
         headers["Authorization"] = `Bearer ${HOMURA_TOKEN}`;
       }
 
-      const response = await fetch(targetUrl, {
-        method: 'GET',
-        headers,
-        signal: controller.signal
-      });
+      let response;
+      try {
+        response = await fetch(targetUrl, {
+          method: 'GET',
+          headers,
+          signal: controller.signal
+        });
+      } catch (error: any) {
+        clearTimeout(timeout);
+        if (error.name === 'AbortError') {
+          console.error(`[Proxy] Timeout fetching ${targetUrl}`);
+          return res.status(504).json({ error: "Timeout ao buscar cartas externas (API demorou mais de 20s)" });
+        }
+        console.error(`[Proxy] Fetch error for ${targetUrl}:`, error);
+        return res.status(500).json({ error: "Erro na conexão com API externa" });
+      }
 
       clearTimeout(timeout);
 
@@ -127,7 +138,8 @@ async function startServer() {
   } else {
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
-    app.get('*', (req, res) => {
+    // Express v5 requires *all for catch-all
+    app.get('*all', (req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }
